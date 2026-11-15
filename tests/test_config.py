@@ -63,3 +63,20 @@ def test_rejects_empty_folders(variable: str) -> None:
 def test_rejects_invalid_port(port_text: str) -> None:
     with pytest.raises(ConfigError, match="PICTORIO_PORT"):
         config_from_environment(HOME | {"PICTORIO_PORT": port_text})
+
+
+@pytest.mark.parametrize(
+    "text, trusted",
+    [(None, ("127.0.0.1",)), ("*", ("*",)), (" 127.0.0.1, 10.88.0.0/16 ,::1", ("127.0.0.1", "10.88.0.0/16", "::1"))],
+    ids=["unset", "any", "addresses and networks"],
+)
+def test_reads_the_trusted_proxies(text: str | None, trusted: tuple[str, ...]) -> None:
+    environment = HOME if text is None else HOME | {"PICTORIO_TRUSTED_PROXIES": text}
+
+    assert config_from_environment(environment).trusted_proxies == trusted
+
+
+@pytest.mark.parametrize("text", ["", " , ", "localhost", "10.0.0.0/33"])
+def test_rejects_invalid_trusted_proxies(text: str) -> None:
+    with pytest.raises(ConfigError, match="PICTORIO_TRUSTED_PROXIES"):
+        config_from_environment(HOME | {"PICTORIO_TRUSTED_PROXIES": text})

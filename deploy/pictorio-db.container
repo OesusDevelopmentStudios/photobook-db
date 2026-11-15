@@ -21,6 +21,11 @@ AutoUpdate=registry
 ContainerName=pictorio-db
 PublishPort=8737:8737
 
+# Behind a reverse proxy such as Caddy (deploy/Caddyfile.example), only the proxy should reach the server.
+# Use these two lines instead of the PublishPort above:
+#PublishPort=127.0.0.1:8737:8737
+#Environment=PICTORIO_TRUSTED_PROXIES=*
+
 # The database; a named volume keeps it when the image is updated.
 Volume=pictorio-data:/data
 

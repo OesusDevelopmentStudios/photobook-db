@@ -3,6 +3,7 @@
 
 """Settings read from environment variables when the server starts."""
 
+import ipaddress
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -10,6 +11,7 @@ from pathlib import Path
 
 DEFAULT_HOST = "127.0.0.1"  # only this computer; the container image sets 0.0.0.0
 DEFAULT_PORT = 8737
+DEFAULT_TRUSTED_PROXIES = ("127.0.0.1",)  # a reverse proxy on the same computer, outside a container
 
 
 class ConfigError(Exception):
@@ -23,6 +25,9 @@ class Config:
     data_dir: Path  # the database and, later, thumbnails; the container image sets /data
     library_dir: Path  # the images, arranged by their tags; the container image sets /library
     import_dir: Path | None = None  # folders admins can import from on the server; the container sets /import
+    # Addresses whose X-Forwarded-For and X-Forwarded-Proto are believed, e.g. from Caddy: then the server knows
+    # that the browser used HTTPS, and which address it came from. "*" trusts every address.
+    trusted_proxies: tuple[str, ...] = DEFAULT_TRUSTED_PROXIES
 
 
 def config_from_environment(environment: Mapping[str, str] = os.environ) -> Config:
@@ -32,7 +37,27 @@ def config_from_environment(environment: Mapping[str, str] = os.environ) -> Conf
         data_dir=_data_dir(environment),
         library_dir=_library_dir(environment),
         import_dir=_import_dir(environment),
+        trusted_proxies=_trusted_proxies(environment.get("PICTORIO_TRUSTED_PROXIES")),
     )
+
+
+def _trusted_proxies(text: str | None) -> tuple[str, ...]:
+    """"*", or addresses and networks separated by commas: "127.0.0.1, 10.88.0.0/16"."""
+    if text is None:
+        return DEFAULT_TRUSTED_PROXIES
+
+    entries = tuple(entry.strip() for entry in text.split(",") if entry.strip())
+    if not entries:
+        raise ConfigError("PICTORIO_TRUSTED_PROXIES must not be empty; leave it unset for 127.0.0.1")
+
+    for entry in entries:
+        if entry != "*":
+            try:
+                ipaddress.ip_network(entry)
+            except ValueError:
+                raise ConfigError(f"PICTORIO_TRUSTED_PROXIES: {entry!r} is not an address, a network or *") from None
+
+    return entries
 
 
 def _parse_port(text: str) -> int:

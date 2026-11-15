@@ -43,7 +43,13 @@ def _serve(config: Config) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)-9s %(message)s")
 
     # One process: the database and the background jobs assume it.
-    uvicorn.run(create_app(config), host=config.host, port=config.port)
+    uvicorn.run(
+        create_app(config),
+        host=config.host,
+        port=config.port,
+        proxy_headers=True,
+        forwarded_allow_ips=list(config.trusted_proxies),
+    )
     return 0
 
 

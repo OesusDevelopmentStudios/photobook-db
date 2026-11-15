@@ -58,3 +58,13 @@ def test_serve_refuses_library_folder_it_cannot_create(
 
     assert exit_code == 1
     assert "cannot create the library folder" in capsys.readouterr().err
+
+
+def test_serve_trusts_the_configured_proxies(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PICTORIO_TRUSTED_PROXIES", "*")
+    started: dict[str, object] = {}
+    monkeypatch.setattr("uvicorn.run", lambda app, **options: started.update(options))
+
+    assert main(["serve"]) == 0
+
+    assert (started["proxy_headers"], started["forwarded_allow_ips"]) == (True, ["*"])

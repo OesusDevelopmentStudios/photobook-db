@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
+#
+# Caddy in front of pictorio-db, so that the desktop app and the admin pages use HTTPS. Caddy gets and renews
+# the certificates by itself (https://caddyserver.com/docs/automatic-https).
+#
+# 1. Let only Caddy reach pictorio-db, and let pictorio-db believe Caddy's X-Forwarded-* headers:
+#    - Container (deploy/pictorio-db.container): PublishPort=127.0.0.1:8737:8737 and
+#      Environment=PICTORIO_TRUSTED_PROXIES=*. The container sees Caddy's requests as coming from the host's
+#      own address, so it trusts any; only Caddy can reach the port.
+#    - pipx install: nothing to change. It listens on 127.0.0.1 and trusts 127.0.0.1 by default.
+# 2. Use one of the two sites below: copy it to /etc/caddy/Caddyfile, put in your name and reload Caddy:
+#    sudo systemctl reload caddy
+
+# A name on the internet, e.g. a dynamic-DNS name for your home connection, with ports 80 and 443 forwarded to
+# this computer. Caddy gets a free certificate from Let's Encrypt.
+photos.example.org {
+	reverse_proxy 127.0.0.1:8737
+}
+
+# Or only in your home network: Caddy is its own certificate authority. Every device that connects must trust
+# Caddy's root certificate once; it is in Caddy's data folder, e.g.
+# /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt
+#pictorio.home.arpa {
+#	tls internal
+#	reverse_proxy 127.0.0.1:8737
+#}

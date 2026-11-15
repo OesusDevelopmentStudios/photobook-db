@@ -49,6 +49,7 @@ The interactive API documentation is at <http://127.0.0.1:8737/api/docs>.
 | `PICTORIO_DATA_DIR` | `~/.local/share/pictorio-db` | Folder for the database. Created if missing |
 | `PICTORIO_LIBRARY_DIR` | `~/Pictures/pictorio-library` | Folder for the images, arranged by their tags. Created if missing |
 | `PICTORIO_IMPORT_DIR` | not set | Folder that admins can import from with an import job, e.g. a NAS share. Unset: no folder imports |
+| `PICTORIO_TRUSTED_PROXIES` | `127.0.0.1` | Addresses (or networks, comma-separated, or `*`) of a reverse proxy whose `X-Forwarded-*` headers are believed. See [deploy/Caddyfile.example](deploy/Caddyfile.example) |
 
 During development, point `PICTORIO_DATA_DIR` and `PICTORIO_LIBRARY_DIR` at scratch folders to keep
 test data out of your home folder, e.g.
