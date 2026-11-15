@@ -6,7 +6,7 @@
 {% block nav %}
 <nav>
     <a class="brand" href="/admin">pictorio-db</a>
-    {% for path, name in [("/admin", "Overview")] %}
+    {% for path, name in [("/admin", "Overview"), ("/admin/settings", "Settings")] %}
     <a href="{{ path }}"{% if request.url.path == path %} aria-current="page"{% endif %}>{{ name }}</a>
     {% endfor %}
     <form method="post" action="/admin/logout">

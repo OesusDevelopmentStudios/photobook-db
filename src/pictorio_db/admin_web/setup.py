@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 
+from pictorio_db.admin_web._messages import problem_message
 from pictorio_db.admin_web._templates import templates
 from pictorio_db.services.auth import PASSWORD_MIN_LENGTH, AuthService
 from pictorio_db.utils.problems import Problem
@@ -40,7 +41,7 @@ def complete_setup(
         if problem.code == "setup_done":
             return _done_page(request, created_username=None, status_code=problem.status)
 
-        return _form_page(request, username, error=_message(problem), status_code=problem.status)
+        return _form_page(request, username, error=problem_message(problem), status_code=problem.status)
 
     return _done_page(request, created_username=admin.username)
 
@@ -57,12 +58,3 @@ def _form_page(request: Request, username: str = "", error: str | None = None, s
 def _done_page(request: Request, created_username: str | None, status_code: int = 200) -> HTMLResponse:
     context = {"created_username": created_username}
     return templates.TemplateResponse(request, "setup_done.html", context, status_code=status_code)
-
-
-def _message(problem: Problem) -> str:
-    """A sentence for the page. Validation problems say which field is wrong and why."""
-    if problem.code == "validation_error":
-        field_errors = problem.extra.get("errors", [])
-        return " ".join(f"{error['field'].capitalize()}: {error['message']}." for error in field_errors)
-
-    return f"{problem.title}. {problem.detail or ''}".strip()
