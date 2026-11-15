@@ -245,14 +245,16 @@ def test_folder_removed_before_the_job_runs_fails_the_job(server: Server, trip: 
 
 # --- Folders to choose from
 
-def test_lists_the_folders_two_levels_deep(server: Server, import_dir: Path, tmp_path: Path) -> None:
-    for folder in ("phone/2025/january", "phone/2024", "camera", "empty"):
+def test_lists_the_folders_three_levels_deep(server: Server, import_dir: Path, tmp_path: Path) -> None:
+    for folder in ("phone/2025/january/day_1", "phone/2024", "camera", "empty"):
         (import_dir / folder).mkdir(parents=True)
     write_jpeg(import_dir / "loose.jpg", "red")
     (tmp_path / "elsewhere").mkdir()
     (import_dir / "link").symlink_to(tmp_path / "elsewhere")
 
-    assert server.folder_import.source_folders() == ["camera", "empty", "phone", "phone/2024", "phone/2025"]
+    assert server.folder_import.source_folders() == [
+        "camera", "empty", "phone", "phone/2024", "phone/2025", "phone/2025/january"
+    ]
 
 
 def test_without_an_import_folder_there_are_no_folders(database: Database, tmp_path: Path) -> None:

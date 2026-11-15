@@ -16,40 +16,49 @@ to import from, then restart it.</p>
 
 <form method="post" action="/admin/jobs/import">
     <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
-    <label>Folder
-        <input name="source_subdir" list="source-folders" autocomplete="off" spellcheck="false"
-               value="{{ source_subdir }}" placeholder="phone_backup/2025">
-    </label>
-    <datalist id="source-folders">
-        {% for folder in source_folders %}<option value="{{ folder }}">{% endfor %}
-    </datalist>
-    <span class="hint">A folder inside the import folder <code>{{ import_dir }}</code>, with its subfolders.
-        Leave it empty to import the whole import folder.</span>
+    {# Enter in a field presses the form's first button: this keeps that "Start import", not "Rescan". #}
+    <button type="submit" name="action" value="start" class="default-button" tabindex="-1" aria-hidden="true">
+        Start import</button>
+    <label for="source_subdir">Folder</label>
+    <div class="field-with-button">
+        <select id="source_subdir" name="source_subdir">
+            <option value="">The whole import folder</option>
+            {# A folder that went missing stays chosen, so that trying again cannot import the whole folder. #}
+            {% if source_subdir and source_subdir not in source_folders %}
+            <option value="{{ source_subdir }}" selected>{{ source_subdir }} (not found)</option>
+            {% endif %}
+            {% for folder in source_folders %}
+            <option value="{{ folder }}"{% if folder == source_subdir %} selected{% endif %}>{{ folder }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" name="action" value="rescan" class="secondary" formnovalidate>Rescan</button>
+    </div>
+    <span class="hint">The folders in the import folder <code>{{ import_dir }}</code>, three levels deep. A folder is
+        imported with its subfolders. Rescan after adding a folder.</span>
     <fieldset class="tag-fields">
         <legend>Tags</legend>
-        <span class="hint">Every imported image gets them. Separate several tags with commas, e.g.
-            <code>sample_artist, other_artist</code>.</span>
+        <span class="hint">Every imported image gets them. Separate several tags with commas or line breaks, e.g.
+            <code>sample_artist, other_artist</code>. Drag a box's corner to make it bigger.</span>
         <div class="tag-grid">
             {% for field in tag_fields %}
             {% set name = tag_field_prefix ~ field.namespace %}
-            <label>{{ field.namespace }}
-                {% if field.kind == "choice" %}
-                <select name="{{ name }}">
-                    <option value="">–</option>
-                    {% for option in field.options %}
-                    <option value="{{ option }}"{% if option == field.value %} selected{% endif %}>{{ option }}</option>
-                    {% endfor %}
-                </select>
-                {% elif field.kind == "single" %}
-                <input name="{{ name }}" list="{{ name }}-values" value="{{ field.value }}" autocomplete="off"
-                       spellcheck="false" placeholder="pick or type one tag">
-                <datalist id="{{ name }}-values">
-                    {% for option in field.options %}<option value="{{ option }}">{% endfor %}
-                </datalist>
-                {% else %}
-                <input name="{{ name }}" value="{{ field.value }}" autocomplete="off" spellcheck="false">
-                {% endif %}
-            </label>
+            <label for="{{ name }}">{{ field.namespace }}</label>
+            {% if field.kind == "choice" %}
+            <select id="{{ name }}" name="{{ name }}">
+                <option value="">–</option>
+                {% for option in field.options %}
+                <option value="{{ option }}"{% if option == field.value %} selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+            {% elif field.kind == "single" %}
+            <input id="{{ name }}" name="{{ name }}" list="{{ name }}-values" value="{{ field.value }}"
+                   autocomplete="off" spellcheck="false" placeholder="pick or type one tag">
+            <datalist id="{{ name }}-values">
+                {% for option in field.options %}<option value="{{ option }}">{% endfor %}
+            </datalist>
+            {% else %}
+            <textarea id="{{ name }}" name="{{ name }}" rows="1" spellcheck="false">{{ field.value }}</textarea>
+            {% endif %}
             {% endfor %}
         </div>
     </fieldset>

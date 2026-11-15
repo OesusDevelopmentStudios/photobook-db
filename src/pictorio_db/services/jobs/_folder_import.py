@@ -16,7 +16,7 @@ from pictorio_db.services.tags import TagsService
 from pictorio_db.utils.problems import Problem
 
 NO_RESTRICTIONS = Restrictions([])  # only admins start folder imports
-SOURCE_FOLDERS_DEPTH = 2  # how deep source_folders() looks, so a big NAS share is listed quickly
+SOURCE_FOLDERS_DEPTH = 3  # how deep source_folders() looks, so a big NAS share is listed quickly
 SOURCE_FOLDERS_LIMIT = 500
 
 _logger = logging.getLogger(__name__)

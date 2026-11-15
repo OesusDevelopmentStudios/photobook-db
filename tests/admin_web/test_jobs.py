@@ -54,10 +54,31 @@ def test_needs_a_login(client: TestClient) -> None:
 
 # --- Folder imports
 
-def test_import_page_suggests_the_folders(admin_browser: TestClient) -> None:
+def chosen_folder(page: str) -> list[str]:
+    return re.findall(r'<option value="([^"]*)" selected>', page.split('name="source_subdir"')[1].split("</select>")[0])
+
+
+def test_import_page_lists_the_folders(admin_browser: TestClient) -> None:
     page = admin_browser.get("/admin/jobs/import").text
 
-    assert '<option value="holiday"><option value="holiday/day_2">' in page
+    assert re.findall(r'<option value="([^"]*)"', page.split('name="source_subdir"')[1].split("</select>")[0]) == [
+        "", "holiday", "holiday/day_2"
+    ]
+
+
+def test_rescan_finds_new_folders_and_keeps_what_was_entered(admin_browser: TestClient, config: Config) -> None:
+    assert config.import_dir is not None
+    (config.import_dir / "camera").mkdir()
+
+    response = start_import(
+        admin_browser, action="rescan", source_subdir="holiday", tag_general="summer", remove_originals="true"
+    )
+
+    assert response.status_code == 200
+    assert '<option value="camera">camera</option>' in response.text
+    assert chosen_folder(response.text) == ["holiday"]
+    assert ">summer</textarea>" in response.text and " checked>" in response.text
+    assert admin_browser.app.state.jobs.list_jobs(admin_browser.app.state.auth.list_users()[0]) == []
 
 
 def test_import_page_has_a_tag_field_per_namespace(admin_browser: TestClient) -> None:
@@ -70,7 +91,8 @@ def test_import_page_has_a_tag_field_per_namespace(admin_browser: TestClient) ->
     assert re.findall(r'name="tag_(\w+)"', page) == [
         "category", "author", "character", "rating", "album", "general", "weather"
     ]
-    assert '<select name="tag_rating">' in page and '<option value="nsfw">nsfw</option>' in page
+    assert '<select id="tag_rating" name="tag_rating">' in page and '<option value="nsfw">nsfw</option>' in page
+    assert '<textarea id="tag_author" name="tag_author" rows="1"' in page  # several tags: a box that can grow
     assert re.search(r'<datalist id="tag_category-values">\s*<option value="photo">', page)
     assert 'list="tag_weather-values"' in page  # every one-tag-per-image namespace gets suggestions
 
@@ -79,7 +101,7 @@ def test_imports_a_folder_and_shows_the_result(admin_browser: TestClient) -> Non
     response = start_import(
         admin_browser,
         source_subdir=" holiday ",
-        tag_author=" sample_artist,, Other Artist ",
+        tag_author=" sample_artist,\n\n Other Artist ",
         tag_rating="sfw",
         tag_general="summer",
         tag_album="",
@@ -113,9 +135,7 @@ def test_import_that_cannot_start_shows_why(admin_browser: TestClient, fields: d
 
     assert response.status_code == 422
     assert message in response.text
-    assert f'value="{fields["source_subdir"]}"' in response.text and " checked>" in response.text
-    for key, value in fields.items():  # the tag fields keep what was entered, too
-        assert f'name="{key}"' not in response.text or f'value="{value}"' in response.text
+    assert chosen_folder(response.text) == [fields["source_subdir"]] and " checked>" in response.text
     assert admin_browser.app.state.jobs.list_jobs(admin_browser.app.state.auth.list_users()[0]) == []
 
 

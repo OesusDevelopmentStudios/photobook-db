@@ -4,6 +4,7 @@
 """/admin/jobs: background jobs and their progress, and starting a folder import. Pages of unfinished jobs
 reload themselves, so progress shows without JavaScript."""
 
+import re
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -78,7 +79,11 @@ def start_import(
     entered_tags: Annotated[dict[str, str], Depends(_entered_tags)],
     source_subdir: Annotated[str, Form()] = "",
     remove_originals: Annotated[bool, Form()] = False,  # an unticked checkbox is not sent at all
+    action: Annotated[str, Form()] = "start",
 ) -> Response:
+    if action == "rescan":  # list the folders again, e.g. after copying one in; keep what was entered
+        return _import_page(request, session, source_subdir, entered_tags, remove_originals)
+
     try:
         tags = _tag_texts(entered_tags, _tags(request).list_namespaces())
         job = _folder_import(request).start(source_subdir.strip(), remove_originals, tags, session.user.id)
@@ -117,8 +122,8 @@ def _tags(request: Request) -> TagsService:
 
 
 def _tag_texts(entered: dict[str, str], namespaces: list[NamespaceInfo]) -> list[str]:
-    """"sample_artist, other_artist" in the author field → author:sample_artist, author:other_artist. A comma
-    can be no part of a tag, so it separates tags; a one-tag-per-image field takes its text whole."""
+    """"sample_artist, other_artist" in the author field → author:sample_artist, author:other_artist. Commas and
+    line breaks can be no part of a tag, so they separate tags; a one-tag-per-image field takes its text whole."""
     texts = []
     for namespace in namespaces:
         text = entered.get(namespace.name, "")
@@ -127,7 +132,7 @@ def _tag_texts(entered: dict[str, str], namespaces: list[NamespaceInfo]) -> list
                 422, "validation_error", "Invalid tag", f"An image has one {namespace.name} tag, so give one."
             )
 
-        names = [text] if namespace.single_value else text.split(",")
+        names = [text] if namespace.single_value else re.split(r"[,\n]", text)
         texts += [f"{namespace.name}:{name.strip()}" for name in names if name.strip()]
 
     return texts

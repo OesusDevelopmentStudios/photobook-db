@@ -60,7 +60,17 @@ fieldset {
     margin: 1.5rem 0 0; padding: 0.5rem 1rem 1rem; border: 1px solid var(--border); border-radius: var(--radius);
 }
 legend { padding: 0 0.4rem; }
-.tag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 0 1.5rem; }
+/* One namespace per row: its name, then its field. */
+.tag-grid {
+    display: grid; grid-template-columns: max-content 1fr; align-items: start; gap: 0.6rem 1rem; margin-top: 1rem;
+}
+.tag-grid label { margin-top: 0; padding-top: 0.45rem; }
+/* Grows with its text where the browser can; otherwise drag the corner. */
+.tag-grid textarea { resize: vertical; min-height: 2.3rem; field-sizing: content; font-family: inherit; }
+.field-with-button { display: flex; gap: 0.5rem; align-items: center; }
+.field-with-button button { margin-top: 0; flex: none; }
+/* Out of sight, but still the button that Enter presses. */
+.default-button { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 input, select, textarea {
     width: 100%; box-sizing: border-box; padding: 0.4rem 0.5rem; font: inherit;
     background: var(--view); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
