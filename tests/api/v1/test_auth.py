@@ -156,3 +156,65 @@ def test_me_lists_no_restricted_tags_for_admins(client: TestClient, auth: AuthSe
     response = client.get("/api/v1/auth/me", headers=bearer(log_in(client, "apo")))
 
     assert response.json()["restricted_tags"] == []
+
+
+# --- Changing your own password
+
+NEW_PASSWORD = "a brand new password"
+
+
+def change_password(client: TestClient, token: str, current_password: str, new_password: str = NEW_PASSWORD):
+    body = {"current_password": current_password, "new_password": new_password}
+    return client.patch("/api/v1/auth/me", json=body, headers=bearer(token))
+
+
+def test_user_changes_their_own_password(client: TestClient, auth: AuthService) -> None:
+    auth.create_user("kid", PASSWORD, Role.USER)
+    laptop = log_in(client, "kid", "laptop")
+    phone = log_in(client, "kid", "phone")
+
+    response = change_password(client, laptop, PASSWORD)
+
+    assert response.status_code == 200
+    assert response.json()["username"] == "kid"
+    assert client.get("/api/v1/auth/me", headers=bearer(laptop)).status_code == 200  # still logged in here
+    assert client.get("/api/v1/auth/me", headers=bearer(phone)).status_code == 401  # logged out elsewhere
+    login = {"username": "kid", "password": NEW_PASSWORD, "device_name": "tablet"}
+    assert client.post("/api/v1/auth/tokens", json=login).status_code == 201
+
+
+def test_wrong_current_password_keeps_the_login(client: TestClient, auth: AuthService) -> None:
+    auth.create_user("kid", PASSWORD, Role.USER)
+    laptop = log_in(client, "kid")
+
+    response = change_password(client, laptop, "wrong password")
+
+    assert (response.status_code, response.json()["code"]) == (403, "wrong_password")
+    assert client.get("/api/v1/auth/me", headers=bearer(laptop)).status_code == 200
+    log_in(client, "kid")  # the old password still works
+
+
+def test_new_password_must_be_long_enough(client: TestClient, auth: AuthService) -> None:
+    auth.create_user("kid", PASSWORD, Role.USER)
+
+    response = change_password(client, log_in(client, "kid"), PASSWORD, new_password="short")
+
+    assert (response.status_code, response.json()["errors"][0]["field"]) == (422, "password")
+
+
+def test_guessing_the_current_password_is_limited_like_logins(client: TestClient, auth: AuthService) -> None:
+    auth.create_user("kid", PASSWORD, Role.USER)
+    laptop = log_in(client, "kid")
+    for _attempt in range(10):
+        change_password(client, laptop, "wrong password")
+
+    response = change_password(client, laptop, PASSWORD)
+
+    assert (response.status_code, response.json()["code"]) == (429, "too_many_attempts")
+    assert "Retry-After" in response.headers
+
+
+def test_changing_the_password_needs_a_login(client: TestClient) -> None:
+    body = {"current_password": PASSWORD, "new_password": NEW_PASSWORD}
+
+    assert client.patch("/api/v1/auth/me", json=body).status_code == 401

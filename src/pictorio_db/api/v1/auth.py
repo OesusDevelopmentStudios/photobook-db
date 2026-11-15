@@ -68,6 +68,29 @@ def current_user(authentication: CurrentAuthentication, access: AccessServiceDep
     return CurrentUser(id=user.id, username=user.username, role=user.role, restricted_tags=restricted_tags)
 
 
+class PasswordChange(BaseModel):
+    current_password: str = Field(max_length=PASSWORD_MAX_LENGTH)
+    new_password: str = Field(max_length=PASSWORD_MAX_LENGTH)
+
+
+@router.patch(
+    "/me",
+    summary="Change your own password; your other devices are logged out",
+    responses=problem_responses(401, 403, 422, 429),
+)
+def change_own_password(
+    change: PasswordChange,
+    authentication: CurrentAuthentication,
+    auth: AuthServiceDependency,
+    access: AccessServiceDependency,
+) -> CurrentUser:
+    """A wrong current_password is 403 wrong_password, not 401: this device stays logged in."""
+    auth.change_own_password(
+        authentication.user.id, authentication.token_id, change.current_password, change.new_password
+    )
+    return current_user(authentication, access)
+
+
 @router.get("/tokens", summary="The logged-in user's devices", responses=problem_responses(401))
 def list_tokens(authentication: CurrentAuthentication, auth: AuthServiceDependency) -> list[DeviceToken]:
     return [_device_token(token, authentication.token_id) for token in auth.list_tokens(authentication.user.id)]

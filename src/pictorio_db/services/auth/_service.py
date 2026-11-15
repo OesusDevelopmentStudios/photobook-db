@@ -210,6 +210,36 @@ class AuthService:
             session.commit()
             return NewToken(token=token, info=_token_info(api_token), user=_user_info(user))
 
+    def change_own_password(
+        self, user_id: int, current_token_id: int, current_password: str, new_password: str
+    ) -> None:
+        """For users themselves: they prove it with the current password, like a login, so failures count towards
+        the same limit. The other devices are logged out; the one asking stays logged in. Raises 403
+        wrong_password, 422 validation_error or 429 too_many_attempts."""
+        check_password(new_password)
+        now = self._now()
+        with self._database.session() as session:
+            user = _existing_user(session, user_id)
+            retry_after = self._login_attempts.seconds_until_allowed(user.username, now)
+            if retry_after is not None:
+                raise Problem(
+                    429,
+                    "too_many_attempts",
+                    "Too many failed attempts",
+                    "Wait before trying again.",
+                    headers={"Retry-After": str(retry_after)},
+                )
+
+            # 403, not 401: the login itself is fine, and a client must not log out over a typo.
+            if not verify_password(user.password_hash, current_password):
+                self._login_attempts.record_failure(user.username, now)
+                raise Problem(403, "wrong_password", "Wrong password", "The current password is not right.")
+
+            self._login_attempts.clear(user.username)
+            user.password_hash = hash_password(new_password)
+            session.execute(delete(ApiToken).where(ApiToken.user_id == user_id, ApiToken.id != current_token_id))
+            session.commit()
+
     def authenticate(self, token: str) -> Authentication:
         """The user a token belongs to. Raises 401 for an unknown, revoked or expired token."""
         now = self._now()

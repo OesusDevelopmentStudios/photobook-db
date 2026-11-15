@@ -383,3 +383,17 @@ def test_new_password_must_be_long_enough(auth: AuthService) -> None:
     kid = auth.create_user("kid", PASSWORD, Role.USER)
 
     assert raised_problem(lambda: auth.update_user(kid.id, password="short")).code == "validation_error"
+
+
+def test_changing_your_own_password_keeps_only_the_current_login(auth: AuthService) -> None:
+    kid = auth.create_user("kid", PASSWORD, Role.USER)
+    laptop = auth.create_token("kid", PASSWORD, "laptop")
+    phone = auth.create_token("kid", PASSWORD, "phone")
+
+    auth.change_own_password(kid.id, laptop.info.id, PASSWORD, "a brand new password")
+
+    assert [token.device_name for token in auth.list_tokens(kid.id)] == ["laptop"]
+    assert raised_problem(lambda: auth.authenticate(phone.token)).status == 401
+    assert raised_problem(lambda: auth.change_own_password(kid.id, laptop.info.id, PASSWORD, "x" * 12)).code == (
+        "wrong_password"  # the old password is gone
+    )
