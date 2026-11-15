@@ -1,0 +1,131 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios */
+
+/* KDE's Breeze Dark colours (Plasma 6), so the pages look like the desktop app next to them. The accent colour
+   comes from the server settings; base.html sets it. */
+:root {
+    color-scheme: dark;  /* the browser draws its own controls, e.g. scroll bars, dark too */
+    --window: #202326;
+    --view: #141618;
+    --header: #2a2e32;
+    --button: #292c30;
+    --border: #4d5054;
+    --text: #fcfcfc;
+    --muted-text: #a1a9b1;
+    --negative: #da4453;
+    --positive: #27ae60;
+    --hover: color-mix(in srgb, var(--accent) 22%, transparent);
+    --link: color-mix(in srgb, var(--accent) 70%, var(--text));  /* readable on dark, whatever the accent */
+    --radius: 3px;
+}
+
+body {
+    margin: 0; line-height: 1.5; background: var(--window); color: var(--text);
+    font-family: "Noto Sans", "Inter", system-ui, sans-serif;  /* Plasma's font where it is installed */
+}
+main { margin: 3rem auto; padding: 0 1rem; }
+.narrow main { max-width: 28rem; }
+.wide main { max-width: 64rem; margin-top: 2rem; }
+h1 { font-size: 2rem; font-weight: 700; margin: 0.5em 0; }
+h2 { font-size: 1.35rem; font-weight: 600; margin: 2rem 0 0.5rem; }
+a { color: var(--link); }
+a:hover { color: var(--text); }
+code {
+    background: var(--view); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 0 0.3rem; font-size: 0.9em;
+}
+.hint { color: var(--muted-text); font-size: 0.9rem; }
+
+/* --- The top bar, as on kde.org: the name on an accent block, the menu, and an accent line below */
+
+nav {
+    display: flex; flex-wrap: wrap; align-items: stretch; min-height: 2.9rem;
+    background: var(--header); border-bottom: 2px solid var(--accent);
+}
+nav a { display: flex; align-items: center; padding: 0 1rem; color: var(--text); text-decoration: none; }
+nav a:hover { background: var(--hover); color: var(--text); }
+nav a[aria-current="page"] { background: var(--hover); box-shadow: inset 0 -3px 0 var(--accent); }
+nav a.brand {
+    gap: 0.5rem; padding: 0 1.1rem; margin-right: 0.5rem; font-weight: 700;
+    background: var(--accent); color: var(--accent-text);
+}
+nav form { margin-left: auto; display: flex; align-items: center; gap: 0.8rem; padding: 0 1rem; }
+nav button { margin-top: 0; padding: 0.25rem 0.8rem; font-size: 0.9rem; }
+
+/* --- Forms */
+
+label { display: block; margin-top: 1rem; }
+form > .hint { display: block; }  /* a field's hint, under the field */
+input, select, textarea {
+    width: 100%; box-sizing: border-box; padding: 0.4rem 0.5rem; font: inherit;
+    background: var(--view); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
+}
+textarea { font-family: "Hack", "Noto Sans Mono", monospace; }
+input:hover, select:hover, textarea:hover { border-color: var(--accent); }
+input:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent);
+}
+input[type="checkbox"] { width: auto; margin-right: 0.5rem; }
+
+button, a.button {
+    display: inline-block; margin-top: 1.5rem; padding: 0.45rem 1.1rem; font: inherit; cursor: pointer;
+    text-decoration: none; border-radius: var(--radius);
+    background: var(--accent); color: var(--accent-text); border: 1px solid var(--accent);
+}
+button:hover, a.button:hover { filter: brightness(1.1); color: var(--accent-text); }
+button:focus-visible, a.button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+button.secondary, a.button.secondary { background: var(--button); color: var(--text); border-color: var(--border); }
+button.secondary:hover, a.button.secondary:hover {
+    filter: none; border-color: var(--accent); background: var(--hover);
+}
+button.danger { background: var(--negative); color: var(--text); border-color: var(--negative); }
+button:disabled {
+    background: var(--button); color: var(--muted-text); border-color: var(--border); filter: none; cursor: default;
+}
+.disabled-reason { display: inline-block; cursor: not-allowed; }
+.disabled-reason button { pointer-events: none; }  /* so that the wrapper gets the hover and shows its title */
+
+a.button.back {
+    display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 1rem 0.45rem 0.75rem;
+}
+.title-row { display: flex; align-items: center; gap: 1.2rem; }
+/* With room beside the page, the back button moves out into the left margin and the heading lines up with the
+   content below it. */
+@media (min-width: 84rem) {
+    .title-row { position: relative; }
+    .title-row a.button.back { position: absolute; right: calc(100% + 1.5rem); }
+}
+
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; }
+.toolbar form { display: flex; gap: 0.5rem; flex: 1; max-width: 32rem; }
+.toolbar button, .toolbar a.button { margin-top: 0; }
+.toolbar a.button { margin-left: auto; }
+
+/* --- Messages, like Kirigami's inline messages */
+
+.error, .success { padding: 0.5rem 1rem; border: 1px solid; border-radius: var(--radius); }
+.error { border-color: var(--negative); background: color-mix(in srgb, var(--negative) 18%, var(--window)); }
+.success { border-color: var(--positive); background: color-mix(in srgb, var(--positive) 18%, var(--window)); }
+
+/* --- Tables and lists */
+
+table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+th, td { text-align: left; vertical-align: middle; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); }
+th { color: var(--muted-text); font-weight: normal; }
+tr:has(td):hover { background: var(--hover); }
+td form button { margin-top: 0; }  /* a button in a row sits on the row's middle line */
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1.5rem; }
+dt { color: var(--muted-text); }
+dd { margin: 0; }
+
+/* --- Accent colour swatches, round like in Plasma's Colours settings */
+
+.swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 1rem; }
+.swatches button.swatch {
+    width: 2rem; height: 2rem; margin: 0; padding: 0; border-radius: 50%;
+    background: var(--swatch); border: 2px solid var(--window); box-shadow: 0 0 0 1px var(--border);
+}
+.swatches button.swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--text); }
+.custom-color { display: flex; align-items: center; gap: 0.6rem; margin-top: 1rem; }
+.custom-color input[type="color"] { width: 3rem; height: 2.2rem; padding: 0.15rem; }
+.custom-color button { margin-top: 0; }

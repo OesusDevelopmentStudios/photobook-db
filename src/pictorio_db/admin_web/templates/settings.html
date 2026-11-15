@@ -37,6 +37,29 @@ Job {{ relayout_job }} now moves the files to match the new path template; its p
     <button type="submit">Save</button>
 </form>
 
+<h2 id="appearance">Appearance</h2>
+{% if accent_error %}
+<p class="error" role="alert">{{ accent_error }}</p>
+{% elif accent_saved %}
+<p class="success" role="status">The accent colour has been saved.</p>
+{% endif %}
+<p class="hint">The accent colour of these pages. Pick the one your Plasma desktop uses to match it.</p>
+<form method="post" action="/admin/settings/accent">
+    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+    <div class="swatches">
+        {% for name, color in plasma_accent_colors %}
+        <button type="submit" class="swatch" name="accent_color" value="{{ color }}" style="--swatch: {{ color }}"
+                title="{{ name }}" aria-label="{{ name }}"
+                aria-pressed="{{ 'true' if color == accent_color else 'false' }}"></button>
+        {% endfor %}
+    </div>
+    <div class="custom-color">
+        <input type="color" name="custom_color" value="{{ accent_color }}" aria-label="Custom colour">
+        <button type="submit" class="secondary" name="accent_color" value="custom">Use custom colour</button>
+        {% if is_custom_accent %}<span class="hint">In use: <code>{{ accent_color }}</code></span>{% endif %}
+    </div>
+</form>
+
 <h2>Folders</h2>
 <p class="hint">Set when the server starts (<code>PICTORIO_LIBRARY_DIR</code> and
 <code>PICTORIO_IMPORT_DIR</code>), so they cannot be changed here.</p>

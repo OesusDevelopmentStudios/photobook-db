@@ -3,13 +3,20 @@
 
 """The server's settings as the admin sees them: the API and the web admin pages read and change them here."""
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 from pictorio_db.services.importer import ImporterService, check_upload_limit
 from pictorio_db.services.jobs import JobInfo, Relayout
+from pictorio_db.services.settings import SettingsService
 from pictorio_db.services.storage import StorageService
 from pictorio_db.services.tags import TagsService
+from pictorio_db.utils.problems import Problem
+
+WEB_ACCENT_COLOR_SETTING = "web_accent_color"
+DEFAULT_WEB_ACCENT_COLOR = "#3daee9"  # the Plasma default, so the pages match a stock KDE desktop
+_COLOR_PATTERN = re.compile("#[0-9a-f]{6}")
 
 
 @dataclass(frozen=True)
@@ -17,6 +24,7 @@ class ServerSettingsInfo:
     path_template: str
     max_upload_bytes: int
     rating_values: list[str]
+    web_accent_color: str  # "#rrggbb"
     library_dir: Path  # from the environment; read-only here
     import_dir: Path | None
 
@@ -28,6 +36,7 @@ class SettingsChanges:
     path_template: str | None = None
     max_upload_bytes: int | None = None
     rating_values: list[str] | None = None
+    web_accent_color: str | None = None
 
 
 class ServerSettings:
@@ -37,12 +46,14 @@ class ServerSettings:
         importer: ImporterService,
         tags: TagsService,
         relayout: Relayout,
+        settings: SettingsService,
         import_dir: Path | None,
     ) -> None:
         self._storage = storage
         self._importer = importer
         self._tags = tags
         self._relayout = relayout
+        self._settings = settings
         self._import_dir = import_dir
 
     def current(self) -> ServerSettingsInfo:
@@ -50,6 +61,7 @@ class ServerSettings:
             path_template=self._storage.path_template().text,
             max_upload_bytes=self._importer.max_upload_bytes(),
             rating_values=self._tags.rating_values(),
+            web_accent_color=self.web_accent_color(),
             library_dir=self._storage.library_dir,
             import_dir=self._import_dir,
         )
@@ -68,7 +80,14 @@ class ServerSettings:
         if changes.max_upload_bytes is not None:
             check_upload_limit(changes.max_upload_bytes)
 
+        web_accent_color = None
+        if changes.web_accent_color is not None:
+            web_accent_color = checked_web_accent_color(changes.web_accent_color)
+
         # Everything is valid: store it.
+        if web_accent_color is not None:
+            self._settings.set(WEB_ACCENT_COLOR_SETTING, web_accent_color)
+
         if changes.max_upload_bytes is not None:
             self._importer.set_max_upload_bytes(changes.max_upload_bytes)
 
@@ -82,5 +101,30 @@ class ServerSettings:
 
         return self.current(), relayout_job
 
+    def web_accent_color(self) -> str:
+        """Read by every web admin page, so on its own rather than through current()."""
+        return self._settings.get(WEB_ACCENT_COLOR_SETTING) or DEFAULT_WEB_ACCENT_COLOR
 
-__all__ = ["ServerSettings", "ServerSettingsInfo", "SettingsChanges"]
+
+def checked_web_accent_color(text: str) -> str:
+    """"#3DAEE9" → "#3daee9". Raises 422 validation_error."""
+    color = text.strip().lower()
+    if not _COLOR_PATTERN.fullmatch(color):
+        raise Problem(
+            422,
+            "validation_error",
+            "Invalid request",
+            "The request body or parameters are invalid.",
+            errors=[{"field": "web_accent_color", "message": "A colour as #rrggbb, e.g. #3daee9"}],
+        )
+
+    return color
+
+
+__all__ = [
+    "DEFAULT_WEB_ACCENT_COLOR",
+    "ServerSettings",
+    "ServerSettingsInfo",
+    "SettingsChanges",
+    "checked_web_accent_color",
+]

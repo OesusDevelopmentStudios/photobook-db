@@ -118,6 +118,7 @@ class Settings(BaseModel):
     )
     max_upload_bytes: int
     rating_values: list[str] = Field(description="The only values a rating: tag may have", examples=[["sfw", "nsfw"]])
+    web_accent_color: str = Field(description="Accent colour of the web admin pages", examples=["#3daee9"])
     library_dir: str = Field(description="Read-only: set with PICTORIO_LIBRARY_DIR")
     import_dir: str | None = Field(
         description="Read-only: set with PICTORIO_IMPORT_DIR; null if folder imports are off"
@@ -141,6 +142,7 @@ class SettingsChangeRequest(BaseModel):
         max_length=MAX_RATING_VALUES,
         description="Images keep a rating that is removed here, but it cannot be given again",
     )
+    web_accent_color: str | None = Field(default=None, max_length=20, description="A colour as #rrggbb")
 
 
 @router.get("/settings", summary="The server's settings", responses=problem_responses(401, 403))
@@ -156,7 +158,12 @@ def get_settings(_admin: CurrentAdmin, server_settings: ServerSettingsDependency
 def change_settings(
     request: SettingsChangeRequest, admin: CurrentAdmin, server_settings: ServerSettingsDependency
 ) -> ChangedSettings:
-    changes = SettingsChanges(request.path_template, request.max_upload_bytes, request.rating_values)
+    changes = SettingsChanges(
+        path_template=request.path_template,
+        max_upload_bytes=request.max_upload_bytes,
+        rating_values=request.rating_values,
+        web_accent_color=request.web_accent_color,
+    )
     settings, job = server_settings.change(changes, admin.user.id)
     return ChangedSettings(**_settings_fields(settings), job_id=None if job is None else job.id)
 
@@ -166,6 +173,7 @@ def _settings_fields(settings: ServerSettingsInfo) -> dict[str, object]:
         "path_template": settings.path_template,
         "max_upload_bytes": settings.max_upload_bytes,
         "rating_values": settings.rating_values,
+        "web_accent_color": settings.web_accent_color,
         "library_dir": str(settings.library_dir),
         "import_dir": None if settings.import_dir is None else str(settings.import_dir),
     }

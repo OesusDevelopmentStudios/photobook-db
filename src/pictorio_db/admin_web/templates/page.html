@@ -5,7 +5,7 @@
 {% block width %}wide{% endblock %}
 {% block nav %}
 <nav>
-    <a class="brand" href="/admin">pictorio-db</a>
+    {% include "_brand.html" %}
     {% for path, name in [("/admin", "Overview"), ("/admin/settings", "Settings"), ("/admin/users", "User Management")] %}
     {# A section's own pages count too, e.g. /admin/users/3 for Users; the overview has none. #}
     {% set current = request.url.path == path or (path != "/admin" and request.url.path.startswith(path + "/")) %}

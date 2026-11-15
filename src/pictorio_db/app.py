@@ -78,7 +78,7 @@ def _lifespan(config: Config) -> Callable[[FastAPI], AbstractAsyncContextManager
         relayout = Relayout(app.state.jobs, app.state.images)
         app.state.jobs.register(JobKind.RELAYOUT, relayout.run)
         app.state.server_settings = ServerSettings(
-            app.state.storage, app.state.importer, app.state.tags, relayout, config.import_dir
+            app.state.storage, app.state.importer, app.state.tags, relayout, settings, config.import_dir
         )
         app.state.tag_admin = TagAdmin(
             app.state.tags, app.state.images, app.state.access, app.state.preferences, app.state.storage, relayout

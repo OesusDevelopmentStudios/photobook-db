@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""/admin/settings: the path template, the upload limit and the rating values."""
+"""/admin/settings: the path template, the upload limit, the rating values and the accent colour of these pages."""
 
 from dataclasses import dataclass
 from typing import Annotated
@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pictorio_db.admin_web._messages import problem_message
 from pictorio_db.admin_web._session import AdminForm, AdminPage, AdminSession
 from pictorio_db.admin_web._templates import templates
+from pictorio_db.admin_web._theme import PLASMA_ACCENT_COLORS
 from pictorio_db.services.importer import UPLOAD_LIMIT_RANGE
 from pictorio_db.services.server_settings import ServerSettings, SettingsChanges
 from pictorio_db.services.tags import MAX_RATING_VALUES
@@ -33,11 +34,14 @@ class SettingsForm:
 
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(
-    request: Request, session: AdminPage, saved: bool = False, relayout_job: int | None = None
+    request: Request,
+    session: AdminPage,
+    saved: bool = False,
+    relayout_job: int | None = None,
+    accent_saved: bool = False,
 ) -> HTMLResponse:
-    settings = _server_settings(request).current()
-    form = SettingsForm(settings.path_template, settings.max_upload_bytes // MIB, "\n".join(settings.rating_values))
-    return _page(request, session, form, saved=saved, relayout_job=relayout_job)
+    return _page(request, session, _stored_form(request), saved=saved, relayout_job=relayout_job,
+                 accent_saved=accent_saved)
 
 
 @router.post("/settings", response_class=HTMLResponse)
@@ -70,8 +74,31 @@ def save_settings(
     return RedirectResponse(target, status_code=303)
 
 
+@router.post("/settings/accent", response_class=HTMLResponse)
+def save_accent_color(
+    request: Request,
+    session: AdminForm,
+    accent_color: Annotated[str, Form()],
+    custom_color: Annotated[str, Form()] = "",
+) -> Response:
+    """A swatch sends its colour; the custom colour's button sends "custom" and the colour field beside it."""
+    color = custom_color if accent_color == "custom" else accent_color
+    try:
+        _server_settings(request).change(SettingsChanges(web_accent_color=color), session.user.id)
+    except Problem as problem:
+        return _page(request, session, _stored_form(request), accent_error=problem_message(problem),
+                     status_code=problem.status)
+
+    return RedirectResponse("/admin/settings?accent_saved=true#appearance", status_code=303)
+
+
 def _server_settings(request: Request) -> ServerSettings:
     return request.app.state.server_settings
+
+
+def _stored_form(request: Request) -> SettingsForm:
+    settings = _server_settings(request).current()
+    return SettingsForm(settings.path_template, settings.max_upload_bytes // MIB, "\n".join(settings.rating_values))
 
 
 def _page(
@@ -81,6 +108,8 @@ def _page(
     error: str | None = None,
     saved: bool = False,
     relayout_job: int | None = None,
+    accent_error: str | None = None,
+    accent_saved: bool = False,
     status_code: int = 200,
 ) -> HTMLResponse:
     settings = _server_settings(request).current()
@@ -94,5 +123,9 @@ def _page(
         "import_dir": settings.import_dir,
         "upload_limit_mib": (UPLOAD_LIMIT_RANGE[0] // MIB, UPLOAD_LIMIT_RANGE[1] // MIB),
         "max_rating_values": MAX_RATING_VALUES,
+        "accent_error": accent_error,
+        "accent_saved": accent_saved,
+        "plasma_accent_colors": PLASMA_ACCENT_COLORS,
+        "is_custom_accent": settings.web_accent_color not in dict(PLASMA_ACCENT_COLORS).values(),
     }
     return templates.TemplateResponse(request, "settings.html", context, status_code=status_code)

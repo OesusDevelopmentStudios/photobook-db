@@ -20,6 +20,7 @@ DEFAULTS = ServerSettingsInfo(
     path_template="{category}/{author}/{year}",
     max_upload_bytes=DEFAULT_MAX_UPLOAD_BYTES,
     rating_values=["sfw", "nsfw"],
+    web_accent_color="#3daee9",
     library_dir=Path("/srv/library"),
     import_dir=Path("/srv/import"),
 )
@@ -33,7 +34,8 @@ def server_settings(database: Database, tmp_path: Path) -> ServerSettings:
     storage = StorageService(database, settings, Path("/srv/library"), tags.namespace_names)
     images = ImagesService(database, tags, storage)
     importer = ImporterService(images, tags, storage, ThumbnailsService(tmp_path / "thumbnails"), settings)
-    return ServerSettings(storage, importer, tags, Relayout(JobsService(database), images), Path("/srv/import"))
+    relayout = Relayout(JobsService(database), images)
+    return ServerSettings(storage, importer, tags, relayout, settings, Path("/srv/import"))
 
 
 def test_shows_the_defaults(server_settings: ServerSettings) -> None:
@@ -66,8 +68,9 @@ def test_same_path_template_moves_nothing(server_settings: ServerSettings) -> No
         SettingsChanges(path_template="{nonsense}", max_upload_bytes=50_000_000, rating_values=["safe"]),
         SettingsChanges(path_template="{year}", max_upload_bytes=1, rating_values=["safe"]),
         SettingsChanges(path_template="{year}", max_upload_bytes=50_000_000, rating_values=[]),
+        SettingsChanges(path_template="{year}", web_accent_color="blue"),
     ],
-    ids=["template", "upload limit", "ratings"],
+    ids=["template", "upload limit", "ratings", "accent colour"],
 )
 def test_one_invalid_setting_changes_nothing(server_settings: ServerSettings, changes: SettingsChanges) -> None:
     with pytest.raises(Problem) as raised:
@@ -75,3 +78,18 @@ def test_one_invalid_setting_changes_nothing(server_settings: ServerSettings, ch
 
     assert raised.value.status == 422
     assert server_settings.current() == DEFAULTS
+
+
+def test_accent_colour_is_stored_in_lowercase(server_settings: ServerSettings) -> None:
+    settings, _job = server_settings.change(SettingsChanges(web_accent_color=" #E93A9A "), None)
+
+    assert settings.web_accent_color == "#e93a9a"
+    assert server_settings.web_accent_color() == "#e93a9a"
+
+
+@pytest.mark.parametrize("color", ["blue", "#3daee", "#3daee9ff", "3daee9", "#gggggg"])
+def test_accent_colour_must_be_rrggbb(server_settings: ServerSettings, color: str) -> None:
+    with pytest.raises(Problem) as raised:
+        server_settings.change(SettingsChanges(web_accent_color=color), None)
+
+    assert raised.value.extra["errors"][0]["field"] == "web_accent_color"

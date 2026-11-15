@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
+import re
+
 from fastapi.testclient import TestClient
 
 from pictorio_db.services.server_settings import ServerSettings, SettingsChanges
@@ -89,3 +91,46 @@ def test_needs_at_least_one_rating_value(admin_browser: TestClient) -> None:
 
     assert response.status_code == 422
     assert "Give from 1 to 20 rating values." in response.text
+
+
+# --- The accent colour of these pages
+
+def choose_accent(browser: TestClient, **fields: str):  # -> Response
+    form = {"csrf_token": csrf_token_in(browser.get("/admin/settings").text)} | fields
+    return browser.post("/admin/settings/accent", data=form, follow_redirects=False)
+
+
+def pressed_swatches(page: str) -> list[str]:
+    return re.findall(r'class="swatch" name="accent_color" value="(#[0-9a-f]{6})"[^>]*aria-pressed="true"', page)
+
+
+def test_pages_use_the_plasma_blue_at_first(admin_browser: TestClient) -> None:
+    page = admin_browser.get("/admin/settings").text
+
+    assert "--accent: #3daee9;" in page
+    assert pressed_swatches(page) == ["#3daee9"]
+
+
+def test_a_swatch_changes_the_accent_colour(admin_browser: TestClient) -> None:
+    response = choose_accent(admin_browser, accent_color="#e93a9a")
+
+    assert response.headers["location"] == "/admin/settings?accent_saved=true#appearance"
+    assert server_settings(admin_browser).web_accent_color() == "#e93a9a"
+    assert "--accent: #e93a9a;" in admin_browser.get("/admin").text
+
+
+def test_a_custom_accent_colour_is_shown_as_such(admin_browser: TestClient) -> None:
+    choose_accent(admin_browser, accent_color="custom", custom_color="#123456")
+
+    page = admin_browser.get("/admin/settings").text
+    assert server_settings(admin_browser).web_accent_color() == "#123456"
+    assert "In use: <code>#123456</code>" in page
+    assert pressed_swatches(page) == []
+
+
+def test_an_invalid_colour_is_refused(admin_browser: TestClient) -> None:
+    response = choose_accent(admin_browser, accent_color="custom", custom_color="blue")
+
+    assert response.status_code == 422
+    assert "Web accent color: A colour as #rrggbb" in response.text
+    assert server_settings(admin_browser).web_accent_color() == "#3daee9"

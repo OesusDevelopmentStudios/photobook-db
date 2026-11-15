@@ -2120,6 +2120,14 @@
               ]
             ]
           },
+          "web_accent_color": {
+            "type": "string",
+            "title": "Web Accent Color",
+            "description": "Accent colour of the web admin pages",
+            "examples": [
+              "#3daee9"
+            ]
+          },
           "library_dir": {
             "type": "string",
             "title": "Library Dir",
@@ -2155,6 +2163,7 @@
           "path_template",
           "max_upload_bytes",
           "rating_values",
+          "web_accent_color",
           "library_dir",
           "import_dir",
           "job_id"
@@ -2928,6 +2937,14 @@
               ]
             ]
           },
+          "web_accent_color": {
+            "type": "string",
+            "title": "Web Accent Color",
+            "description": "Accent colour of the web admin pages",
+            "examples": [
+              "#3daee9"
+            ]
+          },
           "library_dir": {
             "type": "string",
             "title": "Library Dir",
@@ -2951,6 +2968,7 @@
           "path_template",
           "max_upload_bytes",
           "rating_values",
+          "web_accent_color",
           "library_dir",
           "import_dir"
         ],
@@ -3000,6 +3018,19 @@
             ],
             "title": "Rating Values",
             "description": "Images keep a rating that is removed here, but it cannot be given again"
+          },
+          "web_accent_color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Accent Color",
+            "description": "A colour as #rrggbb"
           }
         },
         "type": "object",
