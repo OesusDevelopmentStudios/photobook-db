@@ -70,7 +70,7 @@ def _folder_from(environment: Mapping[str, str], variable: str) -> Path:
     if not environment[variable]:
         raise ConfigError(f"{variable} must not be empty")
 
-    return Path(environment[variable]).expanduser().absolute()
+    return Path(environment[variable]).expanduser().resolve()
 
 
 def _home(environment: Mapping[str, str]) -> Path:

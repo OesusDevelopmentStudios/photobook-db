@@ -1,6 +1,7 @@
 {# SPDX-License-Identifier: GPL-3.0-or-later #}
 {# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
 {% extends "page.html" %}
+{% from "_jobs.html" import job_title, job_status, job_progress %}
 {% block title %}Overview{% endblock %}
 {% block heading %}Overview{% endblock %}
 {% block content %}
@@ -17,16 +18,17 @@
 <h2>Latest jobs</h2>
 {% if recent_jobs %}
 <table>
-    <tr><th>Job</th><th>Kind</th><th>Status</th><th>Progress</th></tr>
+    <tr><th>Job</th><th>What</th><th>Status</th><th>Progress</th></tr>
     {% for job in recent_jobs %}
     <tr>
-        <td>{{ job.id }}</td>
-        <td>{{ job.kind }}</td>
-        <td>{{ job.status }}</td>
-        <td>{{ job.progress_done }}{% if job.progress_total is not none %} / {{ job.progress_total }}{% endif %}</td>
+        <td><a href="/admin/jobs/{{ job.id }}">{{ job.id }}</a></td>
+        <td>{{ job_title(job) }}</td>
+        <td>{{ job_status(job) }}</td>
+        <td>{{ job_progress(job) }}</td>
     </tr>
     {% endfor %}
 </table>
+<p><a href="/admin/jobs">All jobs</a></p>
 {% else %}
 <p class="hint">No jobs yet.</p>
 {% endif %}

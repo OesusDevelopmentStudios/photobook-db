@@ -1,0 +1,60 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{% extends "page.html" %}
+{% from "_buttons.html" import back_button %}
+{% from "_jobs.html" import job_title, job_status, job_progress, time %}
+{% block head %}{% if refresh_seconds %}<meta http-equiv="refresh" content="{{ refresh_seconds }}">{% endif %}{% endblock %}
+{% block title %}Job {{ job.id }}{% endblock %}
+{% block heading %}Job {{ job.id }}{% endblock %}
+{% block back %}{{ back_button("/admin/jobs", "Back to all jobs") }}{% endblock %}
+{% block content %}
+{% if job.status == "failed" %}
+<p class="error" role="alert">The job failed: {{ job.error }}</p>
+{% endif %}
+
+<dl>
+    <dt>What</dt><dd>{{ job_title(job) }}</dd>
+    {% if job.kind == "folder_import" %}
+    <dt>Tags</dt>
+    <dd>{% for tag in job.params.tags %}<code>{{ tag }}</code> {% else %}<span class="hint">none</span>{% endfor %}</dd>
+    <dt>Originals</dt><dd>{% if job.params.remove_originals %}removed once imported{% else %}kept{% endif %}</dd>
+    {% endif %}
+    <dt>Status</dt><dd>{{ job_status(job) }}</dd>
+    <dt>Progress</dt><dd class="progress">{{ job_progress(job) }}</dd>
+    <dt>Started by</dt><dd>{{ usernames.get(job.created_by, "–") }}</dd>
+    <dt>Started</dt><dd>{{ time(job.created_at) }}</dd>
+    <dt>Finished</dt><dd>{{ time(job.finished_at) }}</dd>
+</dl>
+{% if refresh_seconds %}<p class="hint">This page reloads every {{ refresh_seconds }} seconds until the job is done.</p>{% endif %}
+
+{% if job.result %}
+<h2>Result</h2>
+<dl>
+    {% if job.kind == "folder_import" %}
+    <dt>Imported</dt><dd>{{ job.result.imported }}</dd>
+    <dt>In the library already</dt><dd>{{ job.result.duplicates }}</dd>
+    <dt>Not images</dt><dd>{{ job.result.unsupported }} <span class="hint">(left in the folder)</span></dd>
+    {% elif job.kind == "relayout" %}
+    <dt>Moved</dt><dd>{{ job.result.moved }}</dd>
+    <dt>In place already</dt><dd>{{ job.result.unchanged }}</dd>
+    {% endif %}
+    <dt>Failed</dt><dd>{{ job.result.failed | length }}</dd>
+</dl>
+
+{% if job.result.failed %}
+<table>
+    {% if job.kind == "folder_import" %}
+    <tr><th>File</th><th>Problem</th></tr>
+    {% for failure in job.result.failed %}
+    <tr><td><code>{{ failure.path }}</code></td><td><code>{{ failure.code }}</code></td></tr>
+    {% endfor %}
+    {% else %}
+    <tr><th>Image</th><th>Problem</th></tr>
+    {% for failure in job.result.failed %}
+    <tr><td>{{ failure.image_id }}</td><td><code>{{ failure.code }}</code></td></tr>
+    {% endfor %}
+    {% endif %}
+</table>
+{% endif %}
+{% endif %}
+{% endblock %}

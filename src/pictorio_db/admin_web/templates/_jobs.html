@@ -1,0 +1,33 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{# How a job is shown, the same on every page. #}
+
+{% macro job_title(job) %}
+{%- if job.kind == "folder_import" -%}
+Import of {% if job.params.source_subdir %}<code>{{ job.params.source_subdir }}</code>{% else %}the whole import folder{% endif %}
+{%- elif job.kind == "relayout" -%}
+Moving files to the path template
+{%- else -%}
+{{ job.kind }}
+{%- endif -%}
+{% endmacro %}
+
+{% macro job_status(job) %}
+{%- set labels = {"queued": "Waiting", "running": "Running", "done": "Done", "failed": "Failed"} -%}
+<span class="status status-{{ job.status }}">{{ labels.get(job.status, job.status) }}</span>
+{%- endmacro %}
+
+{% macro job_progress(job) %}
+{%- if job.progress_total is none -%}
+{% if job.status == "running" %}<progress aria-label="Progress"></progress>{% else %}<span class="hint">–</span>{% endif %}
+{%- elif job.progress_total == 0 -%}
+<span class="hint">nothing to do</span>
+{%- else -%}
+<span class="job-progress">
+    <progress value="{{ job.progress_done }}" max="{{ job.progress_total }}" aria-label="Progress"></progress>
+    <span class="hint">{{ job.progress_done }} / {{ job.progress_total }}</span>
+</span>
+{%- endif -%}
+{% endmacro %}
+
+{% macro time(moment) %}{% if moment %}{{ moment.strftime("%Y-%m-%d %H:%M") }} UTC{% else %}–{% endif %}{% endmacro %}

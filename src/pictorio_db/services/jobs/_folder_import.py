@@ -16,6 +16,8 @@ from pictorio_db.services.tags import TagsService
 from pictorio_db.utils.problems import Problem
 
 NO_RESTRICTIONS = Restrictions([])  # only admins start folder imports
+SOURCE_FOLDERS_DEPTH = 2  # how deep source_folders() looks, so a big NAS share is listed quickly
+SOURCE_FOLDERS_LIMIT = 500
 
 _logger = logging.getLogger(__name__)
 
@@ -57,6 +59,29 @@ class FolderImport:
 
         params = {"source_subdir": source_subdir, "remove_originals": remove_originals, "tags": tags}
         return self._jobs.submit(JobKind.FOLDER_IMPORT, params, user_id)
+
+    def source_folders(self) -> list[str]:
+        """The folders inside the import folder, a few levels deep, for the admin to choose from; [] if folder
+        imports are off. Links to folders are not followed, as in an import."""
+        if self._import_dir is None or not self._import_dir.is_dir():
+            return []
+
+        found: list[str] = []
+        to_visit = [(self._import_dir, 1)]
+        while to_visit and len(found) < SOURCE_FOLDERS_LIMIT:
+            folder, depth = to_visit.pop(0)
+            try:
+                with os.scandir(folder) as listing:
+                    subfolders = sorted(Path(entry.path) for entry in listing if entry.is_dir(follow_symlinks=False))
+            except OSError:
+                continue  # e.g. not readable: leave it out
+
+            for subfolder in subfolders:
+                found.append(subfolder.relative_to(self._import_dir).as_posix())
+                if depth < SOURCE_FOLDERS_DEPTH:
+                    to_visit.append((subfolder, depth + 1))
+
+        return sorted(found[:SOURCE_FOLDERS_LIMIT])
 
     def run(self, context: JobContext) -> dict[str, Any]:
         """The job. Run again after a restart, the files imported before count as duplicates."""

@@ -1,0 +1,41 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{% extends "page.html" %}
+{% from "_buttons.html" import back_button %}
+{% block title %}Import a folder{% endblock %}
+{% block heading %}Import a folder{% endblock %}
+{% block back %}{{ back_button("/admin/jobs", "Back to all jobs") }}{% endblock %}
+{% block content %}
+{% if not import_dir %}
+<p class="error" role="alert">Folder imports are off. Set <code>PICTORIO_IMPORT_DIR</code> on the server to the folder
+to import from, then restart it.</p>
+{% else %}
+{% if error %}
+<p class="error" role="alert">{{ error }}</p>
+{% endif %}
+
+<form method="post" action="/admin/jobs/import">
+    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+    <label>Folder
+        <input name="source_subdir" list="source-folders" autocomplete="off" spellcheck="false"
+               value="{{ source_subdir }}" placeholder="phone_backup/2025">
+    </label>
+    <datalist id="source-folders">
+        {% for folder in source_folders %}<option value="{{ folder }}">{% endfor %}
+    </datalist>
+    <span class="hint">A folder inside the import folder <code>{{ import_dir }}</code>, with its subfolders.
+        Leave it empty to import the whole import folder.</span>
+    <label>Tags
+        <textarea name="tags" rows="3" spellcheck="false">{{ tags }}</textarea>
+    </label>
+    <span class="hint">One per line, e.g. <code>album:vacation_2015</code>. Every imported image gets them.</span>
+    <label>
+        <input type="checkbox" name="remove_originals" value="true"{% if remove_originals %} checked{% endif %}>
+        Remove the originals
+    </label>
+    <span class="hint">Deletes each file from the import folder once it is in the library, or was there already.
+        Files that are not images or fail to import stay.</span>
+    <button type="submit">Start import</button>
+</form>
+{% endif %}
+{% endblock %}

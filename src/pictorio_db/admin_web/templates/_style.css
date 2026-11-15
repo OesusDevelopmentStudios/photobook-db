@@ -114,6 +114,19 @@ th, td { text-align: left; vertical-align: middle; padding: 0.45rem 0.6rem; bord
 th { color: var(--muted-text); font-weight: normal; }
 tr:has(td):hover { background: var(--hover); }
 td form button, td .disabled-reason button { margin-top: 0; }  /* a button in a row sits on its middle line */
+/* A progress bar drawn the same in every browser: an accent bar in a dark track. */
+.job-progress { display: inline-flex; align-items: center; gap: 0.6rem; white-space: nowrap; }
+progress {
+    appearance: none; width: 10rem; height: 0.6rem; overflow: hidden;
+    background: var(--view); border: 1px solid var(--border); border-radius: var(--radius);
+}
+progress::-webkit-progress-bar { background: var(--view); }
+progress::-webkit-progress-value { background: var(--accent); }
+progress::-moz-progress-bar { background: var(--accent); }
+.status-queued { color: var(--muted-text); }
+.status-running { color: var(--link); }
+.status-done { color: var(--positive); }
+.status-failed { color: var(--negative); }
 dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1.5rem; }
 dt { color: var(--muted-text); }
 dd { margin: 0; }

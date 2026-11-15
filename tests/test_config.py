@@ -33,6 +33,20 @@ def test_reads_environment_variables() -> None:
     )
 
 
+@pytest.mark.parametrize("variable", ["PICTORIO_DATA_DIR", "PICTORIO_LIBRARY_DIR", "PICTORIO_IMPORT_DIR"])
+def test_relative_folders_become_absolute_without_dot_dot(
+    variable: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "server").mkdir()
+    monkeypatch.chdir(tmp_path / "server")
+
+    config = config_from_environment(HOME | {variable: "../test/./library"})
+
+    folder = {"PICTORIO_DATA_DIR": config.data_dir, "PICTORIO_LIBRARY_DIR": config.library_dir,
+              "PICTORIO_IMPORT_DIR": config.import_dir}[variable]
+    assert folder == tmp_path.resolve() / "test" / "library"
+
+
 def test_data_folder_follows_xdg_data_home() -> None:
     environment = HOME | {"XDG_DATA_HOME": "/home/user/data"}
 
