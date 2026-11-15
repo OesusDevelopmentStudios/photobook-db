@@ -113,7 +113,7 @@ table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
 th, td { text-align: left; vertical-align: middle; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); }
 th { color: var(--muted-text); font-weight: normal; }
 tr:has(td):hover { background: var(--hover); }
-td form button { margin-top: 0; }  /* a button in a row sits on the row's middle line */
+td form button, td .disabled-reason button { margin-top: 0; }  /* a button in a row sits on its middle line */
 dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1.5rem; }
 dt { color: var(--muted-text); }
 dd { margin: 0; }

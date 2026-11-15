@@ -1,0 +1,27 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{% extends "page.html" %}
+{% from "_buttons.html" import back_button %}
+{% block title %}New namespace{% endblock %}
+{% block heading %}New namespace{% endblock %}
+{% block back %}{{ back_button("/admin/namespaces", "Back to all namespaces") }}{% endblock %}
+{% block content %}
+{% if error %}
+<p class="error" role="alert">{{ error }}</p>
+{% endif %}
+
+<form method="post" action="/admin/namespaces/new">
+    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+    <label>Name
+        <input name="name" required autocomplete="off" spellcheck="false" value="{{ name }}" placeholder="weather">
+    </label>
+    <span class="hint">Letters a–z, digits and “_”. <code>year</code>, <code>month</code> and <code>date</code> are
+        search fields, so they cannot be used.</span>
+    <label>
+        <input type="checkbox" name="single_value" value="true"{% if single_value %} checked{% endif %}>
+        One tag per image
+    </label>
+    <span class="hint">Like <code>category</code>: a new tag in this namespace replaces the image's old one.</span>
+    <button type="submit">Create namespace</button>
+</form>
+{% endblock %}

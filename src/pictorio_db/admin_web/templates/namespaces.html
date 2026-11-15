@@ -1,0 +1,47 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{% extends "page.html" %}
+{% block title %}Namespaces{% endblock %}
+{% block heading %}Namespaces{% endblock %}
+{% block content %}
+<div class="toolbar">
+    <p class="hint">A tag is written <code>namespace:name</code>, e.g. <code>author:sample_artist</code>.
+        Tags without a namespace go into <code>general</code>.</p>
+    <a class="button" href="/admin/namespaces/new">+ Add New Namespace</a>
+</div>
+
+{% if error %}
+<p class="error" role="alert">{{ error }}</p>
+{% elif created %}
+<p class="success" role="status">The namespace has been created.</p>
+{% elif deleted %}
+<p class="success" role="status">The namespace has been removed.</p>
+{% endif %}
+
+<table>
+    <tr><th>Namespace</th><th>Tags per image</th><th>Kind</th><th>Folders</th><th></th></tr>
+    {% for namespace in namespaces %}
+    <tr>
+        <td><code>{{ namespace.name }}:</code></td>
+        <td>{% if namespace.single_value %}one{% else %}any number{% endif %}</td>
+        <td>{% if namespace.is_builtin %}built-in{% else %}custom{% endif %}</td>
+        <td>{% if namespace.in_path_template %}in the path template{% else %}<span class="hint">no</span>{% endif %}</td>
+        <td>
+            {% if namespace.is_builtin or namespace.in_path_template %}
+            {% set reason = "Built-in namespaces cannot be removed." if namespace.is_builtin
+                            else "The path template uses this namespace. Change the template first." %}
+            <span class="disabled-reason" title="{{ reason }}">
+                <button type="button" class="danger" disabled>Remove</button>
+            </span>
+            {% else %}
+            <form method="post" action="/admin/namespaces/{{ namespace.name }}/delete">
+                <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                <button type="submit" class="danger">Remove</button>
+            </form>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+<p class="hint">Only namespaces without tags can be removed.</p>
+{% endblock %}
