@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pictorio_db.admin_web._messages import problem_message
 from pictorio_db.admin_web._session import AdminForm, AdminPage, AdminSession, PageError
 from pictorio_db.admin_web._templates import templates
-from pictorio_db.services.jobs import FolderImport, JobInfo, JobStatus
+from pictorio_db.services.jobs import SUCCESSFUL_JOB_LIFETIME, FolderImport, JobInfo, JobStatus
 from pictorio_db.utils.problems import Problem
 
 router = APIRouter(prefix="/jobs")
@@ -22,7 +22,7 @@ UNFINISHED = (JobStatus.QUEUED, JobStatus.RUNNING)
 
 
 @router.get("", response_class=HTMLResponse)
-def jobs_page(request: Request, session: AdminPage) -> HTMLResponse:
+def jobs_page(request: Request, session: AdminPage, removed: int | None = None) -> HTMLResponse:
     jobs = request.app.state.jobs.list_jobs(session.user)
     context = {
         "session": session,
@@ -30,8 +30,17 @@ def jobs_page(request: Request, session: AdminPage) -> HTMLResponse:
         "usernames": _usernames(request),
         "import_dir": request.app.state.server_settings.current().import_dir,
         "refresh_seconds": REFRESH_SECONDS if any(job.status in UNFINISHED for job in jobs) else None,
+        "has_finished_jobs": any(job.status not in UNFINISHED for job in jobs),
+        "lifetime_hours": int(SUCCESSFUL_JOB_LIFETIME.total_seconds() // 3600),
+        "removed": removed,
     }
     return templates.TemplateResponse(request, "jobs.html", context)
+
+
+@router.post("/remove-finished")
+def remove_finished_jobs(request: Request, _session: AdminForm) -> RedirectResponse:
+    removed = request.app.state.jobs.remove_finished_jobs()
+    return RedirectResponse(f"/admin/jobs?removed={removed}", status_code=303)
 
 
 # --- Folder imports

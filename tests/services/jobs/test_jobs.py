@@ -7,6 +7,7 @@ import logging
 import threading
 import time
 from collections.abc import Iterator
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -17,6 +18,7 @@ from pictorio_db.db.models import Job
 from pictorio_db.services.auth import AuthService, Role, UserInfo
 from pictorio_db.services.jobs import JobContext, JobInfo, JobKind, JobsService, JobStatus
 from pictorio_db.utils.problems import Problem
+from pictorio_db.utils.time import utc_now
 
 TEST_KIND = JobKind.RELAYOUT  # any kind will do; the tests register their own handlers
 
@@ -198,3 +200,54 @@ def test_lists_jobs_by_status(jobs: JobsService, users: dict[str, UserInfo]) -> 
 
     assert [job.id for job in jobs.list_jobs(users["admin"], JobStatus.DONE)] == [done.id]
     assert [job.id for job in jobs.list_jobs(users["admin"], JobStatus.QUEUED)] == [queued.id]
+
+
+# --- Removing finished jobs
+
+def job_in_state(database: Database, jobs: JobsService, status: JobStatus, finished_hours_ago: float | None) -> int:
+    job_id = jobs.submit(TEST_KIND, {}, None).id  # the worker is not started: the state stays as set here
+    finished_at = None if finished_hours_ago is None else utc_now() - timedelta(hours=finished_hours_ago)
+    with database.session() as session:
+        session.execute(update(Job).where(Job.id == job_id).values(status=status, finished_at=finished_at))
+        session.commit()
+
+    return job_id
+
+
+def test_removes_successful_jobs_a_day_after_they_finished(
+    database: Database, jobs: JobsService, users: dict[str, UserInfo]
+) -> None:
+    old_success = job_in_state(database, jobs, JobStatus.DONE, finished_hours_ago=25)
+    recent_success = job_in_state(database, jobs, JobStatus.DONE, finished_hours_ago=23)
+    old_failure = job_in_state(database, jobs, JobStatus.FAILED, finished_hours_ago=25)
+    waiting = job_in_state(database, jobs, JobStatus.QUEUED, finished_hours_ago=None)
+
+    assert jobs.remove_expired_jobs() == 1
+    remaining = {job.id for job in jobs.list_jobs(users["admin"])}
+    assert old_success not in remaining
+    assert remaining == {recent_success, old_failure, waiting}
+
+
+def test_worker_removes_expired_jobs_when_it_starts(
+    database: Database, jobs: JobsService, users: dict[str, UserInfo]
+) -> None:
+    job_in_state(database, jobs, JobStatus.DONE, finished_hours_ago=25)
+
+    jobs.start()
+
+    deadline = time.monotonic() + 5
+    while jobs.list_jobs(users["admin"]) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert jobs.list_jobs(users["admin"]) == []
+
+
+def test_removes_every_finished_job_on_request(
+    database: Database, jobs: JobsService, users: dict[str, UserInfo]
+) -> None:
+    job_in_state(database, jobs, JobStatus.DONE, finished_hours_ago=1)
+    job_in_state(database, jobs, JobStatus.FAILED, finished_hours_ago=1)
+    running = job_in_state(database, jobs, JobStatus.RUNNING, finished_hours_ago=None)
+    waiting = job_in_state(database, jobs, JobStatus.QUEUED, finished_hours_ago=None)
+
+    assert jobs.remove_finished_jobs() == 2
+    assert {job.id for job in jobs.list_jobs(users["admin"])} == {running, waiting}

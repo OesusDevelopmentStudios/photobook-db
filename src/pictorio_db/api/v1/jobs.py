@@ -9,8 +9,8 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from pictorio_db.api.v1.dependencies import CurrentAuthentication, JobsServiceDependency
-from pictorio_db.services.jobs import LIST_LIMIT, JobInfo, JobKind, JobStatus
+from pictorio_db.api.v1.dependencies import CurrentAdmin, CurrentAuthentication, JobsServiceDependency
+from pictorio_db.services.jobs import LIST_LIMIT, SUCCESSFUL_JOB_LIFETIME, JobInfo, JobKind, JobStatus
 from pictorio_db.utils.problems import problem_responses
 from pictorio_db.utils.time import as_utc
 
@@ -40,6 +40,23 @@ def list_jobs(
     authentication: CurrentAuthentication, jobs: JobsServiceDependency, status: JobStatus | None = None
 ) -> list[JobDetails]:
     return [_job_details(job) for job in jobs.list_jobs(authentication.user, status)]
+
+
+class RemovedJobs(BaseModel):
+    removed: int = Field(description="How many finished jobs were removed")
+
+
+_LIFETIME_HOURS = int(SUCCESSFUL_JOB_LIFETIME.total_seconds() // 3600)
+
+
+@router.delete(
+    "",
+    summary=f"Remove the finished jobs, failed ones included (successful ones go by themselves after "
+    f"{_LIFETIME_HOURS} hours)",
+    responses=problem_responses(401, 403),
+)
+def remove_finished_jobs(_admin: CurrentAdmin, jobs: JobsServiceDependency) -> RemovedJobs:
+    return RemovedJobs(removed=jobs.remove_finished_jobs())
 
 
 @router.get("/{job_id}", summary="One job and its progress", responses=problem_responses(401, 404))

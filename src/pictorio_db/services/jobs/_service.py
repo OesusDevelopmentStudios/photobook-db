@@ -7,11 +7,11 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import ColumnElement, delete, select, update
 
 from pictorio_db.db import Database
 from pictorio_db.db.models import Job
@@ -22,6 +22,8 @@ from pictorio_db.utils.time import utc_now
 PROGRESS_INTERVAL_SECONDS = 1.0  # progress is written at most this often
 IDLE_WAIT_SECONDS = 5.0  # how long the worker sleeps when there is nothing to do, unless woken
 LIST_LIMIT = 100
+SUCCESSFUL_JOB_LIFETIME = timedelta(hours=24)  # then remove_expired_jobs() removes it; failed jobs stay
+CLEANUP_INTERVAL_SECONDS = 600.0
 
 _logger = logging.getLogger(__name__)
 
@@ -36,6 +38,9 @@ class JobStatus(StrEnum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+
+
+FINISHED_STATUSES = (JobStatus.DONE, JobStatus.FAILED)
 
 
 @dataclass(frozen=True)
@@ -157,8 +162,29 @@ class JobsService:
         with self._database.session() as session:
             return [_job_info(job) for job in session.scalars(query)]
 
+    def remove_finished_jobs(self) -> int:
+        """Removes the done and failed jobs; waiting and running ones stay. Returns how many were removed."""
+        return self._remove(Job.status.in_(FINISHED_STATUSES))
+
+    def remove_expired_jobs(self) -> int:
+        """Removes the jobs that succeeded longer than SUCCESSFUL_JOB_LIFETIME ago. Failed jobs stay, so that the
+        admin sees why. The worker calls this now and then."""
+        expired = utc_now() - SUCCESSFUL_JOB_LIFETIME
+        return self._remove((Job.status == JobStatus.DONE) & (Job.finished_at < expired))
+
+    def _remove(self, condition: ColumnElement[bool]) -> int:
+        with self._database.session() as session:
+            result = session.execute(delete(Job).where(condition))
+            session.commit()
+            return result.rowcount
+
     def _work(self) -> None:
+        last_cleanup: float | None = None
         while not self._stop.is_set():
+            if last_cleanup is None or time.monotonic() - last_cleanup >= CLEANUP_INTERVAL_SECONDS:
+                self.remove_expired_jobs()
+                last_cleanup = time.monotonic()
+
             if not self._run_next_job():
                 self._wake_up.wait(IDLE_WAIT_SECONDS)
                 self._wake_up.clear()

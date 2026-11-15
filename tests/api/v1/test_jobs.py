@@ -97,6 +97,20 @@ def test_lists_jobs_by_status(client: TestClient, kid: tuple[dict[str, str], int
     assert client.get("/api/v1/jobs", params={"status": "paused"}, headers=headers).status_code == 422
 
 
+def test_admin_removes_the_finished_jobs(client: TestClient, kid: tuple[dict[str, str], int]) -> None:
+    kid_headers, kid_id = kid
+    admin_headers, _admin_id = log_in(client, "apo", Role.ADMIN)
+    client.app.state.jobs.register(TEST_KIND, count_items)
+    finished = client.app.state.jobs.submit(TEST_KIND, {"items": 1}, kid_id).id
+    wait_for_job(client, kid_headers, finished)
+
+    assert client.delete("/api/v1/jobs", headers=kid_headers).status_code == 403
+    response = client.delete("/api/v1/jobs", headers=admin_headers)
+
+    assert response.json() == {"removed": 1}
+    assert client.get(f"/api/v1/jobs/{finished}", headers=admin_headers).status_code == 404
+
+
 # --- Folder imports
 
 @pytest.fixture

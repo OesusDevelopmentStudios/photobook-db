@@ -1476,6 +1476,50 @@
             "description": "Problem details (RFC 9457)"
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Remove the finished jobs, failed ones included (successful ones go by themselves after 24 hours)",
+        "operationId": "remove_finished_jobs_api_v1_jobs_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovedJobs"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        }
       }
     },
     "/api/v1/jobs/{job_id}": {
@@ -2842,6 +2886,20 @@
         ],
         "title": "ProblemModel",
         "description": "How a problem looks, for the API documentation. Some codes add fields of their own."
+      },
+      "RemovedJobs": {
+        "properties": {
+          "removed": {
+            "type": "integer",
+            "title": "Removed",
+            "description": "How many finished jobs were removed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "removed"
+        ],
+        "title": "RemovedJobs"
       },
       "RenamedTag": {
         "properties": {

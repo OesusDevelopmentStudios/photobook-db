@@ -7,6 +7,7 @@ from pictorio_db.services.jobs._folder_import import FolderImport
 from pictorio_db.services.jobs._relayout import Relayout
 from pictorio_db.services.jobs._service import (
     LIST_LIMIT,
+    SUCCESSFUL_JOB_LIFETIME,
     JobContext,
     JobHandler,
     JobInfo,
@@ -18,6 +19,7 @@ from pictorio_db.services.jobs._service import (
 
 __all__ = [
     "LIST_LIMIT",
+    "SUCCESSFUL_JOB_LIFETIME",
     "FolderImport",
     "JobContext",
     "JobHandler",

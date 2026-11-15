@@ -131,6 +131,24 @@ def test_relayout_job_is_linked_from_the_settings(admin_browser: TestClient) -> 
     assert "<dt>Moved</dt><dd>0</dd>" in page
 
 
+def start_removal(browser: TestClient):  # -> Response
+    form = {"csrf_token": csrf_token_in(browser.get("/admin/jobs").text)}
+    return browser.post("/admin/jobs/remove-finished", data=form, follow_redirects=False)
+
+
+def test_removes_the_finished_jobs(admin_browser: TestClient) -> None:
+    job_id = int(start_import(admin_browser, source_subdir="holiday").headers["location"].rsplit("/", 1)[1])
+    finished(admin_browser, job_id)
+    assert "24 hours after they finish." in admin_browser.get("/admin/jobs").text
+
+    response = start_removal(admin_browser)
+
+    assert (response.status_code, response.headers["location"]) == (303, "/admin/jobs?removed=1")
+    page = admin_browser.get(response.headers["location"]).text
+    assert "1 finished job removed." in page
+    assert '<span class="disabled-reason" title="There are no finished jobs.">' in page
+
+
 def test_unknown_job_is_a_404_page(admin_browser: TestClient) -> None:
     response = admin_browser.get("/admin/jobs/999")
 

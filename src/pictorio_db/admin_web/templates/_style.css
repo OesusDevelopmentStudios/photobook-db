@@ -102,6 +102,9 @@ a.button.back {
 .toolbar select { width: auto; }
 .toolbar button, .toolbar a.button { margin-top: 0; }
 .toolbar a.button { margin-left: auto; }
+.toolbar-actions { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+.toolbar-actions form { flex: none; }
+.toolbar-actions button, .toolbar-actions a.button { margin: 0; }
 
 /* --- Messages, like Kirigami's inline messages */
 

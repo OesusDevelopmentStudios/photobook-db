@@ -8,14 +8,30 @@
 {% block content %}
 <div class="toolbar">
     <p class="hint">Long tasks run here one at a time, in the background.</p>
-    {% if import_dir %}
-    <a class="button" href="/admin/jobs/import">+ Import Folder</a>
-    {% else %}
-    <span class="disabled-reason" title="Folder imports are off. Set PICTORIO_IMPORT_DIR on the server to turn them on.">
-        <button type="button" disabled>+ Import Folder</button>
-    </span>
-    {% endif %}
+    <div class="toolbar-actions">
+        {% if has_finished_jobs %}
+        <form method="post" action="/admin/jobs/remove-finished">
+            <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+            <button type="submit" class="secondary">Remove Finished Jobs</button>
+        </form>
+        {% else %}
+        <span class="disabled-reason" title="There are no finished jobs.">
+            <button type="button" disabled>Remove Finished Jobs</button>
+        </span>
+        {% endif %}
+        {% if import_dir %}
+        <a class="button" href="/admin/jobs/import">+ Import Folder</a>
+        {% else %}
+        <span class="disabled-reason" title="Folder imports are off. Set PICTORIO_IMPORT_DIR on the server to turn them on.">
+            <button type="button" disabled>+ Import Folder</button>
+        </span>
+        {% endif %}
+    </div>
 </div>
+
+{% if removed is not none %}
+<p class="success" role="status">{{ removed }} finished job{% if removed != 1 %}s{% endif %} removed.</p>
+{% endif %}
 
 {% if jobs %}
 <table>
@@ -31,8 +47,9 @@
     </tr>
     {% endfor %}
 </table>
-{% if refresh_seconds %}<p class="hint">This page reloads every {{ refresh_seconds }} seconds while a job is unfinished.</p>{% endif %}
 {% else %}
-<p class="hint">No jobs yet.</p>
+<p class="hint">No jobs.</p>
 {% endif %}
+<p class="hint">Successful jobs are removed {{ lifetime_hours }} hours after they finish.
+{% if refresh_seconds %}This page reloads every {{ refresh_seconds }} seconds while a job is unfinished.{% endif %}</p>
 {% endblock %}
