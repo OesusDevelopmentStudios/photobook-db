@@ -1,0 +1,27 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{% extends "page.html" %}
+{% from "_buttons.html" import back_button %}
+{% block title %}New user{% endblock %}
+{% block heading %}New user{% endblock %}
+{% block back %}{{ back_button("/admin/users", "Back to all users") }}{% endblock %}
+{% block content %}
+{% if error %}
+<p class="error" role="alert">{{ error }}</p>
+{% endif %}
+
+<p class="hint">New accounts are standard users: the server has one admin account.</p>
+<form method="post" action="/admin/users/new">
+    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+    {% with restricted_tags_field = true %}{% include "_user_fields.html" %}{% endwith %}
+    <label>Password
+        <input name="password" type="password" required autocomplete="new-password"
+               minlength="{{ password_min_length }}">
+    </label>
+    <span class="hint">At least {{ password_min_length }} characters.</span>
+    <label>Password again
+        <input name="password_repeated" type="password" required autocomplete="new-password">
+    </label>
+    <button type="submit">Create user</button>
+</form>
+{% endblock %}

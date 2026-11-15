@@ -1,0 +1,16 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{# The fields a new and an existing user share. `restricted_tags_field` is false for the admin account. #}
+<label>Username
+    <input name="username" required autocomplete="off" value="{{ form.username }}">
+</label>
+<span class="hint">Letters a–z, digits, “.”, “_” and “-”.</span>
+{% if restricted_tags_field %}
+<label>Restricted tags
+    <textarea name="restricted_tags" rows="4" spellcheck="false">{{ form.restricted_tags }}</textarea>
+</label>
+<span class="hint">One search term per line, e.g. <code>rating:nsfw</code> or <code>character:*</code>. The user
+    can neither see images that match nor give these tags. They may name tags that do not exist yet.</span>
+{% else %}
+<p class="hint">The admin account sees every image: it has no restricted tags.</p>
+{% endif %}

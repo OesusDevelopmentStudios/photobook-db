@@ -1,0 +1,38 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{% extends "page.html" %}
+{% block title %}User Management{% endblock %}
+{% block heading %}User Management{% endblock %}
+{% block content %}
+<div class="toolbar">
+    <form method="get" action="/admin/users" role="search">
+        <input name="search" type="search" value="{{ search }}" placeholder="Search by username"
+               aria-label="Search by username">
+        <button type="submit" class="secondary">Search</button>
+    </form>
+    <a class="button" href="/admin/users/new">+ Add New User</a>
+</div>
+
+{% if deleted %}
+<p class="success" role="status">The user has been removed.</p>
+{% endif %}
+
+{% if users %}
+<table>
+    <tr><th>Username</th><th>Role</th><th>Restricted tags</th><th>Created</th></tr>
+    {% for user, restricted_tags in users %}
+    <tr>
+        <td><a href="/admin/users/{{ user.id }}">{{ user.username }}</a></td>
+        <td>{{ user.role }}</td>
+        <td>
+            {% for term in restricted_tags %}<code>{{ term }}</code> {% else %}<span class="hint">none</span>{% endfor %}
+            {% if restricted_tags and user.role == "admin" %}<span class="hint">(ignored for the admin)</span>{% endif %}
+        </td>
+        <td>{{ user.created_at.strftime("%Y-%m-%d") }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p class="hint">No username contains “{{ search }}”.</p>
+{% endif %}
+{% endblock %}

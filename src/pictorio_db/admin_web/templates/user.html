@@ -1,0 +1,62 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{% extends "page.html" %}
+{% from "_buttons.html" import back_button %}
+{% block title %}User {{ user.username }}{% endblock %}
+{% block heading %}User {{ user.username }}{% if user.role == "admin" %} <span class="hint">(admin)</span>{% endif %}{% endblock %}
+{% block back %}{{ back_button("/admin/users", "Back to all users") }}{% endblock %}
+{% block content %}
+{% if error %}
+<p class="error" role="alert">{{ error }}</p>
+{% elif saved %}
+<p class="success" role="status">The user has been saved.</p>
+{% endif %}
+
+<form method="post" action="/admin/users/{{ user.id }}">
+    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+    {% with restricted_tags_field = user.role != "admin" %}{% include "_user_fields.html" %}{% endwith %}
+    <label>New password
+        <input name="password" type="password" autocomplete="new-password" minlength="{{ password_min_length }}">
+    </label>
+    <span class="hint">Leave empty to keep the password. A new one logs the user out on every device.</span>
+    <label>New password again
+        <input name="password_repeated" type="password" autocomplete="new-password">
+    </label>
+    <button type="submit">Save</button>
+</form>
+
+<h2>Devices</h2>
+{% if devices %}
+<table>
+    <tr><th>Device</th><th>Logged in</th><th>Last used</th><th>Expires</th><th></th></tr>
+    {% for device in devices %}
+    <tr>
+        <td>{{ device.device_name }}{% if device.id == session.token_id %} <span class="hint">(this browser)</span>{% endif %}</td>
+        <td>{{ device.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</td>
+        <td>{{ device.last_used_at.strftime("%Y-%m-%d %H:%M") }} UTC</td>
+        <td>{% if device.expires_at %}{{ device.expires_at.strftime("%Y-%m-%d %H:%M") }} UTC{% else %}never{% endif %}</td>
+        <td>
+            <form method="post" action="/admin/users/{{ user.id }}/devices/{{ device.id }}/revoke">
+                <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                <button type="submit" class="secondary">Log out</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p class="hint">Not logged in on any device.</p>
+{% endif %}
+
+<h2>Remove</h2>
+{% if user.role == "admin" %}
+{# A disabled button gets no mouse events, so the wrapper shows the reason on hover. #}
+<span class="disabled-reason" title="The admin account cannot be removed. It can be renamed and given a new password.">
+    <button type="button" class="danger" disabled>Remove User</button>
+</span>
+{% else %}
+<form method="get" action="/admin/users/{{ user.id }}/delete">
+    <button type="submit" class="danger">Remove User</button>
+</form>
+{% endif %}
+{% endblock %}

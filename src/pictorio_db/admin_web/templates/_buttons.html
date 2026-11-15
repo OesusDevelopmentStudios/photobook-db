@@ -1,0 +1,12 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{# Buttons used on several pages. #}
+
+{# Back to the page above; it goes into the `back` block, beside the heading. #}
+{% macro back_button(href, description) %}
+<a class="button back" href="{{ href }}" aria-label="{{ description }}">
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    Back
+</a>
+{% endmacro %}

@@ -1,0 +1,19 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{% extends "page.html" %}
+{% block title %}Remove {{ user.username }}{% endblock %}
+{% block heading %}Remove user {{ user.username }}?{% endblock %}
+{% block content %}
+{% if error %}
+<p class="error" role="alert">{{ error }}</p>
+{% endif %}
+
+<p>The account is logged out on every device and cannot be used again. Images the user imported stay in
+the library.</p>
+
+<form method="post" action="/admin/users/{{ user.id }}/delete">
+    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+    <button type="submit" class="danger">Remove {{ user.username }}</button>
+    <a href="/admin/users/{{ user.id }}">Cancel</a>
+</form>
+{% endblock %}

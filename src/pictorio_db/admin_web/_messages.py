@@ -14,4 +14,4 @@ def problem_message(problem: Problem) -> str:
 
 
 def _field_label(field: str) -> str:
-    return field.replace("_", " ").capitalize()  # path_template → Path template
+    return field.removeprefix("body.").replace("_", " ").capitalize()  # body.path_template → Path template

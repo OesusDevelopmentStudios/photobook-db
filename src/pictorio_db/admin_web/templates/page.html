@@ -6,8 +6,10 @@
 {% block nav %}
 <nav>
     <a class="brand" href="/admin">pictorio-db</a>
-    {% for path, name in [("/admin", "Overview"), ("/admin/settings", "Settings")] %}
-    <a href="{{ path }}"{% if request.url.path == path %} aria-current="page"{% endif %}>{{ name }}</a>
+    {% for path, name in [("/admin", "Overview"), ("/admin/settings", "Settings"), ("/admin/users", "User Management")] %}
+    {# A section's own pages count too, e.g. /admin/users/3 for Users; the overview has none. #}
+    {% set current = request.url.path == path or (path != "/admin" and request.url.path.startswith(path + "/")) %}
+    <a href="{{ path }}"{% if current %} aria-current="page"{% endif %}>{{ name }}</a>
     {% endfor %}
     <form method="post" action="/admin/logout">
         <span class="hint">{{ session.user.username }}</span>
