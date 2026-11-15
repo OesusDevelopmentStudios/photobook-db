@@ -1,5 +1,11 @@
 # pictorio-db
 
+[![CI](https://github.com/OesusDevelopmentStudios/pictorio-db/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/OesusDevelopmentStudios/pictorio-db/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/tag/OesusDevelopmentStudios/pictorio-db?sort=semver&label=release)](https://github.com/OesusDevelopmentStudios/pictorio-db/tags)
+[![License: GPL-3.0](https://img.shields.io/github/license/OesusDevelopmentStudios/pictorio-db)](LICENSE)
+[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FOesusDevelopmentStudios%2Fpictorio-db%2Fmaster%2Fpyproject.toml)](pyproject.toml)
+[![Container image](https://img.shields.io/badge/container-ghcr.io-blue?logo=podman)](https://github.com/OesusDevelopmentStudios/pictorio-db/pkgs/container/pictorio-db)
+
 Image library server for [Pictorio](https://github.com/OesusDevelopmentStudios/pictorio).
 
 pictorio-db stores your images in a library folder, arranges them by their tags and keeps a database
