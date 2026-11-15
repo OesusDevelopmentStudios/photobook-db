@@ -14,6 +14,7 @@ from pictorio_db.services.tags._names import (
 from pictorio_db.services.tags._service import (
     DEFAULT_RATING_VALUES,
     MAX_RATING_VALUES,
+    RATING_NAMESPACE,
     NamespaceInfo,
     TagCount,
     TagsService,
@@ -24,6 +25,7 @@ __all__ = [
     "GENERAL_NAMESPACE",
     "MAX_RATING_VALUES",
     "NamespaceInfo",
+    "RATING_NAMESPACE",
     "RESERVED_NAMESPACE_NAMES",
     "TagCount",
     "TagName",

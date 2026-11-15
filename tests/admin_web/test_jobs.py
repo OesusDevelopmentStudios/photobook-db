@@ -2,6 +2,7 @@
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
 import dataclasses
+import re
 import time
 from pathlib import Path
 
@@ -59,12 +60,35 @@ def test_import_page_suggests_the_folders(admin_browser: TestClient) -> None:
     assert '<option value="holiday"><option value="holiday/day_2">' in page
 
 
+def test_import_page_has_a_tag_field_per_namespace(admin_browser: TestClient) -> None:
+    admin_browser.app.state.tags.create_namespace("weather", single_value=True)
+    location = start_import(admin_browser, source_subdir="holiday", tag_category="photo").headers["location"]
+    finished(admin_browser, int(location.rsplit("/", 1)[1]))  # now an image has category:photo
+
+    page = admin_browser.get("/admin/jobs/import").text
+
+    assert re.findall(r'name="tag_(\w+)"', page) == [
+        "category", "author", "character", "rating", "album", "general", "weather"
+    ]
+    assert '<select name="tag_rating">' in page and '<option value="nsfw">nsfw</option>' in page
+    assert re.search(r'<datalist id="tag_category-values">\s*<option value="photo">', page)
+    assert 'list="tag_weather-values"' in page  # every one-tag-per-image namespace gets suggestions
+
+
 def test_imports_a_folder_and_shows_the_result(admin_browser: TestClient) -> None:
-    response = start_import(admin_browser, source_subdir=" holiday ", tags="album:holiday\n\nsummer\n")
+    response = start_import(
+        admin_browser,
+        source_subdir=" holiday ",
+        tag_author=" sample_artist,, Other Artist ",
+        tag_rating="sfw",
+        tag_general="summer",
+        tag_album="",
+    )
 
     job_id = int(response.headers["location"].removeprefix("/admin/jobs/"))
     job = finished(admin_browser, job_id)
-    assert job.params == {"source_subdir": "holiday", "remove_originals": False, "tags": ["album:holiday", "summer"]}
+    tags = ["author:sample_artist", "author:Other Artist", "rating:sfw", "general:summer"]
+    assert job.params == {"source_subdir": "holiday", "remove_originals": False, "tags": tags}
     page = admin_browser.get(f"/admin/jobs/{job_id}").text
     assert "Import of <code>holiday</code>" in page
     assert '<span class="status status-done">Done</span>' in page
@@ -79,9 +103,10 @@ def test_imports_a_folder_and_shows_the_result(admin_browser: TestClient) -> Non
     [
         ({"source_subdir": "nowhere"}, "Folder not found. The import folder has no &#39;nowhere&#39;."),
         ({"source_subdir": "../outside"}, "Invalid folder."),
-        ({"source_subdir": "holiday", "tags": "a|b"}, "Invalid tag."),
+        ({"source_subdir": "holiday", "tag_general": "a|b"}, "Invalid tag."),
+        ({"source_subdir": "holiday", "tag_category": "photo, artwork"}, "An image has one category tag, so give one."),
     ],
-    ids=["missing folder", "outside the import folder", "invalid tag"],
+    ids=["missing folder", "outside the import folder", "invalid tag", "two tags in a one-tag field"],
 )
 def test_import_that_cannot_start_shows_why(admin_browser: TestClient, fields: dict[str, str], message: str) -> None:
     response = start_import(admin_browser, remove_originals="true", **fields)
@@ -89,6 +114,8 @@ def test_import_that_cannot_start_shows_why(admin_browser: TestClient, fields: d
     assert response.status_code == 422
     assert message in response.text
     assert f'value="{fields["source_subdir"]}"' in response.text and " checked>" in response.text
+    for key, value in fields.items():  # the tag fields keep what was entered, too
+        assert f'name="{key}"' not in response.text or f'value="{value}"' in response.text
     assert admin_browser.app.state.jobs.list_jobs(admin_browser.app.state.auth.list_users()[0]) == []
 
 

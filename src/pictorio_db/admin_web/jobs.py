@@ -4,21 +4,35 @@
 """/admin/jobs: background jobs and their progress, and starting a folder import. Pages of unfinished jobs
 reload themselves, so progress shows without JavaScript."""
 
+from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from pictorio_db.admin_web._messages import problem_message
 from pictorio_db.admin_web._session import AdminForm, AdminPage, AdminSession, PageError
 from pictorio_db.admin_web._templates import templates
 from pictorio_db.services.jobs import SUCCESSFUL_JOB_LIFETIME, FolderImport, JobInfo, JobStatus
+from pictorio_db.services.tags import RATING_NAMESPACE, NamespaceInfo, TagsService
 from pictorio_db.utils.problems import Problem
 
 router = APIRouter(prefix="/jobs")
 
 REFRESH_SECONDS = 2  # the worker writes progress about once a second
 UNFINISHED = (JobStatus.QUEUED, JobStatus.RUNNING)
+TAG_FIELD_PREFIX = "tag_"  # the import form has a field per namespace: tag_author, tag_rating…
+SUGGESTIONS = 100  # values offered for a one-tag-per-image namespace
+
+
+@dataclass(frozen=True)
+class TagField:
+    """One namespace's field in the import form."""
+
+    namespace: str
+    kind: str  # "choice": a fixed list (ratings); "single": one tag, with suggestions; "several": comma-separated
+    value: str
+    options: list[str]
 
 
 @router.get("", response_class=HTMLResponse)
@@ -50,20 +64,27 @@ def import_page(request: Request, session: AdminPage) -> HTMLResponse:
     return _import_page(request, session)
 
 
+async def _entered_tags(request: Request) -> dict[str, str]:
+    """The import form's tag fields, by namespace. Read here because the fields depend on the namespaces."""
+    form = await request.form()
+    fields = [(key, str(value)) for key, value in form.items() if key.startswith(TAG_FIELD_PREFIX)]
+    return {key.removeprefix(TAG_FIELD_PREFIX): value for key, value in fields}
+
+
 @router.post("/import", response_class=HTMLResponse)
 def start_import(
     request: Request,
     session: AdminForm,
+    entered_tags: Annotated[dict[str, str], Depends(_entered_tags)],
     source_subdir: Annotated[str, Form()] = "",
-    tags: Annotated[str, Form()] = "",
     remove_originals: Annotated[bool, Form()] = False,  # an unticked checkbox is not sent at all
 ) -> Response:
-    tag_list = [line.strip() for line in tags.splitlines() if line.strip()]
     try:
-        job = _folder_import(request).start(source_subdir.strip(), remove_originals, tag_list, session.user.id)
+        tags = _tag_texts(entered_tags, _tags(request).list_namespaces())
+        job = _folder_import(request).start(source_subdir.strip(), remove_originals, tags, session.user.id)
     except Problem as problem:
         return _import_page(
-            request, session, source_subdir, tags, remove_originals, problem_message(problem), problem.status
+            request, session, source_subdir, entered_tags, remove_originals, problem_message(problem), problem.status
         )
 
     return RedirectResponse(f"/admin/jobs/{job.id}", status_code=303)
@@ -91,6 +112,43 @@ def _folder_import(request: Request) -> FolderImport:
     return request.app.state.folder_import
 
 
+def _tags(request: Request) -> TagsService:
+    return request.app.state.tags
+
+
+def _tag_texts(entered: dict[str, str], namespaces: list[NamespaceInfo]) -> list[str]:
+    """"sample_artist, other_artist" in the author field → author:sample_artist, author:other_artist. A comma
+    can be no part of a tag, so it separates tags; a one-tag-per-image field takes its text whole."""
+    texts = []
+    for namespace in namespaces:
+        text = entered.get(namespace.name, "")
+        if namespace.single_value and "," in text:
+            raise Problem(
+                422, "validation_error", "Invalid tag", f"An image has one {namespace.name} tag, so give one."
+            )
+
+        names = [text] if namespace.single_value else text.split(",")
+        texts += [f"{namespace.name}:{name.strip()}" for name in names if name.strip()]
+
+    return texts
+
+
+def _tag_fields(request: Request, entered: dict[str, str]) -> list[TagField]:
+    tags = _tags(request)
+    fields = []
+    for namespace in tags.list_namespaces():
+        value = entered.get(namespace.name, "")
+        if namespace.name == RATING_NAMESPACE:
+            fields.append(TagField(namespace.name, "choice", value, tags.rating_values()))
+        elif namespace.single_value:
+            known = [match.tag.name for match in tags.autocomplete(namespace=namespace.name, limit=SUGGESTIONS)]
+            fields.append(TagField(namespace.name, "single", value, known))
+        else:
+            fields.append(TagField(namespace.name, "several", value, []))
+
+    return fields
+
+
 def _usernames(request: Request) -> dict[int, str]:
     return {user.id: user.username for user in request.app.state.auth.list_users()}
 
@@ -99,7 +157,7 @@ def _import_page(
     request: Request,
     session: AdminSession,
     source_subdir: str = "",
-    tags: str = "",
+    entered_tags: dict[str, str] | None = None,
     remove_originals: bool = False,
     error: str | None = None,
     status_code: int = 200,
@@ -109,7 +167,8 @@ def _import_page(
         "import_dir": request.app.state.server_settings.current().import_dir,
         "source_folders": _folder_import(request).source_folders(),
         "source_subdir": source_subdir,
-        "tags": tags,
+        "tag_fields": _tag_fields(request, entered_tags or {}),
+        "tag_field_prefix": TAG_FIELD_PREFIX,
         "remove_originals": remove_originals,
         "error": error,
     }

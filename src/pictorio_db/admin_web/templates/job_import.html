@@ -25,10 +25,34 @@ to import from, then restart it.</p>
     </datalist>
     <span class="hint">A folder inside the import folder <code>{{ import_dir }}</code>, with its subfolders.
         Leave it empty to import the whole import folder.</span>
-    <label>Tags
-        <textarea name="tags" rows="3" spellcheck="false">{{ tags }}</textarea>
-    </label>
-    <span class="hint">One per line, e.g. <code>album:vacation_2015</code>. Every imported image gets them.</span>
+    <fieldset class="tag-fields">
+        <legend>Tags</legend>
+        <span class="hint">Every imported image gets them. Separate several tags with commas, e.g.
+            <code>sample_artist, other_artist</code>.</span>
+        <div class="tag-grid">
+            {% for field in tag_fields %}
+            {% set name = tag_field_prefix ~ field.namespace %}
+            <label>{{ field.namespace }}
+                {% if field.kind == "choice" %}
+                <select name="{{ name }}">
+                    <option value="">–</option>
+                    {% for option in field.options %}
+                    <option value="{{ option }}"{% if option == field.value %} selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+                {% elif field.kind == "single" %}
+                <input name="{{ name }}" list="{{ name }}-values" value="{{ field.value }}" autocomplete="off"
+                       spellcheck="false" placeholder="pick or type one tag">
+                <datalist id="{{ name }}-values">
+                    {% for option in field.options %}<option value="{{ option }}">{% endfor %}
+                </datalist>
+                {% else %}
+                <input name="{{ name }}" value="{{ field.value }}" autocomplete="off" spellcheck="false">
+                {% endif %}
+            </label>
+            {% endfor %}
+        </div>
+    </fieldset>
     <label>
         <input type="checkbox" name="remove_originals" value="true"{% if remove_originals %} checked{% endif %}>
         Remove the originals

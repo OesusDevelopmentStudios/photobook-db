@@ -56,6 +56,11 @@ nav button { margin-top: 0; padding: 0.25rem 0.8rem; font-size: 0.9rem; }
 
 label { display: block; margin-top: 1rem; }
 form > .hint { display: block; }  /* a field's hint, under the field */
+fieldset {
+    margin: 1.5rem 0 0; padding: 0.5rem 1rem 1rem; border: 1px solid var(--border); border-radius: var(--radius);
+}
+legend { padding: 0 0.4rem; }
+.tag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 0 1.5rem; }
 input, select, textarea {
     width: 100%; box-sizing: border-box; padding: 0.4rem 0.5rem; font: inherit;
     background: var(--view); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
