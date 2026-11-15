@@ -107,6 +107,19 @@ class TagsService:
         with self._database.session() as session:
             return session.scalar(query) is not None
 
+    def image_count(self, tag: TagName) -> int | None:
+        """How many images have the tag, counting all of them; None if the tag does not exist."""
+        query = (
+            select(func.count(image_tag.c.image_id))
+            .select_from(Tag)
+            .join(Namespace, Tag.namespace_id == Namespace.id)
+            .outerjoin(image_tag, image_tag.c.tag_id == Tag.id)
+            .where(Namespace.name == tag.namespace, Tag.name == tag.name)
+            .group_by(Tag.id)
+        )
+        with self._database.session() as session:
+            return session.scalar(query)
+
     def autocomplete(
         self,
         prefix: str = "",

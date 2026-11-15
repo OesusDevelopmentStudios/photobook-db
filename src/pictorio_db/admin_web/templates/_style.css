@@ -79,6 +79,7 @@ button.secondary:hover, a.button.secondary:hover {
     filter: none; border-color: var(--accent); background: var(--hover);
 }
 button.danger { background: var(--negative); color: var(--text); border-color: var(--negative); }
+button + a.button { margin-left: 0.5rem; }  /* e.g. Cancel beside the button that confirms */
 button:disabled {
     background: var(--button); color: var(--muted-text); border-color: var(--border); filter: none; cursor: default;
 }
@@ -97,7 +98,8 @@ a.button.back {
 }
 
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; }
-.toolbar form { display: flex; gap: 0.5rem; flex: 1; max-width: 32rem; }
+.toolbar form { display: flex; gap: 0.5rem; flex: 1; max-width: 40rem; }
+.toolbar select { width: auto; }
 .toolbar button, .toolbar a.button { margin-top: 0; }
 .toolbar a.button { margin-left: auto; }
 

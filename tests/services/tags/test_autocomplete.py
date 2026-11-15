@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from pictorio_db.db import Database
 from pictorio_db.db.models import Image, Namespace, Tag, image_tag
-from pictorio_db.services.tags import TagsService
+from pictorio_db.services.tags import TagName, TagsService
 
 # tag → number of images that carry it
 TAGGED_IMAGES = {
@@ -116,3 +116,15 @@ def test_unknown_namespace_finds_nothing(tags: TagsService) -> None:
 
 def test_limit(tags: TagsService) -> None:
     assert suggestions(tags, limit=1) == ["author:sample_artist"]
+
+
+# --- One tag
+
+@pytest.mark.parametrize(
+    "tag, count",
+    [(TagName("author", "sample_artist"), 3), (TagName("character", "nobody_yet"), 0),
+     (TagName("author", "nobody"), None), (TagName("general", "sample_artist"), None)],
+    ids=["used", "unused", "unknown", "other namespace"],
+)
+def test_counts_the_images_of_one_tag(tags: TagsService, tag: TagName, count: int | None) -> None:
+    assert tags.image_count(tag) == count
