@@ -41,7 +41,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "pictorio_db.db" = ["migrations/script.py.mako"]  # template for new migrations
-"pictorio_db.admin_web" = ["templates/*.html"]
+"pictorio_db.admin_web" = ["templates/*"]  # the pages, and the stylesheet they include
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
