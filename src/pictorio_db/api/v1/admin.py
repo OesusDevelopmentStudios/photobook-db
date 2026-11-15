@@ -6,7 +6,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from pictorio_db.api.v1.dependencies import (
     AccessServiceDependency,
@@ -38,16 +38,21 @@ RESTRICTED_TAGS_DESCRIPTION = "Search terms, e.g. rating:nsfw or character:*; ig
 
 
 class NewUser(BaseModel):
+    """Always a standard user: the server has one admin account, made by the setup."""
+
+    model_config = ConfigDict(extra="forbid")  # a "role" from an older client must fail, not be ignored
+
     username: str = Field(max_length=100)
     password: str = Field(max_length=PASSWORD_MAX_LENGTH)
-    role: Role
     restricted_tags: list[str] = Field(default=[], max_length=100, description=RESTRICTED_TAGS_DESCRIPTION)
 
 
 class UserChanges(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    username: str | None = Field(default=None, max_length=100, description="Renames the user; logins stay valid")
     password: str | None = Field(default=None, max_length=PASSWORD_MAX_LENGTH,
                                  description="A new password also logs the user out on every device")
-    role: Role | None = None
     restricted_tags: list[str] | None = Field(
         default=None, max_length=100, description=f"Replaces the whole list. {RESTRICTED_TAGS_DESCRIPTION}"
     )
@@ -70,14 +75,14 @@ def create_user(
     new_user: NewUser, _admin: CurrentAdmin, auth: AuthServiceDependency, access: AccessServiceDependency
 ) -> UserDetails:
     restricted_tags = access.checked_terms(new_user.restricted_tags)  # before anything is created
-    user = auth.create_user(new_user.username, new_user.password, new_user.role)
+    user = auth.create_user(new_user.username, new_user.password)
     access.set_restricted_terms(user.id, restricted_tags)
     return _user_details(user, access)
 
 
 @router.patch(
     "/users/{user_id}",
-    summary="Change a user's password, role or restricted tags",
+    summary="Rename a user, or change their password or restricted tags",
     responses=problem_responses(401, 403, 404, 409, 422),
 )
 def update_user(
@@ -88,7 +93,7 @@ def update_user(
     access: AccessServiceDependency,
 ) -> UserDetails:
     restricted_tags = None if changes.restricted_tags is None else access.checked_terms(changes.restricted_tags)
-    user = auth.update_user(user_id, password=changes.password, role=changes.role)
+    user = auth.update_user(user_id, username=changes.username, password=changes.password)
     if restricted_tags is not None:
         access.set_restricted_terms(user.id, restricted_tags)
 
@@ -98,7 +103,7 @@ def update_user(
 @router.delete(
     "/users/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a user account; the last admin cannot be deleted",
+    summary="Delete a user account; the admin account cannot be deleted",
     responses=problem_responses(401, 403, 404, 409, 422),
 )
 def delete_user(user_id: int, _admin: CurrentAdmin, auth: AuthServiceDependency) -> None:

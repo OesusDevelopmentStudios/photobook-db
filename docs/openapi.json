@@ -1674,7 +1674,7 @@
         "tags": [
           "admin"
         ],
-        "summary": "Change a user's password, role or restricted tags",
+        "summary": "Rename a user, or change their password or restricted tags",
         "operationId": "update_user_api_v1_admin_users__user_id__patch",
         "security": [
           {
@@ -1769,7 +1769,7 @@
         "tags": [
           "admin"
         ],
-        "summary": "Delete a user account; the last admin cannot be deleted",
+        "summary": "Delete a user account; the admin account cannot be deleted",
         "operationId": "delete_user_api_v1_admin_users__user_id__delete",
         "security": [
           {
@@ -2741,9 +2741,6 @@
             "maxLength": 1024,
             "title": "Password"
           },
-          "role": {
-            "$ref": "#/components/schemas/Role"
-          },
           "restricted_tags": {
             "items": {
               "type": "string"
@@ -2755,13 +2752,14 @@
             "default": []
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "username",
-          "password",
-          "role"
+          "password"
         ],
-        "title": "NewUser"
+        "title": "NewUser",
+        "description": "Always a standard user: the server has one admin account, made by the setup."
       },
       "Order": {
         "type": "string",
@@ -3122,6 +3120,19 @@
       },
       "UserChanges": {
         "properties": {
+          "username": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username",
+            "description": "Renames the user; logins stay valid"
+          },
           "password": {
             "anyOf": [
               {
@@ -3134,16 +3145,6 @@
             ],
             "title": "Password",
             "description": "A new password also logs the user out on every device"
-          },
-          "role": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Role"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "restricted_tags": {
             "anyOf": [
@@ -3162,6 +3163,7 @@
             "description": "Replaces the whole list. Search terms, e.g. rating:nsfw or character:*; ignored for admins"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "title": "UserChanges"
       },

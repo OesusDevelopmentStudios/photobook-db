@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from pictorio_db.db import Database
 from pictorio_db.db.models import ApiToken, User
@@ -302,19 +303,40 @@ def test_new_password_replaces_the_old_and_logs_out_everywhere(auth: AuthService
     auth.create_token("kid", "a brand new password", "laptop")
 
 
-def test_can_make_a_user_admin(auth: AuthService) -> None:
+def test_new_users_are_standard_users(auth: AuthService) -> None:
+    assert auth.create_user("kid", PASSWORD).role == Role.USER
+
+
+def test_there_is_only_one_admin_account(auth: AuthService, database: Database) -> None:
+    auth.create_user("apo", PASSWORD, Role.ADMIN)
+
+    problem = raised_problem(lambda: auth.create_user("second", PASSWORD, Role.ADMIN))
+
+    assert (problem.status, problem.code) == (409, "admin_exists")
+    with database.session() as session:  # the database refuses a second one too
+        session.add(User(username="second", password_hash="x", role="admin", created_at=datetime(2026, 11, 15)))
+        with pytest.raises(IntegrityError):
+            session.commit()
+
+
+def test_renaming_keeps_the_logins(auth: AuthService) -> None:
+    kid = auth.create_user("kid", PASSWORD, Role.USER)
+    token = auth.create_token("kid", PASSWORD, "laptop")
+
+    renamed = auth.update_user(kid.id, username=" Kiddo ")
+
+    assert renamed.username == "kiddo"
+    assert auth.authenticate(token.token).user == renamed
+    auth.create_token("kiddo", PASSWORD, "laptop")
+
+
+@pytest.mark.parametrize("username, code", [("apo", "already_exists"), ("with space", "validation_error")])
+def test_renaming_refuses_taken_or_invalid_names(auth: AuthService, username: str, code: str) -> None:
+    auth.create_user("apo", PASSWORD, Role.ADMIN)
     kid = auth.create_user("kid", PASSWORD, Role.USER)
 
-    assert auth.update_user(kid.id, role=Role.ADMIN).role == Role.ADMIN
-
-
-def test_last_admin_cannot_become_a_normal_user(auth: AuthService) -> None:
-    admin = auth.create_user("apo", PASSWORD, Role.ADMIN)
-
-    problem = raised_problem(lambda: auth.update_user(admin.id, role=Role.USER))
-
-    assert (problem.status, problem.code) == (409, "last_admin")
-    assert auth.list_users()[0].role == Role.ADMIN
+    assert raised_problem(lambda: auth.update_user(kid.id, username=username)).code == code
+    assert auth.get_user(kid.id).username == "kid"
 
 
 def test_deleting_a_user_removes_their_tokens(auth: AuthService) -> None:
@@ -327,25 +349,32 @@ def test_deleting_a_user_removes_their_tokens(auth: AuthService) -> None:
     assert raised_problem(lambda: auth.authenticate(token.token)).status == 401
 
 
-def test_last_admin_cannot_be_deleted_but_another_can(auth: AuthService) -> None:
-    first_admin = auth.create_user("apo", PASSWORD, Role.ADMIN)
+def test_the_admin_account_cannot_be_deleted(auth: AuthService) -> None:
+    admin = auth.create_user("apo", PASSWORD, Role.ADMIN)
 
-    assert raised_problem(lambda: auth.delete_user(first_admin.id)).code == "last_admin"
+    problem = raised_problem(lambda: auth.delete_user(admin.id))
 
-    second_admin = auth.create_user("second", PASSWORD, Role.ADMIN)
-    auth.delete_user(first_admin.id)
-    assert [user.id for user in auth.list_users()] == [second_admin.id]
+    assert (problem.status, problem.code) == (409, "admin_not_deletable")
+    assert auth.list_users() == [admin]
 
 
-@pytest.mark.parametrize("action", ["update", "delete"])
+def test_finds_a_user_by_id(auth: AuthService) -> None:
+    kid = auth.create_user("kid", PASSWORD, Role.USER)
+
+    assert auth.get_user(kid.id) == kid
+
+
+@pytest.mark.parametrize("action", ["get", "update", "delete"])
 def test_unknown_user_is_not_found(auth: AuthService, action: str) -> None:
-    def change_unknown_user() -> None:
-        if action == "update":
-            auth.update_user(999, role=Role.ADMIN)
+    def use_unknown_user() -> None:
+        if action == "get":
+            auth.get_user(999)
+        elif action == "update":
+            auth.update_user(999, username="kid")
         else:
             auth.delete_user(999)
 
-    problem = raised_problem(change_unknown_user)
+    problem = raised_problem(use_unknown_user)
 
     assert (problem.status, problem.code) == (404, "not_found")
 

@@ -6,7 +6,18 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, CheckConstraint, Column, ForeignKey, Index, MetaData, String, Table, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    Column,
+    ForeignKey,
+    Index,
+    MetaData,
+    String,
+    Table,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # Fixed constraint names, so that later migrations can refer to them.
@@ -90,7 +101,10 @@ image_tag = Table(
 
 class User(Base):
     __tablename__ = "user"
-    __table_args__ = (CheckConstraint(f"role IN ({_ROLES_SQL})", name="role"),)
+    __table_args__ = (
+        CheckConstraint(f"role IN ({_ROLES_SQL})", name="role"),
+        Index(None, "role", unique=True, sqlite_where=text("role = 'admin'")),  # one admin account only
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(USERNAME_MAX_LENGTH), unique=True)  # always lowercase

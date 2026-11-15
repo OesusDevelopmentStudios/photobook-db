@@ -96,19 +96,21 @@ class AuthService:
 
     # --- Users
 
-    def create_user(self, username: str, password: str, role: Role) -> UserInfo:
+    def create_user(self, username: str, password: str, role: Role = Role.USER) -> UserInfo:
         username = normalized_username(username)
         check_username(username)
         check_password(password)
         user = User(username=username, password_hash=hash_password(password), role=role, created_at=self._now())
         with self._database.session() as session:
+            if role == Role.ADMIN and self._admin_count(session) > 0:
+                raise Problem(409, "admin_exists", "There is an admin account already",
+                              "A server has one admin account; new accounts are standard users.")
+
             session.add(user)
             try:
                 session.commit()
             except IntegrityError:
-                raise Problem(
-                    409, "already_exists", "Username is taken", f"A user {username!r} exists already."
-                ) from None
+                raise _username_taken(username) from None
 
             return _user_info(user)
 
@@ -116,31 +118,46 @@ class AuthService:
         with self._database.session() as session:
             return [_user_info(user) for user in session.scalars(select(User).order_by(User.username))]
 
-    def update_user(self, user_id: int, password: str | None = None, role: Role | None = None) -> UserInfo:
-        """A new password also logs the user out everywhere: an admin sets one when the old one leaked."""
+    def get_user(self, user_id: int) -> UserInfo:
+        """Raises 404 not_found."""
+        with self._database.session() as session:
+            return _user_info(_existing_user(session, user_id))
+
+    def update_user(self, user_id: int, username: str | None = None, password: str | None = None) -> UserInfo:
+        if username is not None:
+            username = normalized_username(username)
+            check_username(username)
+
         if password is not None:
             check_password(password)
 
         with self._database.session() as session:
             user = _existing_user(session, user_id)
-            was_admin = user.role == Role.ADMIN
+            if username is not None:
+                user.username = username
+
             if password is not None:
                 user.password_hash = hash_password(password)
                 session.execute(delete(ApiToken).where(ApiToken.user_id == user_id))
 
-            if role is not None:
-                user.role = role
+            try:
+                session.commit()
+            except IntegrityError:
+                assert username is not None
+                raise _username_taken(username) from None
 
-            self._commit_keeping_an_admin(session, was_admin)
             return _user_info(user)
 
     def delete_user(self, user_id: int) -> None:
-        """Their tokens go with them."""
+        """Their tokens go with them. Raises 404, or 409 admin_not_deletable for the admin account."""
         with self._database.session() as session:
             user = _existing_user(session, user_id)
-            was_admin = user.role == Role.ADMIN
+            if user.role == Role.ADMIN:
+                raise Problem(409, "admin_not_deletable", "The admin account cannot be deleted",
+                              "It can be renamed and given a new password instead.")
+
             session.delete(user)
-            self._commit_keeping_an_admin(session, was_admin)
+            session.commit()
 
     # --- Logins
 
@@ -228,17 +245,6 @@ class AuthService:
     def _admin_count(session: Session) -> int:
         return session.scalar(select(func.count()).select_from(User).where(User.role == Role.ADMIN)) or 0
 
-    # Only a change to an admin can remove the last one. Counted after the change, in the same transaction,
-    # so two requests at once cannot remove the last two admins between them.
-    def _commit_keeping_an_admin(self, session: Session, changed_user_was_admin: bool) -> None:
-        session.flush()
-        if changed_user_was_admin and self._admin_count(session) == 0:
-            session.rollback()
-            raise Problem(409, "last_admin", "The last admin cannot be removed",
-                          "Make another user an admin first.")
-
-        session.commit()
-
 
 def not_authenticated() -> Problem:
     return Problem(
@@ -248,6 +254,10 @@ def not_authenticated() -> Problem:
         "Wrong username or password, or the token is unknown or revoked.",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+
+def _username_taken(username: str) -> Problem:
+    return Problem(409, "already_exists", "Username is taken", f"A user {username!r} exists already.")
 
 
 def _existing_user(session: Session, user_id: int) -> User:

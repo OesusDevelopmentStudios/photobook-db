@@ -29,8 +29,8 @@ def admin_headers(client: TestClient, auth: AuthService) -> dict[str, str]:
 
 ADMIN_ENDPOINTS = [
     ("GET", "/api/v1/admin/users", None),
-    ("POST", "/api/v1/admin/users", {"username": "new", "password": PASSWORD, "role": "user"}),
-    ("PATCH", "/api/v1/admin/users/1", {"role": "user"}),
+    ("POST", "/api/v1/admin/users", {"username": "new", "password": PASSWORD}),
+    ("PATCH", "/api/v1/admin/users/1", {"username": "renamed"}),
     ("DELETE", "/api/v1/admin/users/1", None),
 ]
 
@@ -56,7 +56,7 @@ def test_admin_endpoints_are_forbidden_for_normal_users(
 
 def test_creates_and_lists_users(client: TestClient, admin_headers: dict[str, str]) -> None:
     response = client.post(
-        "/api/v1/admin/users", json={"username": "Kid", "password": PASSWORD, "role": "user"}, headers=admin_headers
+        "/api/v1/admin/users", json={"username": "Kid", "password": PASSWORD}, headers=admin_headers
     )
 
     assert response.status_code == 201
@@ -74,30 +74,46 @@ def test_creates_and_lists_users(client: TestClient, admin_headers: dict[str, st
 
 def test_existing_username_is_a_conflict(client: TestClient, admin_headers: dict[str, str]) -> None:
     response = client.post(
-        "/api/v1/admin/users", json={"username": "APO", "password": PASSWORD, "role": "user"}, headers=admin_headers
+        "/api/v1/admin/users", json={"username": "APO", "password": PASSWORD}, headers=admin_headers
     )
 
     assert response.status_code == 409
     assert response.json()["code"] == "already_exists"
 
 
-def test_unknown_role_is_invalid(client: TestClient, admin_headers: dict[str, str]) -> None:
-    response = client.post(
-        "/api/v1/admin/users", json={"username": "kid", "password": PASSWORD, "role": "owner"}, headers=admin_headers
-    )
+@pytest.mark.parametrize("method", ["POST", "PATCH"])
+def test_no_one_can_be_made_an_admin(
+    client: TestClient, auth: AuthService, admin_headers: dict[str, str], method: str
+) -> None:
+    kid = auth.create_user("kid", PASSWORD, Role.USER)
+    path = "/api/v1/admin/users" if method == "POST" else f"/api/v1/admin/users/{kid.id}"
+    body = {"role": "admin"} | ({"username": "second", "password": PASSWORD} if method == "POST" else {})
+
+    response = client.request(method, path, json=body, headers=admin_headers)
 
     assert response.status_code == 422
     assert response.json()["errors"][0]["field"] == "body.role"
+    assert [user.role for user in auth.list_users()] == [Role.ADMIN, Role.USER]
 
 
-def test_changes_a_users_role(client: TestClient, auth: AuthService, admin_headers: dict[str, str]) -> None:
+def test_renames_a_user(client: TestClient, auth: AuthService, admin_headers: dict[str, str]) -> None:
     kid = auth.create_user("kid", PASSWORD, Role.USER)
 
-    response = client.patch(f"/api/v1/admin/users/{kid.id}", json={"role": "admin"}, headers=admin_headers)
+    response = client.patch(f"/api/v1/admin/users/{kid.id}", json={"username": "Kiddo"}, headers=admin_headers)
 
     assert response.status_code == 200
-    assert response.json()["role"] == "admin"
-    assert response.json()["restrictions_active"] is False
+    assert response.json()["username"] == "kiddo"
+
+
+def test_renaming_to_a_taken_name_is_a_conflict(
+    client: TestClient, auth: AuthService, admin_headers: dict[str, str]
+) -> None:
+    kid = auth.create_user("kid", PASSWORD, Role.USER)
+
+    response = client.patch(f"/api/v1/admin/users/{kid.id}", json={"username": "apo"}, headers=admin_headers)
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "already_exists"
 
 
 def test_deletes_a_user(client: TestClient, auth: AuthService, admin_headers: dict[str, str]) -> None:
@@ -109,19 +125,19 @@ def test_deletes_a_user(client: TestClient, auth: AuthService, admin_headers: di
     assert [user.username for user in auth.list_users()] == ["apo"]
 
 
-def test_the_last_admin_cannot_delete_themselves(client: TestClient, admin_headers: dict[str, str]) -> None:
+def test_the_admin_account_cannot_be_deleted(client: TestClient, admin_headers: dict[str, str]) -> None:
     own_id = client.get("/api/v1/auth/me", headers=admin_headers).json()["id"]
 
     response = client.delete(f"/api/v1/admin/users/{own_id}", headers=admin_headers)
 
     assert response.status_code == 409
-    assert response.json()["code"] == "last_admin"
+    assert response.json()["code"] == "admin_not_deletable"
 
 
 # --- Restricted tags
 
 def create(client: TestClient, admin_headers: dict[str, str], body: dict) -> object:
-    return client.post("/api/v1/admin/users", json={"password": PASSWORD, "role": "user"} | body, headers=admin_headers)
+    return client.post("/api/v1/admin/users", json={"password": PASSWORD} | body, headers=admin_headers)
 
 
 def test_creates_a_user_with_restricted_tags(client: TestClient, admin_headers: dict[str, str]) -> None:
@@ -156,19 +172,21 @@ def test_invalid_term_changes_nothing(client: TestClient, admin_headers: dict[st
     user_id = create(client, admin_headers, {"username": "kid", "restricted_tags": ["rating:nsfw"]}).json()["id"]
 
     response = client.patch(
-        f"/api/v1/admin/users/{user_id}", json={"role": "admin", "restricted_tags": ["(a"]}, headers=admin_headers
+        f"/api/v1/admin/users/{user_id}", json={"username": "renamed", "restricted_tags": ["(a"]}, headers=admin_headers
     )
 
     assert response.status_code == 422
     users = client.get("/api/v1/admin/users", headers=admin_headers).json()
     user = next(user for user in users if user["id"] == user_id)
-    assert (user["role"], user["restricted_tags"]) == ("user", ["rating:nsfw"])
+    assert (user["username"], user["restricted_tags"]) == ("kid", ["rating:nsfw"])
 
 
 def test_restricted_tags_of_an_admin_are_kept_but_inactive(client: TestClient, admin_headers: dict[str, str]) -> None:
-    body = {"username": "second", "role": "admin", "restricted_tags": ["rating:nsfw"]}
+    own_id = client.get("/api/v1/auth/me", headers=admin_headers).json()["id"]
 
-    response = create(client, admin_headers, body)
+    response = client.patch(
+        f"/api/v1/admin/users/{own_id}", json={"restricted_tags": ["rating:nsfw"]}, headers=admin_headers
+    )
 
     assert response.json()["restricted_tags"] == ["rating:nsfw"]
     assert response.json()["restrictions_active"] is False

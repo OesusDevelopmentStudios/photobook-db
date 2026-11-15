@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 
-from pictorio_db.db.models import ApiToken
+from pictorio_db.db.models import ApiToken, User
 from pictorio_db.services.auth import Role
 from pictorio_db.utils.time import utc_now
 
@@ -83,10 +83,9 @@ def test_session_ends_after_twelve_hours(admin_browser: TestClient) -> None:
 
 
 def test_admin_who_became_a_user_is_logged_out(admin_browser: TestClient) -> None:
-    auth = admin_browser.app.state.auth
-    auth.create_user("other_admin", PASSWORD, Role.ADMIN)
-    apo = next(user for user in auth.list_users() if user.username == "apo")
-    auth.update_user(apo.id, role=Role.USER)
+    with admin_browser.app.state.database.session() as session:  # as the one-admin migration may do
+        session.execute(update(User).values(role=Role.USER))
+        session.commit()
 
     assert admin_browser.get("/admin", follow_redirects=False).status_code == 303
 
