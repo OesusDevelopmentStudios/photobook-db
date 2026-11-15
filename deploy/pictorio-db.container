@@ -8,12 +8,16 @@
 #   systemctl --user start pictorio-db
 #
 # To start it at boot without logging in: loginctl enable-linger $USER
+# To install new releases by themselves: systemctl --user enable --now podman-auto-update.timer
 
 [Unit]
 Description=pictorio-db image library server
 
 [Container]
-Image=localhost/pictorio-db:latest
+# The released image for amd64 and arm64. For an image you built yourself, use localhost/pictorio-db:latest
+# and remove AutoUpdate.
+Image=ghcr.io/oesusdevelopmentstudios/pictorio-db:latest
+AutoUpdate=registry
 ContainerName=pictorio-db
 PublishPort=8737:8737
 
