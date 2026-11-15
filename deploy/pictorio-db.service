@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
+#
+# systemd user service for pictorio-db installed with pipx (without a container). Copy this file to
+# ~/.config/systemd/user/ and run:
+#
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now pictorio-db
+#
+# To start it at boot without logging in: loginctl enable-linger $USER
+
+[Unit]
+Description=pictorio-db image library server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/pictorio-db serve
+
+# Reachable from the other computers in the network. Behind a reverse proxy on this computer
+# (deploy/Caddyfile.example), remove this line: the server then listens on 127.0.0.1 only.
+Environment=PICTORIO_HOST=0.0.0.0
+
+# The defaults: the database in ~/.local/share/pictorio-db, the images in ~/Pictures/pictorio-library.
+#Environment=PICTORIO_LIBRARY_DIR=/srv/pictorio-library
+# Optional: a folder that admins can import from.
+#Environment=PICTORIO_IMPORT_DIR=/srv/photos-inbox
+
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
