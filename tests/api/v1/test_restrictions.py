@@ -166,6 +166,12 @@ def check_search_excludes(client: TestClient, setup: Setup) -> None:
     assert setup.nsfw_id not in found(client, setup.kid, {"q": "summer", "apply_hidden_filters": False})[0]
 
 
+def check_count_excludes(client: TestClient, setup: Setup) -> None:
+    params = {"q": "summer", "apply_hidden_filters": False}
+    assert client.get("/api/v1/images/count", params=params, headers=setup.kid).json()["count"] == 1
+    assert client.get("/api/v1/images/count", params=params, headers=setup.admin).json()["count"] == 2
+
+
 def check_upload_refuses(client: TestClient, setup: Setup) -> None:
     assert upload(client, setup.kid, jpeg("blue"), ["rating:nsfw"]).status_code == 403
     duplicate = upload(client, setup.kid, setup.nsfw_bytes, [])
@@ -196,6 +202,7 @@ def expect_admins_only(method: str) -> Callable[[TestClient, Setup], None]:
 # must be added here; test_every_image_route_is_checked fails until it is.
 ACCESS_RULES = {
     ("GET", "/api/v1/images"): check_search_excludes,
+    ("GET", "/api/v1/images/count"): check_count_excludes,
     ("POST", "/api/v1/images"): check_upload_refuses,
     ("POST", "/api/v1/images/bulk-tags"): check_bulk_refuses,
     ("GET", "/api/v1/images/{image_id}"): expect_not_found("GET", "/api/v1/images/{image_id}"),

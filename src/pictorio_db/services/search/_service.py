@@ -14,7 +14,7 @@ from sqlalchemy import ColumnElement, and_, func, or_, select
 from pictorio_db.db import Database
 from pictorio_db.db.models import Image
 from pictorio_db.services.search._conditions import matching_condition
-from pictorio_db.services.search._hidden_filters import apply_hidden_filters
+from pictorio_db.services.search._hidden_filters import FilteredQuery, apply_hidden_filters
 from pictorio_db.services.search._parser import parse_query
 from pictorio_db.utils.problems import Problem
 
@@ -51,6 +51,12 @@ class SearchPage:
     effective_query: str  # the query with the hidden filters that were added
 
 
+@dataclass(frozen=True)
+class SearchCount:
+    count: int
+    effective_query: str
+
+
 class SearchService:
     """Searches images with the query language. Pages are found by "keyset": each page continues after the
     sort value and id of the previous page's last image, so pages stay correct while images are added."""
@@ -62,9 +68,7 @@ class SearchService:
     def search(self, request: SearchRequest, visible_images: ColumnElement[bool]) -> SearchPage:
         """Only images matching `visible_images` (the user's restrictions; not shown in effective_query).
         Raises 400 invalid_query, or 422 validation_error for a missing seed or a damaged cursor."""
-        namespace_names = self._namespace_names()
-        tree = parse_query(request.query, namespace_names)
-        filtered = apply_hidden_filters(request.query, tree, list(request.hidden_filters), namespace_names)
+        filtered = self._filtered(request.query, request.hidden_filters)
 
         sort_value = _sort_value(request.sort, request.seed)
         descending = request.sort != Sort.RANDOM and request.order == Order.DESC
@@ -83,6 +87,20 @@ class SearchService:
         has_next_page = len(rows) > request.limit
         next_cursor = _encode_cursor(page_rows[-1][1], page_rows[-1][0]) if has_next_page else None
         return SearchPage([image_id for image_id, _value in page_rows], next_cursor, filtered.effective_query)
+
+    def count(self, query: str, hidden_filters: tuple[str, ...], visible_images: ColumnElement[bool]) -> SearchCount:
+        """How many images search() finds over all its pages. Raises 400 invalid_query."""
+        filtered = self._filtered(query, hidden_filters)
+        statement = select(func.count(Image.id)).where(matching_condition(filtered.tree), visible_images)
+        with self._database.session() as session:
+            count = session.scalar(statement) or 0
+
+        return SearchCount(count, filtered.effective_query)
+
+    def _filtered(self, query: str, hidden_filters: tuple[str, ...]) -> FilteredQuery:
+        namespace_names = self._namespace_names()
+        tree = parse_query(query, namespace_names)
+        return apply_hidden_filters(query, tree, list(hidden_filters), namespace_names)
 
 
 def _sort_value(sort: Sort, seed: int | None) -> ColumnElement:

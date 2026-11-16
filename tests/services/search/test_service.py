@@ -9,7 +9,7 @@ from sqlalchemy import select, true
 from pictorio_db.db import Database
 from pictorio_db.db._connection import shuffled_position
 from pictorio_db.db.models import Image, Namespace, Tag, image_tag
-from pictorio_db.services.search import Order, SearchPage, SearchRequest, SearchService, Sort
+from pictorio_db.services.search import Order, SearchCount, SearchPage, SearchRequest, SearchService, Sort
 from pictorio_db.utils.problems import Problem
 
 NAMESPACES = {"category", "author", "character", "rating", "album", "general"}
@@ -57,6 +57,9 @@ class UnrestrictedSearch:
 
     def search(self, request: SearchRequest) -> SearchPage:
         return self._service.search(request, true())
+
+    def count(self, query: str, hidden_filters: tuple[str, ...] = ()) -> SearchCount:
+        return self._service.count(query, hidden_filters, true())
 
 
 @pytest.fixture
@@ -197,3 +200,27 @@ def test_hidden_filters_are_applied_and_shown(search: UnrestrictedSearch, image_
 
     assert page.effective_query == "year:2025 -category:artwork"
     assert sorted(page.image_ids) == [image_ids[number] for number in (1, 3, 5)]
+
+
+# --- Counting
+
+def test_count_is_the_number_of_images_over_all_pages(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+    assert search.count("").count == len(all_pages(search, SearchRequest(limit=2)))
+    assert search.count("category:photo").count == 3
+
+
+def test_count_applies_hidden_filters_like_the_search(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+    found = search.count("year:2025", ("category:artwork",))
+
+    assert found == SearchCount(3, "year:2025 -category:artwork")
+
+
+def test_count_of_nothing_found(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+    assert search.count("category:refs").count == 0
+
+
+def test_count_refuses_an_invalid_query(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+    with pytest.raises(Problem) as raised:
+        search.count("summer,,beach")
+
+    assert raised.value.code == "invalid_query"

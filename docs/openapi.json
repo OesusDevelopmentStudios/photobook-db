@@ -559,6 +559,89 @@
         }
       }
     },
+    "/api/v1/images/count": {
+      "get": {
+        "tags": [
+          "images"
+        ],
+        "summary": "How many images a search finds",
+        "operationId": "count_images_api_v1_images_count_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Search query, e.g. category:artwork -rating:nsfw",
+              "default": "",
+              "title": "Q"
+            },
+            "description": "Search query, e.g. category:artwork -rating:nsfw"
+          },
+          {
+            "name": "apply_hidden_filters",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "false skips your hidden-by-default filters",
+              "default": true,
+              "title": "Apply Hidden Filters"
+            },
+            "description": "false skips your hidden-by-default filters"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageCount"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        }
+      }
+    },
     "/api/v1/images/bulk-tags": {
       "post": {
         "tags": [
@@ -2444,6 +2527,26 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ImageCount": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "All images the search finds, over all its pages"
+          },
+          "effective_query": {
+            "type": "string",
+            "title": "Effective Query",
+            "description": "The query with the hidden-by-default filters that were added"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "effective_query"
+        ],
+        "title": "ImageCount"
       },
       "ImageLinks": {
         "properties": {

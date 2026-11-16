@@ -304,6 +304,29 @@ def test_search_pages_with_the_cursor(client: TestClient, headers: dict[str, str
     assert second["next_cursor"] is None
 
 
+def test_count_needs_a_login(client: TestClient) -> None:
+    assert client.get("/api/v1/images/count").status_code == 401
+
+
+def test_count_says_how_many_a_search_finds(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
+    for colour in ("red", "green"):
+        upload(client, headers, jpeg_bytes(colour=colour))
+
+    everything = client.get("/api/v1/images/count", headers=headers)
+    photos = client.get("/api/v1/images/count", params={"q": "category:photo summer"}, headers=headers)
+
+    assert everything.status_code == 200
+    assert everything.json() == {"count": 3, "effective_query": ""}
+    assert photos.json() == {"count": 1, "effective_query": "category:photo summer"}
+
+
+def test_count_refuses_an_invalid_query(client: TestClient, headers: dict[str, str]) -> None:
+    response = client.get("/api/v1/images/count", params={"q": "summer beach,,sand"}, headers=headers)
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_query"
+
+
 def test_invalid_query_says_where(client: TestClient, headers: dict[str, str]) -> None:
     response = client.get("/api/v1/images", params={"q": "summer beach,,sand"}, headers=headers)
 

@@ -34,6 +34,10 @@ router = APIRouter(prefix="/images", tags=["images"])
 # A thumbnail never changes for a given SHA-256, so clients may keep it for good.
 THUMBNAIL_CACHE_CONTROL = "private, max-age=31536000, immutable"
 
+# The parameters that choose which images a search finds, shared by the search and its count
+SearchText = Annotated[str, Query(max_length=2000, description="Search query, e.g. category:artwork -rating:nsfw")]
+ApplyHiddenFilters = Annotated[bool, Query(description="false skips your hidden-by-default filters")]
+
 
 class ImageLinks(BaseModel):
     self: str
@@ -63,6 +67,11 @@ class ImageObject(BaseModel):
 class ImageList(BaseModel):
     items: list[ImageObject]
     next_cursor: str | None = Field(description="Pass as `cursor` for the next page; null on the last page")
+    effective_query: str = Field(description="The query with the hidden-by-default filters that were added")
+
+
+class ImageCount(BaseModel):
+    count: int = Field(description="All images the search finds, over all its pages")
     effective_query: str = Field(description="The query with the hidden-by-default filters that were added")
 
 
@@ -114,13 +123,13 @@ def search_images(
     search: SearchServiceDependency,
     images: ImagesServiceDependency,
     preferences: PreferencesServiceDependency,
-    q: Annotated[str, Query(max_length=2000, description="Search query, e.g. category:artwork -rating:nsfw")] = "",
+    q: SearchText = "",
     sort: Sort = Sort.TAKEN_AT,
     order: Annotated[Order, Query(description="Ignored for sort=random")] = Order.DESC,
     seed: Annotated[int | None, Query(description="Required for sort=random: same seed, same order")] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
     cursor: Annotated[str | None, Query(max_length=500, description="next_cursor of the previous page")] = None,
-    apply_hidden_filters: Annotated[bool, Query(description="false skips your hidden-by-default filters")] = True,
+    apply_hidden_filters: ApplyHiddenFilters = True,
 ) -> ImageList:
     hidden_filters = preferences.hidden_filters(authentication.user.id) if apply_hidden_filters else []
     request = SearchRequest(
@@ -132,6 +141,21 @@ def search_images(
         next_cursor=page.next_cursor,
         effective_query=page.effective_query,
     )
+
+
+# Before /{image_id}, so that "count" is never read as an image id.
+@router.get("/count", summary="How many images a search finds", responses=problem_responses(400, 401, 422))
+def count_images(
+    authentication: CurrentAuthentication,
+    restrictions: CurrentRestrictions,
+    search: SearchServiceDependency,
+    preferences: PreferencesServiceDependency,
+    q: SearchText = "",
+    apply_hidden_filters: ApplyHiddenFilters = True,
+) -> ImageCount:
+    hidden_filters = preferences.hidden_filters(authentication.user.id) if apply_hidden_filters else []
+    found = search.count(q, tuple(hidden_filters), restrictions.visible_images_filter())
+    return ImageCount(count=found.count, effective_query=found.effective_query)
 
 
 @router.post(
