@@ -37,6 +37,9 @@ def test_lists_the_builtin_namespaces(tags: TagsService) -> None:
     assert list(namespaces) == ["category", "author", "character", "rating", "album", "general"]
     assert all(namespace.is_builtin for namespace in namespaces.values())
     assert {name for name, namespace in namespaces.items() if namespace.in_path_template} == {"category", "author"}
+    assert {name: namespace.allowed_values for name, namespace in namespaces.items() if namespace.allowed_values} == {
+        "rating": ("sfw", "nsfw")
+    }
 
 
 def test_creates_a_namespace(tags: TagsService) -> None:

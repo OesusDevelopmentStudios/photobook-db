@@ -2911,6 +2911,27 @@
             "type": "boolean",
             "title": "In Path Template",
             "description": "Its tags form folder names in the library"
+          },
+          "allowed_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Values",
+            "description": "The only names its tags may have, e.g. the rating values; null: any",
+            "examples": [
+              [
+                "sfw",
+                "nsfw"
+              ]
+            ]
           }
         },
         "type": "object",
@@ -2918,7 +2939,8 @@
           "name",
           "single_value",
           "is_builtin",
-          "in_path_template"
+          "in_path_template",
+          "allowed_values"
         ],
         "title": "NamespaceDetails"
       },

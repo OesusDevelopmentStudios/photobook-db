@@ -41,6 +41,7 @@ def test_every_user_can_list_namespaces(client: TestClient, user_headers: dict[s
         "single_value": True,
         "is_builtin": True,
         "in_path_template": True,
+        "allowed_values": None,
     }
 
 
@@ -59,6 +60,7 @@ def test_admin_creates_a_namespace(client: TestClient, admin_headers: dict[str, 
         "single_value": False,
         "is_builtin": False,
         "in_path_template": False,
+        "allowed_values": None,
     }
 
 
@@ -99,3 +101,17 @@ def test_in_path_template_follows_the_stored_template(client: TestClient, admin_
     assert {item["name"] for item in items if item["in_path_template"]} == {"weather"}
     assert deletion.status_code == 409
     assert deletion.json()["detail"] == "The library's path template uses this namespace."
+
+
+def test_ratings_list_their_allowed_values(
+    client: TestClient, admin_headers: dict[str, str], user_headers: dict[str, str]
+) -> None:
+    def rating_values() -> list[str] | None:
+        items = client.get("/api/v1/namespaces", headers=user_headers).json()["items"]
+        return next(item["allowed_values"] for item in items if item["name"] == "rating")
+
+    assert rating_values() == ["sfw", "nsfw"]
+
+    client.patch("/api/v1/admin/settings", json={"rating_values": ["safe", "explicit"]}, headers=admin_headers)
+
+    assert rating_values() == ["safe", "explicit"]

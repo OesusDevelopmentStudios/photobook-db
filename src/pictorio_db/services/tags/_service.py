@@ -27,6 +27,7 @@ class NamespaceInfo:
     single_value: bool
     is_builtin: bool
     in_path_template: bool  # its tags form folder names in the library
+    allowed_values: tuple[str, ...] | None = None  # the only names its tags may have, e.g. the ratings; None: any
 
 
 @dataclass(frozen=True)
@@ -197,9 +198,10 @@ class TagsService:
     def list_namespaces(self) -> list[NamespaceInfo]:
         """Built-in namespaces first, then the others in the order they were created."""
         path_namespaces = self._path_template_namespaces()
+        rating_values = self.rating_values()
         with self._database.session() as session:
             namespaces = session.scalars(select(Namespace).order_by(Namespace.id))
-            return [_namespace_info(namespace, path_namespaces) for namespace in namespaces]
+            return [_namespace_info(namespace, path_namespaces, rating_values) for namespace in namespaces]
 
     def create_namespace(self, name: str, single_value: bool) -> NamespaceInfo:
         name = normalized_namespace_name(name)
@@ -213,7 +215,7 @@ class TagsService:
                     409, "already_exists", "Namespace exists", f"A namespace {name!r} exists already."
                 ) from None
 
-            return _namespace_info(namespace, self._path_template_namespaces())
+            return _namespace_info(namespace, self._path_template_namespaces(), self.rating_values())
 
     def delete_namespace(self, name: str) -> None:
         """Only custom namespaces that no tag and no path template uses."""
@@ -243,10 +245,11 @@ class TagsService:
         return None
 
 
-def _namespace_info(namespace: Namespace, path_namespaces: frozenset[str]) -> NamespaceInfo:
+def _namespace_info(namespace: Namespace, path_namespaces: frozenset[str], rating_values: list[str]) -> NamespaceInfo:
     return NamespaceInfo(
         name=namespace.name,
         single_value=namespace.single_value,
         is_builtin=namespace.is_builtin,
         in_path_template=namespace.name in path_namespaces,
+        allowed_values=tuple(rating_values) if namespace.name == RATING_NAMESPACE else None,
     )
