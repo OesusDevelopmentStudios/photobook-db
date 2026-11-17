@@ -18,7 +18,13 @@ from pictorio_db.db import DATABASE_FILE_NAME, Database, open_database
 def config(tmp_path: Path) -> Config:
     library_dir = tmp_path / "library"
     library_dir.mkdir()
-    return Config(host=DEFAULT_HOST, port=DEFAULT_PORT, data_dir=tmp_path, library_dir=library_dir)
+    return Config(
+        host=DEFAULT_HOST,
+        port=DEFAULT_PORT,
+        data_dir=tmp_path,
+        library_dir=library_dir,
+        host_machine_id_file=tmp_path / "machine-id",  # none, unless a test writes it: never this computer's
+    )
 
 
 @pytest.fixture

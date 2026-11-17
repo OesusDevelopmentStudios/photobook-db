@@ -18,6 +18,7 @@ from pictorio_db.db import DATABASE_FILE_NAME, open_database
 from pictorio_db.services.access import AccessService
 from pictorio_db.services.auth import AuthService
 from pictorio_db.services.preferences import PreferencesService
+from pictorio_db.services.same_machine import SameMachine
 from pictorio_db.services.search import SearchService
 from pictorio_db.services.server_settings import ServerSettings
 from pictorio_db.services.images import ImagesService
@@ -82,6 +83,9 @@ def _lifespan(config: Config) -> Callable[[FastAPI], AbstractAsyncContextManager
         )
         app.state.tag_admin = TagAdmin(
             app.state.tags, app.state.images, app.state.access, app.state.preferences, app.state.storage, relayout
+        )
+        app.state.same_machine = SameMachine(
+            config.host_machine_id_file, config.host_library_dir or config.library_dir
         )
         app.state.jobs.start()
         _announce_setup_code(app.state.auth)

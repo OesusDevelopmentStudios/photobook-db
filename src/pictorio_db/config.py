@@ -12,6 +12,7 @@ from pathlib import Path
 DEFAULT_HOST = "127.0.0.1"  # only this computer; the container image sets 0.0.0.0
 DEFAULT_PORT = 8737
 DEFAULT_TRUSTED_PROXIES = ("127.0.0.1",)  # a reverse proxy on the same computer, outside a container
+DEFAULT_HOST_MACHINE_ID_FILE = Path("/etc/machine-id")  # outside a container: this computer's own
 
 
 class ConfigError(Exception):
@@ -28,6 +29,11 @@ class Config:
     # Addresses whose X-Forwarded-For and X-Forwarded-Proto are believed, e.g. from Caddy: then the server knows
     # that the browser used HTTPS, and which address it came from. "*" trusts every address.
     trusted_proxies: tuple[str, ...] = DEFAULT_TRUSTED_PROXIES
+    # The machine ID of the computer the server runs on, and the library folder as programs there see it: a
+    # desktop app on that computer can then open an image's folder. In a container, both differ from the
+    # container's own; the install script mounts the one and sets the other.
+    host_machine_id_file: Path = DEFAULT_HOST_MACHINE_ID_FILE
+    host_library_dir: Path | None = None  # None: library_dir
 
 
 def config_from_environment(environment: Mapping[str, str] = os.environ) -> Config:
@@ -38,6 +44,8 @@ def config_from_environment(environment: Mapping[str, str] = os.environ) -> Conf
         library_dir=_library_dir(environment),
         import_dir=_import_dir(environment),
         trusted_proxies=_trusted_proxies(environment.get("PICTORIO_TRUSTED_PROXIES")),
+        host_machine_id_file=_host_path(environment, "PICTORIO_HOST_MACHINE_ID_FILE") or DEFAULT_HOST_MACHINE_ID_FILE,
+        host_library_dir=_host_path(environment, "PICTORIO_HOST_LIBRARY_DIR"),
     )
 
 
@@ -89,6 +97,18 @@ def _import_dir(environment: Mapping[str, str]) -> Path | None:
         return _folder_from(environment, "PICTORIO_IMPORT_DIR")
 
     return None
+
+
+def _host_path(environment: Mapping[str, str], variable: str) -> Path | None:
+    """A path on the computer the server runs on, taken as written: in a container it need not exist."""
+    if variable not in environment:
+        return None
+
+    path = Path(environment[variable])
+    if not path.is_absolute():
+        raise ConfigError(f"{variable} must be an absolute path, not {environment[variable]!r}")
+
+    return path
 
 
 def _folder_from(environment: Mapping[str, str], variable: str) -> Path:

@@ -80,3 +80,29 @@ def test_reads_the_trusted_proxies(text: str | None, trusted: tuple[str, ...]) -
 def test_rejects_invalid_trusted_proxies(text: str) -> None:
     with pytest.raises(ConfigError, match="PICTORIO_TRUSTED_PROXIES"):
         config_from_environment(HOME | {"PICTORIO_TRUSTED_PROXIES": text})
+
+
+def test_reads_where_the_host_keeps_its_machine_id_and_the_library() -> None:
+    environment = HOME | {
+        "PICTORIO_LIBRARY_DIR": "/library",
+        "PICTORIO_HOST_MACHINE_ID_FILE": "/run/host/machine-id",
+        "PICTORIO_HOST_LIBRARY_DIR": "/home/kid/Pictures/pictorio-library",
+    }
+
+    config = config_from_environment(environment)
+
+    assert config.host_machine_id_file == Path("/run/host/machine-id")
+    assert config.host_library_dir == Path("/home/kid/Pictures/pictorio-library")  # need not exist in a container
+
+
+def test_uses_this_computers_machine_id_and_library_by_default() -> None:
+    config = config_from_environment(HOME)
+
+    assert config.host_machine_id_file == Path("/etc/machine-id")
+    assert config.host_library_dir is None
+
+
+@pytest.mark.parametrize("variable", ["PICTORIO_HOST_MACHINE_ID_FILE", "PICTORIO_HOST_LIBRARY_DIR"])
+def test_host_paths_must_be_absolute(variable: str) -> None:
+    with pytest.raises(ConfigError, match=variable):
+        config_from_environment(HOME | {variable: "Pictures/pictorio-library"})

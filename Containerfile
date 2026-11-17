@@ -31,12 +31,15 @@ USER pictorio
 
 # Listen on all interfaces inside the container; publish the port with -p 8737:8737.
 # Mount volumes at /data and /library, or the database and the images are lost when the container
-# is removed. Folders to import from can be mounted at /import.
+# is removed. Folders to import from can be mounted at /import. The host's /etc/machine-id, mounted at
+# /run/host/machine-id, tells a desktop app on the same computer where the library is (see the README);
+# without it the container's own machine ID never matches.
 ENV PICTORIO_HOST=0.0.0.0 \
     PICTORIO_PORT=8737 \
     PICTORIO_DATA_DIR=/data \
     PICTORIO_LIBRARY_DIR=/library \
-    PICTORIO_IMPORT_DIR=/import
+    PICTORIO_IMPORT_DIR=/import \
+    PICTORIO_HOST_MACHINE_ID_FILE=/run/host/machine-id
 EXPOSE 8737
 
 CMD ["pictorio-db", "serve"]

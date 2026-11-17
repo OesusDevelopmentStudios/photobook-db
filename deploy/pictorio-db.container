@@ -33,6 +33,11 @@ Volume=pictorio-data:/data
 # :Z lets the container use it on systems with SELinux.
 Volume=%h/Pictures/pictorio-library:/library:Z
 
+# The desktop app on this computer can then open an image's folder in the file manager: the host's machine ID
+# shows it runs here, and the library's path is as above. No :Z here: the file is only read.
+Volume=/etc/machine-id:/run/host/machine-id:ro
+Environment=PICTORIO_HOST_LIBRARY_DIR=%h/Pictures/pictorio-library
+
 # Optional: a folder that admins can import from. Without ro, an import can remove the originals.
 #Volume=/srv/photos-inbox:/import:ro,Z
 

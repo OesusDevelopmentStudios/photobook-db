@@ -160,6 +160,8 @@ These environment variables are read when the server starts. The container image
 | `PICTORIO_LIBRARY_DIR` | `~/Pictures/pictorio-library` | Folder for the images, arranged by their tags. Created if missing |
 | `PICTORIO_IMPORT_DIR` | not set | Folder that admins can import from with an import job, e.g. a NAS share. Unset: no folder imports |
 | `PICTORIO_TRUSTED_PROXIES` | `127.0.0.1` | Addresses (or networks, comma-separated, or `*`) of a reverse proxy whose `X-Forwarded-*` headers are believed. See [deploy/Caddyfile.example](deploy/Caddyfile.example) |
+| `PICTORIO_HOST_MACHINE_ID_FILE` | `/etc/machine-id` | The machine ID of the computer the server runs on. A desktop app that proves it runs there gets the library folder's path, to open an image's folder in the file manager. The container image reads `/run/host/machine-id`: mount the host's `/etc/machine-id` there, read-only, as [deploy/pictorio-db.container](deploy/pictorio-db.container) does |
+| `PICTORIO_HOST_LIBRARY_DIR` | `PICTORIO_LIBRARY_DIR` | The library folder as programs on that computer see it; in a container, the host folder mounted at `/library` |
 
 Everything else (path template, users, namespaces, tags, accent colour…) is set on the admin pages.
 
