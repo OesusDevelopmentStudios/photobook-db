@@ -30,6 +30,9 @@ Pick one way:
 Podman 4.4+ and Python 3.12+ come with Debian 13 and the Raspberry Pi OS based on it, Ubuntu 24.04 and
 Fedora. Debian 12 has older versions: use Docker there.
 
+For a server on the computer where you use the desktop app, follow [the local server guide](docs/local-server.md)
+instead: it sets the server up for that computer, so that the app can also open an image's folder.
+
 The server uses port **8737**. If the computer has a firewall, open it, e.g. on Fedora:
 `sudo firewall-cmd --add-port=8737/tcp --permanent && sudo firewall-cmd --reload`.
 
