@@ -9,9 +9,11 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
+from sqlalchemy import update
 
 from pictorio_db.api.v1 import _upload_receiver
 from pictorio_db.config import Config
+from pictorio_db.db.models import Image as ImageModel
 from pictorio_db.services.auth import Role
 
 PASSWORD = "correct horse battery"
@@ -218,7 +220,7 @@ def test_file_is_the_original(client: TestClient, headers: dict[str, str], uploa
     assert response.status_code == 200
     assert response.content == uploaded["content"]
     assert response.headers["content-type"] == "image/jpeg"
-    assert response.headers["etag"] == f'"{uploaded["sha256"]}"'
+    assert response.headers["etag"] == f'"{uploaded["sha256"]}-0"'  # revision 0: as uploaded
     assert response.headers["content-disposition"] == 'inline; filename="beach.jpg"'
 
 
@@ -226,7 +228,7 @@ def test_file_unchanged_since_last_time_is_304(
     client: TestClient, headers: dict[str, str], uploaded: dict
 ) -> None:
     response = client.get(
-        f"/api/v1/images/{uploaded['id']}/file", headers=headers | {"If-None-Match": f'"{uploaded["sha256"]}"'}
+        f"/api/v1/images/{uploaded['id']}/file", headers=headers | {"If-None-Match": f'"{uploaded["sha256"]}-0"'}
     )
 
     assert response.status_code == 304
@@ -247,7 +249,7 @@ def test_thumbnail_is_cacheable_webp(client: TestClient, headers: dict[str, str]
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/webp"
     assert response.headers["cache-control"] == "private, max-age=31536000, immutable"
-    assert response.headers["etag"] == f'"{uploaded["sha256"]}-{size}"'
+    assert response.headers["etag"] == f'"{uploaded["sha256"]}-0-{size}"'
     assert Image.open(io.BytesIO(response.content)).format == "WEBP"
 
 
@@ -260,7 +262,7 @@ def test_thumbnail_size_must_be_256_or_1024(client: TestClient, headers: dict[st
 def test_thumbnail_unchanged_since_last_time_is_304(
     client: TestClient, headers: dict[str, str], uploaded: dict
 ) -> None:
-    etag = f'"{uploaded["sha256"]}-256"'
+    etag = f'"{uploaded["sha256"]}-0-256"'
 
     response = client.get(f"/api/v1/images/{uploaded['id']}/thumbnail", headers=headers | {"If-None-Match": etag})
 
@@ -274,6 +276,25 @@ def test_missing_thumbnail_is_made_again(client: TestClient, headers: dict[str, 
 
     assert response.status_code == 200
     assert client.app.state.thumbnails.thumbnail_path(uploaded["sha256"], 256).exists()
+
+
+# After the file changed, e.g. a saved rotation: new ETags, and thumbnails of their own
+def test_a_new_revision_has_new_etags_and_thumbnails(
+    client: TestClient, headers: dict[str, str], uploaded: dict
+) -> None:
+    assert uploaded["revision"] == 0
+    with client.app.state.database.session() as session:
+        session.execute(update(ImageModel).where(ImageModel.id == uploaded["id"]).values(revision=1))
+        session.commit()
+
+    image = client.get(f"/api/v1/images/{uploaded['id']}", headers=headers).json()
+    file = client.get(f"/api/v1/images/{uploaded['id']}/file", headers=headers)
+    thumbnail = client.get(f"/api/v1/images/{uploaded['id']}/thumbnail", params={"rev": 1}, headers=headers)
+
+    assert image["revision"] == 1
+    assert file.headers["etag"] == f'"{uploaded["sha256"]}-1"'
+    assert thumbnail.headers["etag"] == f'"{uploaded["sha256"]}-1-256"'
+    assert client.app.state.thumbnails.thumbnail_path(uploaded["sha256"], 256, revision=1).exists()
 
 
 # --- Searching

@@ -52,6 +52,7 @@ class ImageRecord:
     updated_at: datetime  # UTC
     imported_by_user_id: int | None
     tags: list[TagName]  # sorted by namespace, then name
+    revision: int = 0  # how often the file was changed since it came in
 
 
 # Checks one image's tags before and after a change, and its date; raises a Problem to cancel the whole change.
@@ -352,4 +353,5 @@ def _record_with_tags(image: Image, tags: list[TagName]) -> ImageRecord:
         updated_at=image.updated_at,
         imported_by_user_id=image.imported_by_user_id,
         tags=tags,
+        revision=image.revision,
     )

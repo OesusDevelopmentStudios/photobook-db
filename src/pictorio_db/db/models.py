@@ -88,6 +88,8 @@ class Image(Base):
     imported_at: Mapped[datetime]  # UTC
     updated_at: Mapped[datetime]  # UTC
     imported_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id", ondelete="SET NULL"))
+    # Counts changes to the file, e.g. a saved rotation; the sha256 stays the uploaded file's.
+    revision: Mapped[int] = mapped_column(default=0, server_default="0")
 
 
 image_tag = Table(

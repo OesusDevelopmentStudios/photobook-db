@@ -106,6 +106,17 @@ def test_leaves_no_partial_files(thumbnails: ThumbnailsService, tmp_path: Path) 
     assert list((tmp_path / "thumbnails").rglob("*.partial")) == []
 
 
+def test_keeps_each_revision_apart(thumbnails: ThumbnailsService, tmp_path: Path) -> None:
+    thumbnails.create_thumbnails(write_image(tmp_path / "wide.png", (300, 200)), SHA256)
+    thumbnails.create_thumbnails(write_image(tmp_path / "tall.png", (200, 300)), SHA256, revision=1)
+
+    thumbnails.delete_thumbnails(SHA256, revision=0)
+
+    assert not thumbnails.thumbnail_path(SHA256, 256).exists()
+    with Image.open(thumbnails.thumbnail_path(SHA256, 256, revision=1)) as turned:
+        assert turned.size == (171, 256)
+
+
 def test_deletes_both_sizes(thumbnails: ThumbnailsService, tmp_path: Path) -> None:
     thumbnails.create_thumbnails(write_image(tmp_path / "image.png", (300, 200)), SHA256)
 

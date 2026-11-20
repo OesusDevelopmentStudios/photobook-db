@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Thumbnails for the desktop app's grid and image view: WebP, upright, by SHA-256."""
+"""Thumbnails for the desktop app's grid and image view: WebP, upright, by SHA-256 and the image's revision."""
 
 import os
 from pathlib import Path
@@ -22,23 +22,25 @@ class ThumbnailsService:
     def __init__(self, thumbnails_dir: Path) -> None:
         self._thumbnails_dir = thumbnails_dir
 
-    def thumbnail_path(self, sha256: str, size: int) -> Path:
-        """thumbnails/<size>/<first two hex digits>/<sha256>.webp: no folder gets too many files."""
+    def thumbnail_path(self, sha256: str, size: int, revision: int = 0) -> Path:
+        """thumbnails/<size>/<first two hex digits>/<sha256>.webp, or <sha256>-<revision>.webp once the file
+        changed: no folder gets too many files."""
         if size not in THUMBNAIL_SIZES:
             raise ValueError(f"Thumbnail sizes are {THUMBNAIL_SIZES}, not {size}")
 
-        return self._thumbnails_dir / str(size) / sha256[:2] / f"{sha256}.webp"
+        name = sha256 if revision == 0 else f"{sha256}-{revision}"
+        return self._thumbnails_dir / str(size) / sha256[:2] / f"{name}.webp"
 
-    def create_thumbnails(self, image_path: Path, sha256: str) -> None:
+    def create_thumbnails(self, image_path: Path, sha256: str, revision: int = 0) -> None:
         """Decodes the whole image, so damaged image data is found here: raises 415."""
         largest = _upright_image_fitting(image_path, max(THUMBNAIL_SIZES))
         for size in sorted(THUMBNAIL_SIZES, reverse=True):
             largest.thumbnail((size, size))  # each smaller size from the previous one, not the original
-            _save_atomically(largest, self.thumbnail_path(sha256, size))
+            _save_atomically(largest, self.thumbnail_path(sha256, size, revision))
 
-    def delete_thumbnails(self, sha256: str) -> None:
+    def delete_thumbnails(self, sha256: str, revision: int = 0) -> None:
         for size in THUMBNAIL_SIZES:
-            self.thumbnail_path(sha256, size).unlink(missing_ok=True)
+            self.thumbnail_path(sha256, size, revision).unlink(missing_ok=True)
 
 
 def _upright_image_fitting(image_path: Path, size: int) -> Image.Image:

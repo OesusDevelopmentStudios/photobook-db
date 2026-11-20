@@ -1042,6 +1042,24 @@
               "default": 256,
               "title": "Size"
             }
+          },
+          {
+            "name": "rev",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The image's `revision`: a new URL after the file changed, so caches fetch it anew",
+              "title": "Rev"
+            },
+            "description": "The image's `revision`: a new URL after the file changed, so caches fetch it anew"
           }
         ],
         "responses": {
@@ -2738,6 +2756,11 @@
             "format": "date-time",
             "title": "Updated At"
           },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Grows when the file changes, e.g. a saved rotation; put it into thumbnail URLs as `rev`"
+          },
           "tags": {
             "items": {
               "type": "string"
@@ -2770,6 +2793,7 @@
           "taken_at_source",
           "imported_at",
           "updated_at",
+          "revision",
           "tags",
           "links"
         ],

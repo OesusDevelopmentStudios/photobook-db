@@ -31,7 +31,7 @@ from pictorio_db.utils.time import as_utc
 
 router = APIRouter(prefix="/images", tags=["images"])
 
-# A thumbnail never changes for a given SHA-256, so clients may keep it for good.
+# A thumbnail never changes for a given SHA-256 and revision, so clients may keep it for good.
 THUMBNAIL_CACHE_CONTROL = "private, max-age=31536000, immutable"
 
 # The parameters that choose which images a search finds, shared by the search and its count
@@ -58,6 +58,9 @@ class ImageObject(BaseModel):
     taken_at_source: Literal["exif", "file_mtime", "import_time"]
     imported_at: datetime
     updated_at: datetime
+    revision: int = Field(
+        description="Grows when the file changes, e.g. a saved rotation; put it into thumbnail URLs as `rev`"
+    )
     tags: list[str] = Field(
         description="Sorted by namespace, then name", examples=[["category:photo", "general:summer"]]
     )
@@ -235,7 +238,7 @@ def get_image_file(
     storage: StorageServiceDependency,
 ) -> Response:
     record = images.get_visible_image(image_id, restrictions)
-    etag = f'"{record.sha256}"'
+    etag = f'"{record.sha256}-{record.revision}"'
     if _client_has(request, etag):
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers={"ETag": etag})
 
@@ -266,6 +269,10 @@ def get_image_thumbnail(
     storage: StorageServiceDependency,
     thumbnails: ThumbnailsServiceDependency,
     size: Annotated[int, Query(json_schema_extra={"enum": list(THUMBNAIL_SIZES)})] = 256,
+    rev: Annotated[
+        int | None,
+        Query(description="The image's `revision`: a new URL after the file changed, so caches fetch it anew"),
+    ] = None,
 ) -> Response:
     if size not in THUMBNAIL_SIZES:  # query values arrive as text, so a Literal type would refuse every size
         raise Problem(
@@ -277,14 +284,14 @@ def get_image_thumbnail(
         )
 
     record = images.get_visible_image(image_id, restrictions)
-    etag = f'"{record.sha256}-{size}"'
+    etag = f'"{record.sha256}-{record.revision}-{size}"'
     headers = {"ETag": etag, "Cache-Control": THUMBNAIL_CACHE_CONTROL}
     if _client_has(request, etag):
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
 
-    thumbnail = thumbnails.thumbnail_path(record.sha256, size)
+    thumbnail = thumbnails.thumbnail_path(record.sha256, size, record.revision)
     if not thumbnail.exists():  # e.g. the thumbnail folder was cleared: make them again
-        thumbnails.create_thumbnails(storage.absolute_path(record.storage_path), record.sha256)
+        thumbnails.create_thumbnails(storage.absolute_path(record.storage_path), record.sha256, record.revision)
 
     return FileResponse(thumbnail, media_type="image/webp", headers=headers)
 
@@ -333,6 +340,7 @@ def _image_object(record: ImageRecord) -> ImageObject:
         taken_at_source=record.taken_at_source,  # type: ignore[arg-type]
         imported_at=as_utc(record.imported_at),
         updated_at=as_utc(record.updated_at),
+        revision=record.revision,
         tags=[str(tag) for tag in record.tags],
         links=ImageLinks(self=base, file=f"{base}/file", thumbnail=f"{base}/thumbnail"),
     )
