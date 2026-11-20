@@ -14,6 +14,7 @@ from pictorio_db.services.images import ImagesService
 from pictorio_db.services.importer import ImporterService
 from pictorio_db.services.jobs import FolderImport, JobsService
 from pictorio_db.services.preferences import PreferencesService
+from pictorio_db.services.rotation import RotationService
 from pictorio_db.services.same_machine import SameMachine
 from pictorio_db.services.search import SearchService
 from pictorio_db.services.server_settings import ServerSettings
@@ -61,6 +62,10 @@ def jobs_service(request: Request) -> JobsService:
 
 def preferences_service(request: Request) -> PreferencesService:
     return request.app.state.preferences
+
+
+def rotation_service(request: Request) -> RotationService:
+    return request.app.state.rotation
 
 
 def same_machine(request: Request) -> SameMachine:
@@ -119,6 +124,7 @@ ImporterServiceDependency = Annotated[ImporterService, Depends(importer_service)
 JobsServiceDependency = Annotated[JobsService, Depends(jobs_service)]
 FolderImportDependency = Annotated[FolderImport, Depends(folder_import)]
 PreferencesServiceDependency = Annotated[PreferencesService, Depends(preferences_service)]
+RotationServiceDependency = Annotated[RotationService, Depends(rotation_service)]
 SameMachineDependency = Annotated[SameMachine, Depends(same_machine)]
 SearchServiceDependency = Annotated[SearchService, Depends(search_service)]
 ServerSettingsDependency = Annotated[ServerSettings, Depends(server_settings)]

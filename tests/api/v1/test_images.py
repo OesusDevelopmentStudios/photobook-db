@@ -14,6 +14,7 @@ from sqlalchemy import update
 from pictorio_db.api.v1 import _upload_receiver
 from pictorio_db.config import Config
 from pictorio_db.db.models import Image as ImageModel
+from pictorio_db.utils.exif_orientation import read_orientation
 from pictorio_db.services.auth import Role
 
 PASSWORD = "correct horse battery"
@@ -295,6 +296,94 @@ def test_a_new_revision_has_new_etags_and_thumbnails(
     assert file.headers["etag"] == f'"{uploaded["sha256"]}-1"'
     assert thumbnail.headers["etag"] == f'"{uploaded["sha256"]}-1-256"'
     assert client.app.state.thumbnails.thumbnail_path(uploaded["sha256"], 256, revision=1).exists()
+
+
+# --- Turning images
+
+
+def rotate(client: TestClient, headers: dict[str, str], image_id: int, degrees: int):  # -> httpx Response
+    return client.post(f"/api/v1/images/{image_id}/rotation", json={"degrees": degrees}, headers=headers)
+
+
+def image_file(client: TestClient, headers: dict[str, str], image_id: int) -> bytes:
+    return client.get(f"/api/v1/images/{image_id}/file", headers=headers).content
+
+
+def jpeg_image_data(content: bytes) -> bytes:
+    """Everything from the start of the scan: the compressed pixels"""
+    return content[content.index(b"\xff\xda"):]
+
+
+def test_turns_a_jpeg_in_its_exif_orientation(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
+    response = rotate(client, headers, uploaded["id"], 90)
+
+    assert response.status_code == 200
+    image = response.json()
+    assert (image["width"], image["height"]) == (30, 40)
+    assert image["revision"] == 1
+    assert image["sha256"] == uploaded["sha256"]  # still a duplicate of the uploaded file
+    assert image["storage_path"] == uploaded["storage_path"]
+    content = image_file(client, headers, uploaded["id"])
+    assert read_orientation(content) == 6
+    assert jpeg_image_data(content) == jpeg_image_data(uploaded["content"])  # nothing lost
+    assert image["file_size"] == len(content)
+
+
+def test_makes_new_thumbnails_after_a_turn(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
+    thumbnails = client.app.state.thumbnails
+
+    rotate(client, headers, uploaded["id"], 90)
+
+    response = client.get(f"/api/v1/images/{uploaded['id']}/thumbnail", params={"rev": 1}, headers=headers)
+    assert Image.open(io.BytesIO(response.content)).size == (30, 40)
+    assert thumbnails.thumbnail_path(uploaded["sha256"], 256, revision=1).exists()
+    assert not thumbnails.thumbnail_path(uploaded["sha256"], 256).exists()  # the old ones are gone
+
+
+def test_turns_add_up(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
+    rotate(client, headers, uploaded["id"], 90)
+
+    image = rotate(client, headers, uploaded["id"], 90).json()
+
+    assert (image["width"], image["height"]) == (40, 30)
+    assert image["revision"] == 2
+    assert read_orientation(image_file(client, headers, uploaded["id"])) == 3
+
+
+def test_turns_the_pixels_of_a_png(client: TestClient, headers: dict[str, str]) -> None:
+    original = Image.new("RGB", (40, 30), "red")
+    original.paste("blue", (20, 0, 40, 30))
+    buffer = io.BytesIO()
+    original.save(buffer, format="PNG")
+    uploaded = upload(client, headers, buffer.getvalue(), {"original_filename": "flag.png"}).json()
+
+    image = rotate(client, headers, uploaded["id"], 270).json()
+
+    assert (image["width"], image["height"]) == (30, 40)
+    turned = Image.open(io.BytesIO(image_file(client, headers, uploaded["id"])))
+    assert turned.format == "PNG"
+    assert turned.tobytes() == original.transpose(Image.Transpose.ROTATE_90).tobytes()  # lossless
+
+
+def test_refuses_to_turn_a_webp(client: TestClient, headers: dict[str, str]) -> None:
+    buffer = io.BytesIO()
+    Image.new("RGB", (40, 30), "teal").save(buffer, format="WEBP")
+    uploaded = upload(client, headers, buffer.getvalue(), {"original_filename": "sea.webp"}).json()
+
+    response = rotate(client, headers, uploaded["id"], 90)
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "rotation_not_supported"
+    assert image_file(client, headers, uploaded["id"]) == buffer.getvalue()
+    assert client.get(f"/api/v1/images/{uploaded['id']}", headers=headers).json()["revision"] == 0
+
+
+def test_turns_only_by_quarters(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
+    assert rotate(client, headers, uploaded["id"], 45).status_code == 422
+
+
+def test_cannot_turn_an_unknown_image(client: TestClient, headers: dict[str, str]) -> None:
+    assert rotate(client, headers, 999, 90).status_code == 404
 
 
 # --- Searching

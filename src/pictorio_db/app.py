@@ -18,6 +18,7 @@ from pictorio_db.db import DATABASE_FILE_NAME, open_database
 from pictorio_db.services.access import AccessService
 from pictorio_db.services.auth import AuthService
 from pictorio_db.services.preferences import PreferencesService
+from pictorio_db.services.rotation import RotationService
 from pictorio_db.services.same_machine import SameMachine
 from pictorio_db.services.search import SearchService
 from pictorio_db.services.server_settings import ServerSettings
@@ -67,6 +68,7 @@ def _lifespan(config: Config) -> Callable[[FastAPI], AbstractAsyncContextManager
         app.state.storage.clean_incoming()  # uploads a restart interrupted
         app.state.thumbnails = ThumbnailsService(config.data_dir / "thumbnails")
         app.state.images = ImagesService(database, app.state.tags, app.state.storage)
+        app.state.rotation = RotationService(app.state.images, app.state.storage, app.state.thumbnails)
         app.state.search = SearchService(database, app.state.tags.namespace_names)
         app.state.preferences = PreferencesService(database, app.state.tags.namespace_names)
         app.state.access = AccessService(database, app.state.tags.namespace_names)

@@ -172,6 +172,25 @@ class ImagesService:
         current_path = PurePosixPath(record.storage_path)
         return self._storage.move_to_layout(record.id, current_path, record.tags, record.taken_at) != current_path
 
+    def record_file_change(self, image_id: int, width: int, height: int, file_size: int) -> ImageRecord:
+        """After the image's file was changed in place, e.g. turned: its new size, and the next revision. The
+        sha256 stays the uploaded file's."""
+        with self._database.session() as session:
+            session.execute(
+                update(Image)
+                .where(Image.id == image_id)
+                .values(
+                    width=width,
+                    height=height,
+                    file_size=file_size,
+                    revision=Image.revision + 1,
+                    updated_at=utc_now(),
+                )
+            )
+            session.commit()
+
+        return self.get_image(image_id)
+
     def find_id_by_sha256(self, sha256: str) -> int | None:
         with self._database.session() as session:
             return session.scalar(select(Image.id).where(Image.sha256 == sha256))

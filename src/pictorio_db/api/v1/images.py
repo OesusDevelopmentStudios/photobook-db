@@ -18,6 +18,7 @@ from pictorio_db.api.v1.dependencies import (
     ImagesServiceDependency,
     ImporterServiceDependency,
     PreferencesServiceDependency,
+    RotationServiceDependency,
     SearchServiceDependency,
     StorageServiceDependency,
     ThumbnailsServiceDependency,
@@ -89,6 +90,10 @@ class BulkTagChanges(TagChanges):
 
 class BulkTagResult(BaseModel):
     updated: int
+
+
+class Rotation(BaseModel):
+    degrees: Literal[90, 180, 270] = Field(description="Clockwise, from how the image is shown now")
 
 
 class UploadMetadataModel(BaseModel):
@@ -216,6 +221,23 @@ async def change_tags(
     record = await run_in_threadpool(
         images.change_tags, image_id, changes.add_tags, changes.remove_tags, restrictions
     )
+    return _image_object(record)
+
+
+@router.post(
+    "/{image_id}/rotation",
+    summary="Turn an image, saved into its file without losing quality",
+    description=(
+        "JPEG and TIFF get a new EXIF orientation; PNG and BMP have their pixels turned. Other types: "
+        "422 rotation_not_supported. The response has the new size and the next `revision`; `sha256` stays "
+        "the uploaded file's."
+    ),
+    responses=problem_responses(401, 404, 422),
+)
+async def rotate_image(
+    image_id: int, rotation: Rotation, restrictions: CurrentRestrictions, rotations: RotationServiceDependency
+) -> ImageObject:
+    record = await run_in_threadpool(rotations.rotate, image_id, rotation.degrees, restrictions)
     return _image_object(record)
 
 

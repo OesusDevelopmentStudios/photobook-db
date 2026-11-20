@@ -155,7 +155,7 @@ def test_bulk_change_with_a_restricted_image_changes_nothing(client: TestClient,
 
 def expect_not_found(method: str, path: str) -> Callable[[TestClient, Setup], None]:
     def check(client: TestClient, setup: Setup) -> None:
-        body = {"add_tags": ["beach"]} if method == "PATCH" else None
+        body = {"add_tags": ["beach"]} if method == "PATCH" else {"degrees": 90} if method == "POST" else None
         response = client.request(method, path.format(image_id=setup.nsfw_id), json=body, headers=setup.kid)
         assert response.status_code == 404
 
@@ -209,6 +209,7 @@ ACCESS_RULES = {
     ("PATCH", "/api/v1/images/{image_id}"): expect_not_found("PATCH", "/api/v1/images/{image_id}"),
     ("GET", "/api/v1/images/{image_id}/file"): expect_not_found("GET", "/api/v1/images/{image_id}/file"),
     ("GET", "/api/v1/images/{image_id}/thumbnail"): expect_not_found("GET", "/api/v1/images/{image_id}/thumbnail"),
+    ("POST", "/api/v1/images/{image_id}/rotation"): expect_not_found("POST", "/api/v1/images/{image_id}/rotation"),
     ("GET", "/api/v1/tags"): check_autocomplete_hides,
     ("PATCH", "/api/v1/tags/{namespace}/{name}"): expect_admins_only("PATCH"),
     ("DELETE", "/api/v1/tags/{namespace}/{name}"): expect_admins_only("DELETE"),

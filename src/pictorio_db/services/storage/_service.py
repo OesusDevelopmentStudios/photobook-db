@@ -110,6 +110,17 @@ class StorageService:
         move_file(incoming, self.absolute_path(stored_path))
         return stored_path
 
+    def replace_library_file(self, library_path: PurePosixPath | str, content: bytes) -> None:
+        """A library file's content, replaced at once: written under another name first, so a crash leaves the
+        old file or the new one, never half of one."""
+        incoming = self.new_incoming_path()
+        with incoming.open("wb") as incoming_file:
+            incoming_file.write(content)
+            incoming_file.flush()
+            os.fsync(incoming_file.fileno())
+
+        os.replace(incoming, self.absolute_path(library_path))
+
     def delete_library_file(self, library_path: PurePosixPath | str) -> None:
         file_path = self.absolute_path(library_path)
         file_path.unlink(missing_ok=True)
