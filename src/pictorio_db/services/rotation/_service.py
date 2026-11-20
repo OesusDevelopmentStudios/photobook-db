@@ -2,7 +2,6 @@
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
 import io
-import threading
 
 from PIL import Image
 
@@ -37,7 +36,6 @@ class RotationService:
         self._images = images
         self._storage = storage
         self._thumbnails = thumbnails
-        self._lock = threading.Lock()  # two turns at once would each start from the same file
 
     def rotate(self, image_id: int, clockwise_degrees: int, restrictions: Restrictions) -> ImageRecord:
         """Turns the image clockwise from how it is shown now, in its file; then its size, the next revision and
@@ -46,7 +44,8 @@ class RotationService:
         if clockwise_degrees not in ROTATIONS:
             raise ValueError(f"Not a quarter turn: {clockwise_degrees}")
 
-        with self._lock:
+        # Read and written under the storage's lock: another turn, or a move after a tag change, waits.
+        with self._storage.changing_files():
             record = self._images.get_visible_image(image_id, restrictions)
             file_path = self._storage.absolute_path(record.storage_path)
             content = _turned_file(file_path.read_bytes(), record.mime_type, clockwise_degrees)

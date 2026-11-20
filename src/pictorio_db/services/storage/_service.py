@@ -5,9 +5,11 @@ import errno
 import logging
 import os
 import shutil
+import threading
 import uuid
 from collections import defaultdict
 from collections.abc import Callable, Collection
+from contextlib import AbstractContextManager
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
@@ -47,6 +49,13 @@ class StorageService:
         self._settings = settings
         self._namespace_names = namespace_names
         self.library_dir = library_dir
+        self._file_lock = threading.RLock()
+
+    def changing_files(self) -> AbstractContextManager[bool]:
+        """Held while an image's file is moved or its content replaced, also by callers that read it first (a
+        rotation): one change at a time, so a move never takes a file that is being rewritten, and a rewrite
+        never lands where a file was before it moved."""
+        return self._file_lock
 
     # --- Path template
 
@@ -119,7 +128,8 @@ class StorageService:
             incoming_file.flush()
             os.fsync(incoming_file.fileno())
 
-        os.replace(incoming, self.absolute_path(library_path))
+        with self._file_lock:
+            os.replace(incoming, self.absolute_path(library_path))
 
     def delete_library_file(self, library_path: PurePosixPath | str) -> None:
         file_path = self.absolute_path(library_path)
@@ -144,6 +154,10 @@ class StorageService:
     def move_image_file(self, image_id: int, to_path: PurePosixPath) -> None:
         """Moves an image's file within the library, e.g. after a tag change. `to_path` is relative to the
         library. Raises FileExistsError if a file is in the way, or another OSError if moving fails."""
+        with self._file_lock:
+            self._move_image_file(image_id, to_path)
+
+    def _move_image_file(self, image_id: int, to_path: PurePosixPath) -> None:
         target = self.absolute_path(to_path)
         if target.exists():
             raise FileExistsError(errno.EEXIST, "The target file exists already", str(target))

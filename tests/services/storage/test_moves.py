@@ -7,6 +7,7 @@ exception at a chosen step; a new StorageService then plays the part of the rest
 import errno
 import logging
 import os
+import threading
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
@@ -106,6 +107,19 @@ def test_moves_the_file_and_records_the_new_path(
     assert not (library_dir / OLD_PATH).exists()
     assert stored_path(database, image_id) == str(NEW_PATH)
     assert journal(database) == []
+
+
+# E.g. while a rotation rewrites the file: the move waits, then moves the rewritten file.
+def test_a_move_waits_while_files_change(storage: StorageService, library_dir: Path, image_id: int) -> None:
+    with storage.changing_files():
+        mover = threading.Thread(target=storage.move_image_file, args=(image_id, NEW_PATH))
+        mover.start()
+        mover.join(timeout=0.3)
+        assert mover.is_alive()
+        assert (library_dir / OLD_PATH).exists()
+
+    mover.join(timeout=5)
+    assert (library_dir / NEW_PATH).read_bytes() == CONTENT
 
 
 def test_removes_folders_left_empty_but_not_the_library(

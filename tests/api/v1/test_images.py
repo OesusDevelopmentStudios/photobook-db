@@ -5,6 +5,8 @@ import hashlib
 import io
 import json
 import os
+import threading
+from pathlib import PurePosixPath
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,6 +16,7 @@ from sqlalchemy import update
 from pictorio_db.api.v1 import _upload_receiver
 from pictorio_db.config import Config
 from pictorio_db.db.models import Image as ImageModel
+from pictorio_db.services.access import Restrictions
 from pictorio_db.utils.exif_orientation import read_orientation
 from pictorio_db.services.auth import Role
 
@@ -338,6 +341,29 @@ def test_makes_new_thumbnails_after_a_turn(client: TestClient, headers: dict[str
     assert Image.open(io.BytesIO(response.content)).size == (30, 40)
     assert thumbnails.thumbnail_path(uploaded["sha256"], 256, revision=1).exists()
     assert not thumbnails.thumbnail_path(uploaded["sha256"], 256).exists()  # the old ones are gone
+
+
+# A tag change moves the file while a turn waits for its turn: the turn reads and writes the file at its new
+# place, not where it was.
+def test_a_turn_waits_while_files_change(client: TestClient, uploaded: dict) -> None:
+    storage = client.app.state.storage
+    moved_to = PurePosixPath("elsewhere") / PurePosixPath(uploaded["storage_path"]).name
+    revisions: list[int] = []
+
+    def turn() -> None:
+        revisions.append(client.app.state.rotation.rotate(uploaded["id"], 90, Restrictions([])).revision)
+
+    with storage.changing_files():
+        turner = threading.Thread(target=turn)
+        turner.start()
+        turner.join(timeout=0.3)
+        assert turner.is_alive()
+        storage.move_image_file(uploaded["id"], moved_to)
+
+    turner.join(timeout=5)
+    assert revisions == [1]
+    assert not storage.absolute_path(uploaded["storage_path"]).exists()
+    assert read_orientation(storage.absolute_path(moved_to).read_bytes()) == 6
 
 
 def test_turns_add_up(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
