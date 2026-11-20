@@ -30,3 +30,4 @@ jobs:
       - run: pip install -e '.[dev]'
       - run: pytest
       - run: flake8
+      - run: shellcheck deploy/install.sh  # tests/deploy run it with sh, which is dash here

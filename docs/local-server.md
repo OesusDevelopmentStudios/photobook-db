@@ -7,6 +7,16 @@ Raspberry Pi, see [Install](../README.md#install) in the README instead.
 With the server on the same computer, the desktop app can also show an image's file in its folder
 ("Open Containing Folder").
 
+The install script does all of this for you. It asks where things go, each with a default, and needs no
+`sudo` once Podman is installed:
+
+```sh
+curl -fsSL https://github.com/OesusDevelopmentStudios/pictorio-db/releases/latest/download/install.sh | sh
+```
+
+Add `-s -- --help` to see its options, e.g. `| sh -s -- --version 0.1.0` for a fixed release. To do it by
+hand instead, follow the steps below.
+
 ## What you need
 
 - **Podman 4.4 or newer**, with systemd. Fedora, Ubuntu 24.04 and Debian 13 have it.
