@@ -11,6 +11,7 @@ never seen it before.
   ```sh
   pytest
   flake8
+  shellcheck deploy/install.sh    # after changing it
   ```
 
 ## Code layout
@@ -56,6 +57,14 @@ one migration per reviewable change. The server applies them itself when it star
    ```
 3. Read the generated file and tidy it up; it is code like any other.
 4. `pytest` fails if the models and the migrations do not describe the same schema.
+
+## API changes
+
+The API schema is committed as [docs/openapi.json](docs/openapi.json), and a test checks that it matches the code. After an intended API change, update it with:
+
+```sh
+pictorio-db openapi > docs/openapi.json
+```
 
 ## Python style
 

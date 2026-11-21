@@ -14,9 +14,6 @@ images. Web pages on the server (`/admin`) are used to configure it.
 
 It runs on a desktop PC, a NAS or a Raspberry Pi, on 64-bit Linux (amd64 or arm64).
 
-> **Status:** version 0.1. The server and its admin pages work; the desktop app learns to connect to
-> it in a later version.
-
 ## Install
 
 Pick one way:
@@ -170,7 +167,7 @@ Everything else (path template, users, namespaces, tags, accent colour…) is se
 
 ## Development
 
-Needs Python 3.12 or newer.
+Needs Python 3.12 or newer. How to work on the code (its layout, the style, the checks before a commit, database and API changes) is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Set up a virtual environment in the repository and install the project with its development tools:
 
@@ -178,13 +175,6 @@ Set up a virtual environment in the repository and install the project with its 
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
-```
-
-Run the tests and the style check:
-
-```sh
-pytest
-flake8
 ```
 
 Run the server (in the virtual environment):
@@ -200,13 +190,6 @@ During development, point `PICTORIO_DATA_DIR` and `PICTORIO_LIBRARY_DIR` at scra
 test data out of your home folder, e.g.
 `PICTORIO_DATA_DIR=/tmp/pictorio-dev/data PICTORIO_LIBRARY_DIR=/tmp/pictorio-dev/library pictorio-db serve`.
 The tests always use temporary folders of their own.
-
-The API schema is committed as [docs/openapi.json](docs/openapi.json), and a test checks that it
-matches the code. After an intended API change, update it with:
-
-```sh
-pictorio-db openapi > docs/openapi.json
-```
 
 ### Building the image yourself
 
