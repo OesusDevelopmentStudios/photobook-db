@@ -84,7 +84,6 @@ class ServerSettings:
         if changes.web_accent_color is not None:
             web_accent_color = checked_web_accent_color(changes.web_accent_color)
 
-        # Everything is valid: store it.
         if web_accent_color is not None:
             self._settings.set(WEB_ACCENT_COLOR_SETTING, web_accent_color)
 

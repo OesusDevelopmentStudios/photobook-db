@@ -57,8 +57,6 @@ class Authentication:
 
 
 class AuthService:
-    """User accounts, logins (API tokens) and the one-time setup of the first admin account."""
-
     def __init__(self, database: Database, now: Callable[[], datetime] = utc_now) -> None:
         self._database = database
         self._now = now

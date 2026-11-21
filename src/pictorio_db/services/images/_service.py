@@ -62,7 +62,7 @@ _logger = logging.getLogger(__name__)
 
 
 class ImagesService:
-    """Image records and their tags. When a tag change affects an image's folder, its file is moved."""
+    """When a tag change affects an image's folder, its file is moved."""
 
     def __init__(self, database: Database, tags: TagsService, storage: StorageService) -> None:
         self._database = database

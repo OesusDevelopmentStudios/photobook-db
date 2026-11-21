@@ -42,9 +42,6 @@ def local_now() -> datetime:
 
 
 class ImporterService:
-    """Brings an uploaded file into the library: checks it, stores it in its place, records it with its tags
-    and makes its thumbnails."""
-
     def __init__(
         self,
         images: ImagesService,

@@ -23,7 +23,7 @@ class ConfigError(Exception):
 class Config:
     host: str
     port: int
-    data_dir: Path  # the database and, later, thumbnails; the container image sets /data
+    data_dir: Path  # the database and the thumbnails; the container image sets /data
     library_dir: Path  # the images, arranged by their tags; the container image sets /library
     import_dir: Path | None = None  # folders admins can import from on the server; the container sets /import
     # Addresses whose X-Forwarded-For and X-Forwarded-Proto are believed, e.g. from Caddy: then the server knows

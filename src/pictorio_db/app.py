@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Creates the web application: the REST API and its documentation, on top of the database."""
-
 import logging
 
 from collections.abc import AsyncIterator, Callable
@@ -42,7 +40,7 @@ def create_app(config: Config) -> FastAPI:
         title="pictorio-db",
         version=pictorio_db.__version__,
         openapi_url="/api/openapi.json",
-        docs_url="/api/docs",  # interactive API documentation
+        docs_url="/api/docs",
         redoc_url=None,
         lifespan=_lifespan(config),
     )
@@ -56,7 +54,6 @@ def create_app(config: Config) -> FastAPI:
 def _lifespan(config: Config) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        # Creates the database on first start and upgrades its schema after an update.
         database = open_database(config.data_dir / DATABASE_FILE_NAME)
         app.state.database = database
         app.state.auth = AuthService(database)
