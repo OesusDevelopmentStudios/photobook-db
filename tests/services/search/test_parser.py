@@ -7,8 +7,8 @@ from datetime import date
 
 import pytest
 
-from pictorio_db.services.search import All, AnyOf, DateMatch, Node, Not, TagMatch, parse_query
-from pictorio_db.utils.problems import Problem
+from photobook_db.services.search import All, AnyOf, DateMatch, Node, Not, TagMatch, parse_query
+from photobook_db.utils.problems import Problem
 
 NAMESPACES = {"category", "author", "character", "rating", "album", "general"}
 

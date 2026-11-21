@@ -7,13 +7,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-import pictorio_db
-from pictorio_db.config import Config
-from pictorio_db.services.auth import Role
-from pictorio_db.services.same_machine import app_specific_id
+import photobook_db
+from photobook_db.config import Config
+from photobook_db.services.auth import Role
+from photobook_db.services.same_machine import app_specific_id
 
 MACHINE_ID = "0123456789abcdef0123456789abcdef"
-HOST_LIBRARY = Path("/home/kid/Pictures/pictorio-library")
+HOST_LIBRARY = Path("/home/kid/Pictures/photobook-library")
 PASSWORD = "correct horse battery"
 
 
@@ -36,8 +36,8 @@ def test_server_info_is_public_and_names_the_server(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == {
-        "name": "pictorio-db",
-        "version": pictorio_db.__version__,
+        "name": "photobook-db",
+        "version": photobook_db.__version__,
         "api_version": 1,
         "setup_required": True,
     }

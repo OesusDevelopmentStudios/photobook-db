@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from pictorio_db.db import Database
-from pictorio_db.services.images import ImagesService
-from pictorio_db.services.importer import DEFAULT_MAX_UPLOAD_BYTES, ImporterService
-from pictorio_db.services.jobs import JobKind, JobsService, JobStatus, Relayout
-from pictorio_db.services.server_settings import ServerSettings, ServerSettingsInfo, SettingsChanges
-from pictorio_db.services.settings import SettingsService
-from pictorio_db.services.storage import StorageService
-from pictorio_db.services.tags import TagsService
-from pictorio_db.services.thumbnails import ThumbnailsService
-from pictorio_db.utils.problems import Problem
+from photobook_db.db import Database
+from photobook_db.services.images import ImagesService
+from photobook_db.services.importer import DEFAULT_MAX_UPLOAD_BYTES, ImporterService
+from photobook_db.services.jobs import JobKind, JobsService, JobStatus, Relayout
+from photobook_db.services.server_settings import ServerSettings, ServerSettingsInfo, SettingsChanges
+from photobook_db.services.settings import SettingsService
+from photobook_db.services.storage import StorageService
+from photobook_db.services.tags import TagsService
+from photobook_db.services.thumbnails import ThumbnailsService
+from photobook_db.utils.problems import Problem
 
 DEFAULTS = ServerSettingsInfo(
     path_template="{category}/{author}/{year}",

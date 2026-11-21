@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "pictorio-db",
+    "title": "photobook-db",
     "version": "0.1.0"
   },
   "paths": {
@@ -47,10 +47,10 @@
             "schema": {
               "type": "string",
               "maxLength": 128,
-              "description": "HMAC-SHA256 of \"pictorio-db\" with the machine ID in /etc/machine-id as the key, in hex",
+              "description": "HMAC-SHA256 of \"photobook-db\" with the machine ID in /etc/machine-id as the key, in hex",
               "title": "Machine"
             },
-            "description": "HMAC-SHA256 of \"pictorio-db\" with the machine ID in /etc/machine-id as the key, in hex"
+            "description": "HMAC-SHA256 of \"photobook-db\" with the machine ID in /etc/machine-id as the key, in hex"
           }
         ],
         "responses": {
@@ -2500,7 +2500,7 @@
           "library_dir": {
             "type": "string",
             "title": "Library Dir",
-            "description": "Read-only: set with PICTORIO_LIBRARY_DIR"
+            "description": "Read-only: set with PHOTOBOOK_LIBRARY_DIR"
           },
           "import_dir": {
             "anyOf": [
@@ -2512,7 +2512,7 @@
               }
             ],
             "title": "Import Dir",
-            "description": "Read-only: set with PICTORIO_IMPORT_DIR; null if folder imports are off"
+            "description": "Read-only: set with PHOTOBOOK_IMPORT_DIR; null if folder imports are off"
           },
           "job_id": {
             "anyOf": [
@@ -2883,7 +2883,7 @@
             "type": "string",
             "maxLength": 1000,
             "title": "Source Subdir",
-            "description": "A folder inside the server's import folder (PICTORIO_IMPORT_DIR); '' for all of it",
+            "description": "A folder inside the server's import folder (PHOTOBOOK_IMPORT_DIR); '' for all of it",
             "examples": [
               "phone_backup/2025"
             ]
@@ -3041,7 +3041,7 @@
             "title": "Library Dir",
             "description": "The library folder on this computer; an image's file is there at its storage_path",
             "examples": [
-              "/home/kid/Pictures/pictorio-library"
+              "/home/kid/Pictures/photobook-library"
             ]
           }
         },
@@ -3069,7 +3069,7 @@
             "minLength": 1,
             "title": "Device Name",
             "examples": [
-              "laptop (pictorio 0.1.0)"
+              "laptop (photobook 0.1.0)"
             ]
           }
         },
@@ -3435,7 +3435,7 @@
           "library_dir": {
             "type": "string",
             "title": "Library Dir",
-            "description": "Read-only: set with PICTORIO_LIBRARY_DIR"
+            "description": "Read-only: set with PHOTOBOOK_LIBRARY_DIR"
           },
           "import_dir": {
             "anyOf": [
@@ -3447,7 +3447,7 @@
               }
             ],
             "title": "Import Dir",
-            "description": "Read-only: set with PICTORIO_IMPORT_DIR; null if folder imports are off"
+            "description": "Read-only: set with PHOTOBOOK_IMPORT_DIR; null if folder imports are off"
           }
         },
         "type": "object",

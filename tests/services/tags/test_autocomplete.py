@@ -6,9 +6,9 @@ from datetime import datetime
 import pytest
 from sqlalchemy import select
 
-from pictorio_db.db import Database
-from pictorio_db.db.models import Image, Namespace, Tag, image_tag
-from pictorio_db.services.tags import TagName, TagsService
+from photobook_db.db import Database
+from photobook_db.db.models import Image, Namespace, Tag, image_tag
+from photobook_db.services.tags import TagName, TagsService
 
 # tag → number of images that carry it
 TAGGED_IMAGES = {

@@ -3,7 +3,7 @@
 
 import pytest
 
-from pictorio_db.admin_web._theme import DARK_TEXT, LIGHT_TEXT, PLASMA_ACCENT_COLORS, readable_text_on
+from photobook_db.admin_web._theme import DARK_TEXT, LIGHT_TEXT, PLASMA_ACCENT_COLORS, readable_text_on
 
 
 @pytest.mark.parametrize(

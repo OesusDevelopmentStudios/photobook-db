@@ -12,9 +12,9 @@ from alembic.migration import MigrationContext
 from sqlalchemy import delete, inspect, select, text
 from sqlalchemy.exc import IntegrityError
 
-from pictorio_db.db import DATABASE_FILE_NAME, Database, open_database
-from pictorio_db.db._migrations import _alembic_config
-from pictorio_db.db.models import Base, Image, Namespace, Tag, image_tag
+from photobook_db.db import DATABASE_FILE_NAME, Database, open_database
+from photobook_db.db._migrations import _alembic_config
+from photobook_db.db.models import Base, Image, Namespace, Tag, image_tag
 
 
 @pytest.fixture

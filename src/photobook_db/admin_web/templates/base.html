@@ -1,0 +1,27 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% block head %}{% endblock %}
+    <title>{% block title %}{% endblock %} – photobook-db</title>
+    <style>
+        :root { --accent: {{ accent_color }}; --accent-text: {{ accent_text_color }}; }
+        {% include "_style.css" %}
+    </style>
+</head>
+<body class="{% block width %}narrow{% endblock %}">
+    {% block nav %}
+    <nav>{% include "_brand.html" %}</nav>
+    {% endblock %}
+    <main>
+        <div class="title-row">
+            {% block back %}{% endblock %}
+            <h1>{% block heading %}{% endblock %}</h1>
+        </div>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

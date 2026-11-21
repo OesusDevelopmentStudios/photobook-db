@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from PIL import ExifTags, Image
 
-from pictorio_db.services.thumbnails import ThumbnailsService
-from pictorio_db.utils.problems import Problem
+from photobook_db.services.thumbnails import ThumbnailsService
+from photobook_db.utils.problems import Problem
 
 SHA256 = "ab12" + "0" * 60
 

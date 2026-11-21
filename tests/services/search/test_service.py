@@ -6,11 +6,11 @@ from datetime import datetime, timedelta
 import pytest
 from sqlalchemy import select, true
 
-from pictorio_db.db import Database
-from pictorio_db.db._connection import shuffled_position
-from pictorio_db.db.models import Image, Namespace, Tag, image_tag
-from pictorio_db.services.search import Order, SearchCount, SearchPage, SearchRequest, SearchService, Sort
-from pictorio_db.utils.problems import Problem
+from photobook_db.db import Database
+from photobook_db.db._connection import shuffled_position
+from photobook_db.db.models import Image, Namespace, Tag, image_tag
+from photobook_db.services.search import Order, SearchCount, SearchPage, SearchRequest, SearchService, Sort
+from photobook_db.utils.problems import Problem
 
 NAMESPACES = {"category", "author", "character", "rating", "album", "general"}
 FIRST_DAY = datetime(2025, 1, 1, 12, 0)

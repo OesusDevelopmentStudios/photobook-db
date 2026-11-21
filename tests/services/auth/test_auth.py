@@ -8,10 +8,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from pictorio_db.db import Database
-from pictorio_db.db.models import ApiToken, User
-from pictorio_db.services.auth import AuthService, Role
-from pictorio_db.utils.problems import Problem
+from photobook_db.db import Database
+from photobook_db.db.models import ApiToken, User
+from photobook_db.services.auth import AuthService, Role
+from photobook_db.utils.problems import Problem
 
 PASSWORD = "correct horse battery"
 
@@ -136,7 +136,7 @@ def test_stores_only_an_argon2id_hash_of_the_password(auth: AuthService, databas
 def test_login_returns_token_that_authenticates(auth: AuthService) -> None:
     auth.create_user("kid", PASSWORD, Role.USER)
 
-    new_token = auth.create_token("Kid", PASSWORD, "laptop (pictorio 0.1.0)")
+    new_token = auth.create_token("Kid", PASSWORD, "laptop (photobook 0.1.0)")
     authentication = auth.authenticate(new_token.token)
 
     assert re.fullmatch(r"pk_[A-Za-z0-9_-]{43}", new_token.token)

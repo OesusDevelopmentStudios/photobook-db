@@ -9,8 +9,8 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from pictorio_db.services.auth import Role
-from pictorio_db.services.tags import TagName, TagsService
+from photobook_db.services.auth import Role
+from photobook_db.services.tags import TagName, TagsService
 
 from .conftest import PASSWORD, csrf_token_in
 

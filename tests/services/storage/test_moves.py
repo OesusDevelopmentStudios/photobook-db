@@ -14,11 +14,11 @@ from pathlib import Path, PurePosixPath
 import pytest
 from sqlalchemy import select
 
-from pictorio_db.db import Database
-from pictorio_db.db.models import FileMove, Image
-from pictorio_db.services.settings import SettingsService
-from pictorio_db.services.storage import StorageService
-from pictorio_db.services.storage import _files, _service
+from photobook_db.db import Database
+from photobook_db.db.models import FileMove, Image
+from photobook_db.services.settings import SettingsService
+from photobook_db.services.storage import StorageService
+from photobook_db.services.storage import _files, _service
 
 OLD_PATH = PurePosixPath("photo/_unknown/2024/beach_3fa2b1c9.jpg")
 NEW_PATH = PurePosixPath("photo/sample_artist/2024/beach_3fa2b1c9.jpg")

@@ -5,13 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from pictorio_db.services.same_machine import SameMachine, app_specific_id
-from pictorio_db.utils.problems import Problem
+from photobook_db.services.same_machine import SameMachine, app_specific_id
+from photobook_db.utils.problems import Problem
 
 MACHINE_ID = "0123456789abcdef0123456789abcdef"
-# printf pictorio-db | openssl dgst -sha256 -hmac 0123456789abcdef0123456789abcdef: what the desktop app sends
-CLIENT_ID = "9d623a361e613d33fd9937381c885a2ef999fa19c152bbbcadbf789bee807420"
-LIBRARY = Path("/home/kid/Pictures/pictorio-library")
+# printf photobook-db | openssl dgst -sha256 -hmac 0123456789abcdef0123456789abcdef: what the desktop app sends
+CLIENT_ID = "68ca712866a854762ce8a71933440d7105df0c2debd2692ae766bbc0888bb323"
+LIBRARY = Path("/home/kid/Pictures/photobook-library")
 
 
 def same_machine(tmp_path: Path, machine_id_text: str | None) -> SameMachine:

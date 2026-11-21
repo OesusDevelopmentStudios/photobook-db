@@ -5,7 +5,7 @@ import re
 
 from fastapi.testclient import TestClient
 
-from pictorio_db.services.server_settings import ServerSettings, SettingsChanges
+from photobook_db.services.server_settings import ServerSettings, SettingsChanges
 
 from .conftest import csrf_token_in
 

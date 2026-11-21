@@ -10,10 +10,10 @@ from pathlib import Path
 import pytest
 from PIL import ExifTags, Image
 
-from pictorio_db.services.importer import file_sha256, inspect_image
-from pictorio_db.services.importer._inspection import _parse_utc_offset
-from pictorio_db.utils import image_limits
-from pictorio_db.utils.problems import Problem
+from photobook_db.services.importer import file_sha256, inspect_image
+from photobook_db.services.importer._inspection import _parse_utc_offset
+from photobook_db.utils import image_limits
+from photobook_db.utils.problems import Problem
 
 
 def write_image(

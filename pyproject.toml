@@ -6,9 +6,9 @@ requires = ["setuptools>=77"]  # 77: SPDX license expression in [project]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pictorio-db"
+name = "photobook-db"
 version = "0.1.0"
-description = "Image library server for Pictorio: stores images, tags and thumbnails"
+description = "Image library server for Photobook: stores images, tags and thumbnails"
 readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pictorio-db = "pictorio_db.cli:main"
+photobook-db = "photobook_db.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -40,8 +40,8 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-"pictorio_db.db" = ["migrations/script.py.mako"]  # template for new migrations
-"pictorio_db.admin_web" = ["templates/*"]  # the pages, and the stylesheet they include
+"photobook_db.db" = ["migrations/script.py.mako"]  # template for new migrations
+"photobook_db.admin_web" = ["templates/*"]  # the pages, and the stylesheet they include
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

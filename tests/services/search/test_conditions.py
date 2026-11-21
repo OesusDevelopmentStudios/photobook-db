@@ -8,9 +8,9 @@ from datetime import datetime
 import pytest
 from sqlalchemy import select
 
-from pictorio_db.db import Database
-from pictorio_db.db.models import Image, Namespace, Tag, image_tag
-from pictorio_db.services.search import (
+from photobook_db.db import Database
+from photobook_db.db.models import Image, Namespace, Tag, image_tag
+from photobook_db.services.search import (
     TagMatch,
     apply_hidden_filters,
     matching_condition,
@@ -18,7 +18,7 @@ from pictorio_db.services.search import (
     parse_query,
     tree_matches,
 )
-from pictorio_db.services.tags import TagName
+from photobook_db.services.tags import TagName
 
 NAMESPACES = {"category", "author", "character", "rating", "album", "general"}
 

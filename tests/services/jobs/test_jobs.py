@@ -13,12 +13,12 @@ from typing import Any
 import pytest
 from sqlalchemy import update
 
-from pictorio_db.db import Database
-from pictorio_db.db.models import Job
-from pictorio_db.services.auth import AuthService, Role, UserInfo
-from pictorio_db.services.jobs import JobContext, JobInfo, JobKind, JobsService, JobStatus
-from pictorio_db.utils.problems import Problem
-from pictorio_db.utils.time import utc_now
+from photobook_db.db import Database
+from photobook_db.db.models import Job
+from photobook_db.services.auth import AuthService, Role, UserInfo
+from photobook_db.services.jobs import JobContext, JobInfo, JobKind, JobsService, JobStatus
+from photobook_db.utils.problems import Problem
+from photobook_db.utils.time import utc_now
 
 TEST_KIND = JobKind.RELAYOUT  # any kind will do; the tests register their own handlers
 

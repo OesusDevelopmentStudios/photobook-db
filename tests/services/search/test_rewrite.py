@@ -3,8 +3,8 @@
 
 import pytest
 
-from pictorio_db.services.search import parse_query, renamed_in_term, term_text, without_tag_in_term
-from pictorio_db.services.tags import TagName
+from photobook_db.services.search import parse_query, renamed_in_term, term_text, without_tag_in_term
+from photobook_db.services.tags import TagName
 
 NAMESPACES = {"general", "category", "author", "rating", "character"}
 NSFW = TagName("rating", "nsfw")

@@ -2,30 +2,30 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 #
-# Installs pictorio-db on this computer: a Podman container that systemd runs as a service of your user,
+# Installs photobook-db on this computer: a Podman container that systemd runs as a service of your user,
 # never as root. It asks where things go, each with a default, writes the Quadlet unit, starts the server
 # and tells you how to create the admin account. docs/local-server.md does the same by hand.
 #
-#   curl -fsSL https://github.com/OesusDevelopmentStudios/pictorio-db/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/OesusDevelopmentStudios/photobook-db/releases/latest/download/install.sh | sh
 #   curl -fsSL …/install.sh | sh -s -- --version 0.1.0     # a fixed release instead of the latest
 #   sh install.sh --help                                   # every question as an option
 
 set -eu
 
-IMAGE=ghcr.io/oesusdevelopmentstudios/pictorio-db
+IMAGE=ghcr.io/oesusdevelopmentstudios/photobook-db
 SERVER_PORT=8737  # inside the container
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/systemd"
-UNIT_FILE="$UNIT_DIR/pictorio-db.container"
+UNIT_FILE="$UNIT_DIR/photobook-db.container"
 START_TIMEOUT=900  # seconds; the first start downloads the image
 
 usage() {
     cat <<'EOF'
-Installs the pictorio-db server for your user with Podman and systemd.
+Installs the photobook-db server for your user with Podman and systemd.
 
 Usage: install.sh [options]
 
-  --library DIR    where the images go (default: ~/Pictures/pictorio-library)
-  --database DIR   the database and thumbnails (default: .pictorio in the library folder)
+  --library DIR    where the images go (default: ~/Pictures/photobook-library)
+  --database DIR   the database and thumbnails (default: .photobook in the library folder)
   --import DIR     a folder admins can import from, read only (default: none)
   --port PORT      the port on this computer (default: 8737)
   --lan            other devices can connect too (default: only this computer)
@@ -34,7 +34,7 @@ Usage: install.sh [options]
   --no-boot        start it when you log in
   --version X      a fixed release, e.g. 0.1.0, not updated by itself (default: the latest, updated daily
                    if podman-auto-update.timer is on)
-  --replace        replace an existing pictorio-db unit
+  --replace        replace an existing photobook-db unit
   --yes            ask nothing: use the options given and the defaults
   -h, --help       this text
 EOF
@@ -141,14 +141,14 @@ fi
 
 if [ -e "$UNIT_FILE" ] && [ "$replace" = no ]; then
     [ "$assume_defaults" = no ] || fail "$UNIT_FILE exists already; add --replace to replace it"
-    [ "$(ask_yes_no "pictorio-db is set up already. Replace its unit file? The images and database stay" no)" = yes ] \
+    [ "$(ask_yes_no "photobook-db is set up already. Replace its unit file? The images and database stay" no)" = yes ] \
         || { echo "Nothing changed."; exit 0; }
 fi
 
 # The questions not answered by options
-[ -n "$library" ] || library=$(ask "Library folder, for the images" "$HOME/Pictures/pictorio-library")
+[ -n "$library" ] || library=$(ask "Library folder, for the images" "$HOME/Pictures/photobook-library")
 library=$(folder "$library")
-[ -n "$database" ] || database=$(ask "Database folder, also for the thumbnails" "$library/.pictorio")
+[ -n "$database" ] || database=$(ask "Database folder, also for the thumbnails" "$library/.photobook")
 database=$(folder "$database")
 [ "$import_given" = yes ] || import_dir=$(ask "Folder to import from, read only (empty: none)" "")
 [ -z "$import_dir" ] || import_dir=$(folder "$import_dir")
@@ -185,18 +185,18 @@ import_lines=""
 machine_lines=""
 if [ -r /etc/machine-id ]; then
     machine_lines="Volume=/etc/machine-id:/run/host/machine-id:ro
-Environment=PICTORIO_HOST_LIBRARY_DIR=$library"
+Environment=PHOTOBOOK_HOST_LIBRARY_DIR=$library"
 fi
 
 cat >"$UNIT_FILE" <<EOF
-# Written by pictorio-db's install.sh. Run it again to change the answers.
+# Written by photobook-db's install.sh. Run it again to change the answers.
 
 [Unit]
-Description=pictorio-db image library server
+Description=photobook-db image library server
 
 [Container]
 $image_lines
-ContainerName=pictorio-db
+ContainerName=photobook-db
 $publish
 Volume=$library:/library:Z
 Volume=$database:/data:Z
@@ -217,24 +217,24 @@ EOF
 echo "Wrote $UNIT_FILE"
 
 systemctl --user daemon-reload
-echo "Starting pictorio-db; the first start downloads the image, which can take a few minutes…"
-systemctl --user restart pictorio-db
+echo "Starting photobook-db; the first start downloads the image, which can take a few minutes…"
+systemctl --user restart photobook-db
 [ "$boot" = no ] || loginctl enable-linger
 
 if command -v curl >/dev/null 2>&1; then
     waited=0
     until curl -fsS -o /dev/null "http://127.0.0.1:$port/api/v1/server/info" 2>/dev/null; do
-        systemctl --user is-failed --quiet pictorio-db \
-            && fail "the server did not start; see: journalctl --user -u pictorio-db"
-        [ "$waited" -lt "$START_TIMEOUT" ] || fail "the server did not answer; see: journalctl --user -u pictorio-db"
+        systemctl --user is-failed --quiet photobook-db \
+            && fail "the server did not start; see: journalctl --user -u photobook-db"
+        [ "$waited" -lt "$START_TIMEOUT" ] || fail "the server did not answer; see: journalctl --user -u photobook-db"
         sleep 2
         waited=$((waited + 2))
     done
 fi
 
 echo
-echo "pictorio-db runs at http://localhost:$port"
-setup_code=$(podman logs pictorio-db 2>&1 | sed -n 's/.*setup code \([^[:space:]]*\).*/\1/p' | tail -n 1)
+echo "photobook-db runs at http://localhost:$port"
+setup_code=$(podman logs photobook-db 2>&1 | sed -n 's/.*setup code \([^[:space:]]*\).*/\1/p' | tail -n 1)
 if [ -n "$setup_code" ]; then
     echo "Create the admin account at http://localhost:$port/admin/setup with the setup code $setup_code"
 else

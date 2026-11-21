@@ -8,7 +8,7 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
-from pictorio_db.services.auth import Role
+from photobook_db.services.auth import Role
 
 PASSWORD = "correct horse battery"
 

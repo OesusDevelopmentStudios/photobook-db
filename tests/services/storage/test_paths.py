@@ -8,7 +8,7 @@ from pathlib import PurePosixPath
 
 import pytest
 
-from pictorio_db.services.storage import (
+from photobook_db.services.storage import (
     DEFAULT_PATH_TEMPLATE,
     PathTemplate,
     file_name,
@@ -16,7 +16,7 @@ from pictorio_db.services.storage import (
     folder_path,
     parse_path_template,
 )
-from pictorio_db.utils.problems import Problem
+from photobook_db.utils.problems import Problem
 
 NAMESPACES = {"category", "author", "character", "rating", "album", "general"}
 TAKEN_AT = datetime(2025, 7, 14, 18, 30)

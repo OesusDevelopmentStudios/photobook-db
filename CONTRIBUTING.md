@@ -1,4 +1,4 @@
-# Contributing to pictorio-db
+# Contributing to photobook-db
 
 Readability comes first. The code should be easy to understand and maintain for someone who has
 never seen it before.
@@ -17,7 +17,7 @@ never seen it before.
 ## Code layout
 
 ```
-src/pictorio_db/
+src/photobook_db/
 ├── app.py          creates the services and the web application; contains no logic of its own
 ├── config.py       settings read from environment variables at startup
 ├── db/             database tables (models.py), connection and migrations
@@ -25,7 +25,7 @@ src/pictorio_db/
 ├── admin_web/      web admin pages
 ├── services/       one package per service, each with a single responsibility
 └── utils/          small helpers shared by several services
-tests/              mirrors src/pictorio_db/: tests/api/v1/test_server.py tests api/v1/server.py
+tests/              mirrors src/photobook_db/: tests/api/v1/test_server.py tests api/v1/server.py
 ```
 
 **Routers and admin pages are thin.** They validate the input, call a service and turn the result
@@ -45,10 +45,10 @@ services/<service_name>/       snake_case, e.g. services/tags/
 
 ## Database changes
 
-The schema changes only through Alembic migrations in `src/pictorio_db/db/migrations/versions/`,
+The schema changes only through Alembic migrations in `src/photobook_db/db/migrations/versions/`,
 one migration per reviewable change. The server applies them itself when it starts.
 
-1. Change the tables in `src/pictorio_db/db/models.py`.
+1. Change the tables in `src/photobook_db/db/models.py`.
 2. Let Alembic write the migration. It compares the models with `migration-dev.sqlite3` in the
    repository root (ignored by git), so bring that file up to date first. Use the next number as id:
    ```sh
@@ -63,7 +63,7 @@ one migration per reviewable change. The server applies them itself when it star
 The API schema is committed as [docs/openapi.json](docs/openapi.json), and a test checks that it matches the code. After an intended API change, update it with:
 
 ```sh
-pictorio-db openapi > docs/openapi.json
+photobook-db openapi > docs/openapi.json
 ```
 
 ## Python style

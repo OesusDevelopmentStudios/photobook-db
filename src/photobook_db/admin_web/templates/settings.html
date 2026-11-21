@@ -1,0 +1,71 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{% extends "page.html" %}
+{% block title %}Settings{% endblock %}
+{% block heading %}Settings{% endblock %}
+{% block content %}
+{% if error %}
+<p class="error" role="alert">{{ error }}</p>
+{% elif saved %}
+<p class="success" role="status">The settings have been saved.
+{% if relayout_job is not none %}
+<a href="/admin/jobs/{{ relayout_job }}">Job {{ relayout_job }}</a> now moves the files to match the new path
+template.
+{% endif %}
+</p>
+{% endif %}
+
+<form method="post" action="/admin/settings">
+    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+    <label>Path template
+        <input name="path_template" required spellcheck="false" value="{{ form.path_template }}">
+    </label>
+    <span class="hint">The folders each image is stored in, e.g. <code>{category}/{author}/{year}</code>.
+        Placeholders are namespaces, <code>{year}</code> and <code>{month}</code>.
+        A change moves every file in the background.</span>
+    <label>Upload limit (MiB)
+        <input name="max_upload_mib" type="number" required step="1" value="{{ form.max_upload_mib }}"
+               min="{{ upload_limit_mib[0] }}" max="{{ upload_limit_mib[1] }}">
+    </label>
+    <span class="hint">The largest image that can be uploaded, from {{ upload_limit_mib[0] }} to
+        {{ upload_limit_mib[1] }} MiB.</span>
+    <label>Rating values
+        <textarea name="rating_values" rows="4" required spellcheck="false">{{ form.rating_values }}</textarea>
+    </label>
+    <span class="hint">One per line, at most {{ max_rating_values }}. Images keep a rating that is removed here,
+        but it cannot be given again.</span>
+    <button type="submit">Save</button>
+</form>
+
+<h2 id="appearance">Appearance</h2>
+{% if accent_error %}
+<p class="error" role="alert">{{ accent_error }}</p>
+{% elif accent_saved %}
+<p class="success" role="status">The accent colour has been saved.</p>
+{% endif %}
+<p class="hint">The accent colour of these pages. Pick the one your Plasma desktop uses to match it.</p>
+<form method="post" action="/admin/settings/accent">
+    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+    <div class="swatches">
+        {% for name, color in plasma_accent_colors %}
+        <button type="submit" class="swatch" name="accent_color" value="{{ color }}" style="--swatch: {{ color }}"
+                title="{{ name }}" aria-label="{{ name }}"
+                aria-pressed="{{ 'true' if color == accent_color else 'false' }}"></button>
+        {% endfor %}
+    </div>
+    <div class="custom-color">
+        <input type="color" name="custom_color" value="{{ accent_color }}" aria-label="Custom colour">
+        <button type="submit" class="secondary" name="accent_color" value="custom">Use custom colour</button>
+        {% if is_custom_accent %}<span class="hint">In use: <code>{{ accent_color }}</code></span>{% endif %}
+    </div>
+</form>
+
+<h2>Folders</h2>
+<p class="hint">Set when the server starts (<code>PHOTOBOOK_LIBRARY_DIR</code> and
+<code>PHOTOBOOK_IMPORT_DIR</code>), so they cannot be changed here.</p>
+<dl>
+    <dt>Library folder</dt><dd><code>{{ library_dir }}</code></dd>
+    <dt>Import folder</dt>
+    <dd>{% if import_dir %}<code>{{ import_dir }}</code>{% else %}not set: folder imports are off{% endif %}</dd>
+</dl>
+{% endblock %}

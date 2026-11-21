@@ -6,7 +6,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
-import pictorio_db
+import photobook_db
 
 PROJECT_DIR = Path(__file__).parent.parent
 
@@ -16,14 +16,14 @@ def pyproject() -> dict[str, Any]:
 
 
 def test_version_matches_pyproject() -> None:
-    assert pictorio_db.__version__ == pyproject()["project"]["version"]
+    assert photobook_db.__version__ == pyproject()["project"]["version"]
 
 
 def test_installed_package_has_every_template() -> None:
     """An editable install reads the source folder, so a template missing from package-data only fails in a
     real install, e.g. the container image."""
-    patterns = pyproject()["tool"]["setuptools"]["package-data"]["pictorio_db.admin_web"]
-    admin_web = PROJECT_DIR / "src" / "pictorio_db" / "admin_web"
+    patterns = pyproject()["tool"]["setuptools"]["package-data"]["photobook_db.admin_web"]
+    admin_web = PROJECT_DIR / "src" / "photobook_db" / "admin_web"
 
     for template in (admin_web / "templates").iterdir():
         relative = template.relative_to(admin_web).as_posix()

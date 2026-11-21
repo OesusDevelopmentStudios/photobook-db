@@ -9,13 +9,13 @@ import pytest
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
-from pictorio_db.db import Database
-from pictorio_db.db.models import Tag, User
-from pictorio_db.services.images import ImagesService, NewImage
-from pictorio_db.services.settings import SettingsService
-from pictorio_db.services.storage import StorageService
-from pictorio_db.services.tags import TagName, TagsService
-from pictorio_db.utils.problems import Problem
+from photobook_db.db import Database
+from photobook_db.db.models import Tag, User
+from photobook_db.services.images import ImagesService, NewImage
+from photobook_db.services.settings import SettingsService
+from photobook_db.services.storage import StorageService
+from photobook_db.services.tags import TagName, TagsService
+from photobook_db.utils.problems import Problem
 
 BEACH = NewImage(
     sha256="3fa2b1c9".ljust(64, "0"),

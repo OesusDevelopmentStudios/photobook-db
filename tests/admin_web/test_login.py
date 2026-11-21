@@ -7,9 +7,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 
-from pictorio_db.db.models import ApiToken, User
-from pictorio_db.services.auth import Role
-from pictorio_db.utils.time import utc_now
+from photobook_db.db.models import ApiToken, User
+from photobook_db.services.auth import Role
+from photobook_db.utils.time import utc_now
 
 from .conftest import PASSWORD, csrf_token_in
 
@@ -37,7 +37,7 @@ def test_login_sets_a_session_cookie_and_returns_to_the_page(client: TestClient,
 
     assert (response.status_code, response.headers["location"]) == (303, "/admin")
     cookie = response.headers["set-cookie"]
-    assert cookie.startswith("pictorio_admin=")
+    assert cookie.startswith("photobook_admin=")
     for attribute in ("HttpOnly", "Path=/admin", "SameSite=strict"):
         assert attribute in cookie
     assert "Max-Age" not in cookie and "expires" not in cookie.lower()  # forgotten when the browser closes

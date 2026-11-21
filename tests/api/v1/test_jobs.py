@@ -13,10 +13,10 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from pictorio_db.app import create_app
-from pictorio_db.config import Config
-from pictorio_db.services.auth import Role
-from pictorio_db.services.jobs import JobContext, JobKind
+from photobook_db.app import create_app
+from photobook_db.config import Config
+from photobook_db.services.auth import Role
+from photobook_db.services.jobs import JobContext, JobKind
 
 PASSWORD = "correct horse battery"
 TEST_KIND = JobKind.RELAYOUT  # the tests replace its handler

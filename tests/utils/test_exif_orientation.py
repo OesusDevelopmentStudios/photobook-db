@@ -9,7 +9,7 @@ import io
 import pytest
 from PIL import Image, ImageOps
 
-from pictorio_db.utils.exif_orientation import (
+from photobook_db.utils.exif_orientation import (
     ORIENTATION_TAG,
     read_orientation,
     turned_orientation,

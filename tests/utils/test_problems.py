@@ -7,7 +7,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from pictorio_db.utils.problems import PROBLEM_MEDIA_TYPE, Problem, install_problem_handlers
+from photobook_db.utils.problems import PROBLEM_MEDIA_TYPE, Problem, install_problem_handlers
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def test_problem_has_rfc9457_fields_and_extras(client: TestClient) -> None:
     assert response.status_code == 409
     assert response.headers["content-type"] == PROBLEM_MEDIA_TYPE
     assert response.json() == {
-        "type": "https://pictorio.invalid/problems/duplicate-image",
+        "type": "https://photobook.invalid/problems/duplicate-image",
         "title": "Image already exists",
         "status": 409,
         "code": "duplicate_image",

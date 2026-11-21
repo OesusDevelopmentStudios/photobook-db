@@ -50,7 +50,7 @@ class Machine:
 
     @property
     def unit_file(self) -> Path:
-        return self.home / ".config" / "containers" / "systemd" / "pictorio-db.container"
+        return self.home / ".config" / "containers" / "systemd" / "photobook-db.container"
 
     def unit_lines(self) -> list[str]:
         return [line for line in self.unit_file.read_text().splitlines() if line and not line.startswith("#")]
@@ -123,24 +123,24 @@ def install_answering(machine: Machine, answers: list[str], *options: str) -> tu
 
 
 def test_installs_with_the_defaults(machine: Machine) -> None:
-    library = machine.home / "Pictures" / "pictorio-library"
+    library = machine.home / "Pictures" / "photobook-library"
 
     result = install(machine, "--yes")
 
     assert result.returncode == 0, result.stderr
     lines = machine.unit_lines()
-    assert "Image=ghcr.io/oesusdevelopmentstudios/pictorio-db:latest" in lines
+    assert "Image=ghcr.io/oesusdevelopmentstudios/photobook-db:latest" in lines
     assert "AutoUpdate=registry" in lines
     assert "PublishPort=127.0.0.1:8737:8737" in lines  # only this computer
     assert f"Volume={library}:/library:Z" in lines
-    assert f"Volume={library}/.pictorio:/data:Z" in lines
+    assert f"Volume={library}/.photobook:/data:Z" in lines
     assert not any(line.startswith("Volume=") and ":/import:" in line for line in lines)
     if Path("/etc/machine-id").exists():
         assert "Volume=/etc/machine-id:/run/host/machine-id:ro" in lines
-        assert f"Environment=PICTORIO_HOST_LIBRARY_DIR={library}" in lines
-    assert (library / ".pictorio").is_dir()
+        assert f"Environment=PHOTOBOOK_HOST_LIBRARY_DIR={library}" in lines
+    assert (library / ".photobook").is_dir()
     calls = machine.calls()
-    assert calls.index("systemctl --user daemon-reload") < calls.index("systemctl --user restart pictorio-db")
+    assert calls.index("systemctl --user daemon-reload") < calls.index("systemctl --user restart photobook-db")
     assert "loginctl enable-linger" in calls  # starts at boot
     assert f"http://localhost:8737/admin/setup with the setup code {SETUP_CODE}" in result.stdout
 
@@ -157,7 +157,7 @@ def test_takes_every_answer_as_an_option(machine: Machine, tmp_path: Path) -> No
 
     assert result.returncode == 0, result.stderr
     lines = machine.unit_lines()
-    assert "Image=ghcr.io/oesusdevelopmentstudios/pictorio-db:0.1.0" in lines
+    assert "Image=ghcr.io/oesusdevelopmentstudios/photobook-db:0.1.0" in lines
     assert "AutoUpdate=registry" not in lines  # a fixed release
     assert "PublishPort=9000:8737" in lines  # other devices too
     assert f"Volume={library}:/library:Z" in lines
@@ -176,7 +176,7 @@ def test_asks_in_the_terminal(machine: Machine, tmp_path: Path) -> None:
     assert "Library folder, for the images" in shown
     lines = machine.unit_lines()
     assert f"Volume={machine.home}/Photos:/library:Z" in lines
-    assert f"Volume={machine.home}/Photos/.pictorio:/data:Z" in lines
+    assert f"Volume={machine.home}/Photos/.photobook:/data:Z" in lines
     assert "PublishPort=127.0.0.1:8737:8737" in lines
     assert not any(call.startswith("loginctl") for call in machine.calls())
 
@@ -228,15 +228,15 @@ def test_refuses_a_wrong_port(machine: Machine, port: str) -> None:
 
 def test_keeps_an_existing_unit_unless_asked_to_replace_it(machine: Machine) -> None:
     machine.unit_file.parent.mkdir(parents=True)
-    machine.unit_file.write_text("[Container]\nImage=localhost/pictorio-db:latest\n")
+    machine.unit_file.write_text("[Container]\nImage=localhost/photobook-db:latest\n")
 
     kept = install(machine, "--yes")
 
     assert kept.returncode != 0
     assert "--replace" in kept.stderr
-    assert "localhost/pictorio-db" in machine.unit_file.read_text()
+    assert "localhost/photobook-db" in machine.unit_file.read_text()
 
     replaced = install(machine, "--yes", "--replace")
 
     assert replaced.returncode == 0, replaced.stderr
-    assert "Image=ghcr.io/oesusdevelopmentstudios/pictorio-db:latest" in machine.unit_lines()
+    assert "Image=ghcr.io/oesusdevelopmentstudios/photobook-db:latest" in machine.unit_lines()

@@ -11,10 +11,10 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import update
 
-from pictorio_db.config import Config
-from pictorio_db.db.models import Job
-from pictorio_db.services.jobs import JobInfo, JobStatus
-from pictorio_db.services.server_settings import SettingsChanges
+from photobook_db.config import Config
+from photobook_db.db.models import Job
+from photobook_db.services.jobs import JobInfo, JobStatus
+from photobook_db.services.server_settings import SettingsChanges
 
 from .conftest import csrf_token_in
 
@@ -211,7 +211,7 @@ class TestWithoutAnImportFolder:
     def test_import_button_says_why_it_is_off(self, admin_browser: TestClient) -> None:
         page = admin_browser.get("/admin/jobs").text
 
-        assert 'title="Folder imports are off. Set PICTORIO_IMPORT_DIR on the server to turn them on."' in page
+        assert 'title="Folder imports are off. Set PHOTOBOOK_IMPORT_DIR on the server to turn them on."' in page
         assert '<button type="button" disabled>+ Import Folder</button>' in page
 
     def test_import_page_explains_how_to_turn_imports_on(self, admin_browser: TestClient) -> None:

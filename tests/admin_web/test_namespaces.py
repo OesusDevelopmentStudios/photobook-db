@@ -7,9 +7,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from pictorio_db.db.models import Namespace, Tag
-from pictorio_db.services.server_settings import SettingsChanges
-from pictorio_db.services.tags import NamespaceInfo, TagsService
+from photobook_db.db.models import Namespace, Tag
+from photobook_db.services.server_settings import SettingsChanges
+from photobook_db.services.tags import NamespaceInfo, TagsService
 
 from .conftest import csrf_token_in
 

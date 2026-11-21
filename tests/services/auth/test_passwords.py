@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-from pictorio_db.services.auth._passwords import hash_password, verify_password
+from photobook_db.services.auth._passwords import hash_password, verify_password
 
 
 def test_verifies_the_right_password_only() -> None:

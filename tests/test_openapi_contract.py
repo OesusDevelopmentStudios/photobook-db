@@ -6,8 +6,8 @@
 import json
 from pathlib import Path
 
-from pictorio_db.app import create_app
-from pictorio_db.config import Config
+from photobook_db.app import create_app
+from photobook_db.config import Config
 
 SCHEMA_PATH = Path(__file__).parent.parent / "docs" / "openapi.json"
 
@@ -17,5 +17,5 @@ def test_api_matches_committed_schema(config: Config) -> None:
 
     assert create_app(config).openapi() == committed_schema, (
         "The API differs from docs/openapi.json. If the change is intended, update the file with:\n"
-        "    pictorio-db openapi > docs/openapi.json"
+        "    photobook-db openapi > docs/openapi.json"
     )

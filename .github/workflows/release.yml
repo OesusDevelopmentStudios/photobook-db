@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 env:
-  IMAGE: ghcr.io/oesusdevelopmentstudios/pictorio-db  # registry names must be lowercase
+  IMAGE: ghcr.io/oesusdevelopmentstudios/photobook-db  # registry names must be lowercase
 
 jobs:
   checks:

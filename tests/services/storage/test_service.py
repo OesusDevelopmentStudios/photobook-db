@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from pictorio_db.db import Database
-from pictorio_db.services.settings import SettingsService
-from pictorio_db.services.storage import DEFAULT_PATH_TEMPLATE, StorageService
-from pictorio_db.utils.problems import Problem
+from photobook_db.db import Database
+from photobook_db.services.settings import SettingsService
+from photobook_db.services.storage import DEFAULT_PATH_TEMPLATE, StorageService
+from photobook_db.utils.problems import Problem
 
 NAMESPACES = {"category", "author", "character", "rating", "album", "general"}
 

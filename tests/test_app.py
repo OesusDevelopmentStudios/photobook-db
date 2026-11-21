@@ -8,11 +8,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from pictorio_db.app import create_app
-from pictorio_db.config import Config
-from pictorio_db.db import DATABASE_FILE_NAME, open_database
-from pictorio_db.db.models import FileMove, Image, Namespace
-from pictorio_db.services.auth import Role
+from photobook_db.app import create_app
+from photobook_db.config import Config
+from photobook_db.db import DATABASE_FILE_NAME, open_database
+from photobook_db.db.models import FileMove, Image, Namespace
+from photobook_db.services.auth import Role
 
 
 def test_creating_the_app_touches_no_files(config: Config) -> None:

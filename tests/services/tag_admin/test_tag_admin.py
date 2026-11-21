@@ -10,19 +10,19 @@ from pathlib import Path, PurePosixPath
 import pytest
 from PIL import ExifTags, Image
 
-from pictorio_db.db import Database
-from pictorio_db.services.access import AccessService, Restrictions
-from pictorio_db.services.auth import AuthService, Role
-from pictorio_db.services.images import ImageRecord, ImagesService
-from pictorio_db.services.importer import ImporterService, UploadMetadata
-from pictorio_db.services.jobs import JobInfo, JobKind, JobsService, JobStatus, Relayout
-from pictorio_db.services.preferences import PreferencesService
-from pictorio_db.services.settings import SettingsService
-from pictorio_db.services.storage import StorageService
-from pictorio_db.services.tag_admin import TagAdmin
-from pictorio_db.services.tags import TagName, TagsService
-from pictorio_db.services.thumbnails import ThumbnailsService
-from pictorio_db.utils.problems import Problem
+from photobook_db.db import Database
+from photobook_db.services.access import AccessService, Restrictions
+from photobook_db.services.auth import AuthService, Role
+from photobook_db.services.images import ImageRecord, ImagesService
+from photobook_db.services.importer import ImporterService, UploadMetadata
+from photobook_db.services.jobs import JobInfo, JobKind, JobsService, JobStatus, Relayout
+from photobook_db.services.preferences import PreferencesService
+from photobook_db.services.settings import SettingsService
+from photobook_db.services.storage import StorageService
+from photobook_db.services.tag_admin import TagAdmin
+from photobook_db.services.tags import TagName, TagsService
+from photobook_db.services.thumbnails import ThumbnailsService
+from photobook_db.utils.problems import Problem
 
 
 class Library:

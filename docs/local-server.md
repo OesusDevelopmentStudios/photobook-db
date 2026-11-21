@@ -1,6 +1,6 @@
 # A server on your own computer
 
-This guide sets up pictorio-db on the computer where you use the pictorio desktop app, step by step. The
+This guide sets up photobook-db on the computer where you use the photobook desktop app, step by step. The
 server then runs in the background as a service of your user, never as root. For a server on a NAS or a
 Raspberry Pi, see [Install](../README.md#install) in the README instead.
 
@@ -11,7 +11,7 @@ The install script does all of this for you. It asks where things go, each with 
 `sudo` once Podman is installed:
 
 ```sh
-curl -fsSL https://github.com/OesusDevelopmentStudios/pictorio-db/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/OesusDevelopmentStudios/photobook-db/releases/latest/download/install.sh | sh
 ```
 
 Add `-s -- --help` to see its options, e.g. `| sh -s -- --version 0.1.0` for a fixed release. To do it by
@@ -31,11 +31,11 @@ sudo dnf install podman          # Ubuntu, Debian: sudo apt install podman
 
 ## 2. Make the folders
 
-The images go into a library folder; the database and the thumbnails go into `.pictorio` inside it, so
+The images go into a library folder; the database and the thumbnails go into `.photobook` inside it, so
 one folder holds everything to back up:
 
 ```sh
-mkdir -p ~/Pictures/pictorio-library/.pictorio ~/.config/containers/systemd
+mkdir -p ~/Pictures/photobook-library/.photobook ~/.config/containers/systemd
 ```
 
 To keep them elsewhere, use your own paths here and in the next step.
@@ -45,24 +45,24 @@ To keep them elsewhere, use your own paths here and in the next step.
 The unit file tells systemd how to run the server's container. Copy all of this into a terminal:
 
 ```sh
-cat > ~/.config/containers/systemd/pictorio-db.container <<'EOF'
+cat > ~/.config/containers/systemd/photobook-db.container <<'EOF'
 [Unit]
-Description=pictorio-db image library server
+Description=photobook-db image library server
 
 [Container]
-Image=ghcr.io/oesusdevelopmentstudios/pictorio-db:latest
+Image=ghcr.io/oesusdevelopmentstudios/photobook-db:latest
 AutoUpdate=registry
-ContainerName=pictorio-db
+ContainerName=photobook-db
 # Only this computer can connect. For other devices too: PublishPort=8737:8737
 PublishPort=127.0.0.1:8737:8737
 
 # The images, and the database with the thumbnails
-Volume=%h/Pictures/pictorio-library:/library:Z
-Volume=%h/Pictures/pictorio-library/.pictorio:/data:Z
+Volume=%h/Pictures/photobook-library:/library:Z
+Volume=%h/Pictures/photobook-library/.photobook:/data:Z
 
 # Lets the desktop app see that the server runs on this computer, and where the library is
 Volume=/etc/machine-id:/run/host/machine-id:ro
-Environment=PICTORIO_HOST_LIBRARY_DIR=%h/Pictures/pictorio-library
+Environment=PHOTOBOOK_HOST_LIBRARY_DIR=%h/Pictures/photobook-library
 
 # Files the server writes belong to you
 UserNS=keep-id:uid=1000,gid=1000
@@ -94,7 +94,7 @@ EOF
 
 ```sh
 systemctl --user daemon-reload
-systemctl --user start pictorio-db
+systemctl --user start photobook-db
 ```
 
 The first start downloads the image, which can take a few minutes. The server then starts again each time
@@ -109,7 +109,7 @@ loginctl enable-linger
 On its first start, the server writes a one-time **setup code** to its log:
 
 ```sh
-podman logs pictorio-db 2>&1 | grep "setup code"
+podman logs photobook-db 2>&1 | grep "setup code"
 ```
 
 Open <http://localhost:8737/admin/setup> in a browser, enter the code and create the admin account. Then,
@@ -117,7 +117,7 @@ at <http://localhost:8737/admin>, create accounts for the other people who use t
 
 ## 6. Connect the desktop app
 
-In pictorio, choose **Use a Local Server…** on the Welcome page, set the port if you changed it, connect,
+In photobook, choose **Use a Local Server…** on the Welcome page, set the port if you changed it, connect,
 and log in with your account. The app warns that the connection is not encrypted (plain HTTP): on your own
 computer that is fine.
 
@@ -125,8 +125,8 @@ computer that is fine.
 
 - **Updates:** to install new releases by themselves, once a day:
   `systemctl --user enable --now podman-auto-update.timer`.
-- **Stop or start it:** `systemctl --user stop pictorio-db`, `systemctl --user start pictorio-db`.
-- **Backups:** copy the library folder, with `.pictorio` in it. Stop the server first, so that the copy of
+- **Stop or start it:** `systemctl --user stop photobook-db`, `systemctl --user start photobook-db`.
+- **Backups:** copy the library folder, with `.photobook` in it. Stop the server first, so that the copy of
   the database is complete.
-- **Remove it:** `systemctl --user stop pictorio-db`, remove the unit file, then
+- **Remove it:** `systemctl --user stop photobook-db`, remove the unit file, then
   `systemctl --user daemon-reload`. The library folder stays; delete it yourself if you want to.

@@ -1,42 +1,42 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 #
-# Podman Quadlet unit: systemd runs pictorio-db as a service. For a rootless setup, copy this file to
+# Podman Quadlet unit: systemd runs photobook-db as a service. For a rootless setup, copy this file to
 # ~/.config/containers/systemd/ and run:
 #
 #   systemctl --user daemon-reload
-#   systemctl --user start pictorio-db
+#   systemctl --user start photobook-db
 #
 # To start it at boot without logging in: loginctl enable-linger $USER
 # To install new releases by themselves: systemctl --user enable --now podman-auto-update.timer
 
 [Unit]
-Description=pictorio-db image library server
+Description=photobook-db image library server
 
 [Container]
-# The released image for amd64 and arm64. For an image you built yourself, use localhost/pictorio-db:latest
+# The released image for amd64 and arm64. For an image you built yourself, use localhost/photobook-db:latest
 # and remove AutoUpdate.
-Image=ghcr.io/oesusdevelopmentstudios/pictorio-db:latest
+Image=ghcr.io/oesusdevelopmentstudios/photobook-db:latest
 AutoUpdate=registry
-ContainerName=pictorio-db
+ContainerName=photobook-db
 PublishPort=8737:8737
 
 # Behind a reverse proxy such as Caddy (deploy/Caddyfile.example), only the proxy should reach the server.
 # Use these two lines instead of the PublishPort above:
 #PublishPort=127.0.0.1:8737:8737
-#Environment=PICTORIO_TRUSTED_PROXIES=*
+#Environment=PHOTOBOOK_TRUSTED_PROXIES=*
 
 # The database; a named volume keeps it when the image is updated.
-Volume=pictorio-data:/data
+Volume=photobook-data:/data
 
-# The images, in a folder of your own. Create it before the first start: mkdir -p ~/Pictures/pictorio-library
+# The images, in a folder of your own. Create it before the first start: mkdir -p ~/Pictures/photobook-library
 # :Z lets the container use it on systems with SELinux.
-Volume=%h/Pictures/pictorio-library:/library:Z
+Volume=%h/Pictures/photobook-library:/library:Z
 
 # The desktop app on this computer can then open an image's folder in the file manager: the host's machine ID
 # shows it runs here, and the library's path is as above. No :Z here: the file is only read.
 Volume=/etc/machine-id:/run/host/machine-id:ro
-Environment=PICTORIO_HOST_LIBRARY_DIR=%h/Pictures/pictorio-library
+Environment=PHOTOBOOK_HOST_LIBRARY_DIR=%h/Pictures/photobook-library
 
 # Optional: a folder that admins can import from. Without ro, an import can remove the originals.
 #Volume=/srv/photos-inbox:/import:ro,Z

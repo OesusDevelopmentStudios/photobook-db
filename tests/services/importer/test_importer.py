@@ -11,17 +11,17 @@ import pytest
 from PIL import ExifTags, Image
 from sqlalchemy import func, select
 
-from pictorio_db.db import Database
-from pictorio_db.db.models import Image as ImageRow
-from pictorio_db.db.models import User
-from pictorio_db.services.access import Restrictions
-from pictorio_db.services.images import ImageRecord, ImagesService
-from pictorio_db.services.importer import DEFAULT_MAX_UPLOAD_BYTES, ImporterService, UploadMetadata
-from pictorio_db.services.settings import SettingsService
-from pictorio_db.services.storage import StorageService
-from pictorio_db.services.tags import TagsService
-from pictorio_db.services.thumbnails import ThumbnailsService
-from pictorio_db.utils.problems import Problem
+from photobook_db.db import Database
+from photobook_db.db.models import Image as ImageRow
+from photobook_db.db.models import User
+from photobook_db.services.access import Restrictions
+from photobook_db.services.images import ImageRecord, ImagesService
+from photobook_db.services.importer import DEFAULT_MAX_UPLOAD_BYTES, ImporterService, UploadMetadata
+from photobook_db.services.settings import SettingsService
+from photobook_db.services.storage import StorageService
+from photobook_db.services.tags import TagsService
+from photobook_db.services.thumbnails import ThumbnailsService
+from photobook_db.utils.problems import Problem
 
 IMPORT_TIME = datetime(2026, 11, 12, 9, 30)
 NO_RESTRICTIONS = Restrictions([])

@@ -6,12 +6,12 @@ from datetime import datetime
 import pytest
 from sqlalchemy import delete, select
 
-from pictorio_db.db import Database
-from pictorio_db.db.models import Image, Namespace, Tag, User, image_tag
-from pictorio_db.services.access import AccessService, Restrictions
-from pictorio_db.services.auth import AuthService, Role, UserInfo
-from pictorio_db.services.tags import TagName
-from pictorio_db.utils.problems import Problem
+from photobook_db.db import Database
+from photobook_db.db.models import Image, Namespace, Tag, User, image_tag
+from photobook_db.services.access import AccessService, Restrictions
+from photobook_db.services.auth import AuthService, Role, UserInfo
+from photobook_db.services.tags import TagName
+from photobook_db.utils.problems import Problem
 
 NAMESPACES = {"category", "author", "character", "rating", "album", "general"}
 

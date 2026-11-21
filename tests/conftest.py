@@ -9,9 +9,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from pictorio_db.app import create_app
-from pictorio_db.config import DEFAULT_HOST, DEFAULT_PORT, Config
-from pictorio_db.db import DATABASE_FILE_NAME, Database, open_database
+from photobook_db.app import create_app
+from photobook_db.config import DEFAULT_HOST, DEFAULT_PORT, Config
+from photobook_db.db import DATABASE_FILE_NAME, Database, open_database
 
 
 @pytest.fixture

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-from pictorio_db.db import Database
-from pictorio_db.services.settings import SettingsService
+from photobook_db.db import Database
+from photobook_db.services.settings import SettingsService
 
 
 def test_unchanged_setting_is_none(database: Database) -> None:

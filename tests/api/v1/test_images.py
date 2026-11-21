@@ -13,12 +13,12 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import update
 
-from pictorio_db.api.v1 import _upload_receiver
-from pictorio_db.config import Config
-from pictorio_db.db.models import Image as ImageModel
-from pictorio_db.services.access import Restrictions
-from pictorio_db.utils.exif_orientation import read_orientation
-from pictorio_db.services.auth import Role
+from photobook_db.api.v1 import _upload_receiver
+from photobook_db.config import Config
+from photobook_db.db.models import Image as ImageModel
+from photobook_db.services.access import Restrictions
+from photobook_db.utils.exif_orientation import read_orientation
+from photobook_db.services.auth import Role
 
 PASSWORD = "correct horse battery"
 

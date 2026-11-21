@@ -4,11 +4,11 @@
 import pytest
 from sqlalchemy import delete
 
-from pictorio_db.db import Database
-from pictorio_db.db.models import User
-from pictorio_db.services.auth import AuthService, Role
-from pictorio_db.services.preferences import PreferencesService
-from pictorio_db.utils.problems import Problem
+from photobook_db.db import Database
+from photobook_db.db.models import User
+from photobook_db.services.auth import AuthService, Role
+from photobook_db.services.preferences import PreferencesService
+from photobook_db.utils.problems import Problem
 
 NAMESPACES = {"category", "author", "character", "rating", "album", "general"}
 

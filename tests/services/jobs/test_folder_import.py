@@ -11,16 +11,16 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from pictorio_db.db import Database
-from pictorio_db.services.auth import AuthService, Role
-from pictorio_db.services.images import ImagesService
-from pictorio_db.services.importer import ImporterService
-from pictorio_db.services.jobs import FolderImport, JobInfo, JobKind, JobsService, JobStatus
-from pictorio_db.services.settings import SettingsService
-from pictorio_db.services.storage import StorageService
-from pictorio_db.services.tags import TagsService
-from pictorio_db.services.thumbnails import ThumbnailsService
-from pictorio_db.utils.problems import Problem
+from photobook_db.db import Database
+from photobook_db.services.auth import AuthService, Role
+from photobook_db.services.images import ImagesService
+from photobook_db.services.importer import ImporterService
+from photobook_db.services.jobs import FolderImport, JobInfo, JobKind, JobsService, JobStatus
+from photobook_db.services.settings import SettingsService
+from photobook_db.services.storage import StorageService
+from photobook_db.services.tags import TagsService
+from photobook_db.services.thumbnails import ThumbnailsService
+from photobook_db.utils.problems import Problem
 
 
 class Server:

@@ -1,0 +1,55 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{% extends "page.html" %}
+{% from "_jobs.html" import job_title, job_status, job_progress, time %}
+{% block head %}{% if refresh_seconds %}<meta http-equiv="refresh" content="{{ refresh_seconds }}">{% endif %}{% endblock %}
+{% block title %}Jobs{% endblock %}
+{% block heading %}Jobs{% endblock %}
+{% block content %}
+<div class="toolbar">
+    <p class="hint">Long tasks run here one at a time, in the background.</p>
+    <div class="toolbar-actions">
+        {% if has_finished_jobs %}
+        <form method="post" action="/admin/jobs/remove-finished">
+            <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+            <button type="submit" class="secondary">Remove Finished Jobs</button>
+        </form>
+        {% else %}
+        <span class="disabled-reason" title="There are no finished jobs.">
+            <button type="button" disabled>Remove Finished Jobs</button>
+        </span>
+        {% endif %}
+        {% if import_dir %}
+        <a class="button" href="/admin/jobs/import">+ Import Folder</a>
+        {% else %}
+        <span class="disabled-reason" title="Folder imports are off. Set PHOTOBOOK_IMPORT_DIR on the server to turn them on.">
+            <button type="button" disabled>+ Import Folder</button>
+        </span>
+        {% endif %}
+    </div>
+</div>
+
+{% if removed is not none %}
+<p class="success" role="status">{{ removed }} finished job{% if removed != 1 %}s{% endif %} removed.</p>
+{% endif %}
+
+{% if jobs %}
+<table>
+    <tr><th>Job</th><th>What</th><th>Status</th><th>Progress</th><th>Started</th><th>By</th></tr>
+    {% for job in jobs %}
+    <tr>
+        <td><a href="/admin/jobs/{{ job.id }}">{{ job.id }}</a></td>
+        <td>{{ job_title(job) }}</td>
+        <td>{{ job_status(job) }}</td>
+        <td>{{ job_progress(job) }}</td>
+        <td>{{ time(job.created_at) }}</td>
+        <td>{{ usernames.get(job.created_by, "–") }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p class="hint">No jobs.</p>
+{% endif %}
+<p class="hint">Successful jobs are removed {{ lifetime_hours }} hours after they finish.
+{% if refresh_seconds %}This page reloads every {{ refresh_seconds }} seconds while a job is unfinished.{% endif %}</p>
+{% endblock %}

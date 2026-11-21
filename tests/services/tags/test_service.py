@@ -3,10 +3,10 @@
 
 import pytest
 
-from pictorio_db.db import Database
-from pictorio_db.db.models import Namespace, Tag
-from pictorio_db.services.tags import TagName, TagsService
-from pictorio_db.utils.problems import Problem
+from photobook_db.db import Database
+from photobook_db.db.models import Namespace, Tag
+from photobook_db.services.tags import TagName, TagsService
+from photobook_db.utils.problems import Problem
 
 PATH_TEMPLATE_NAMESPACES = frozenset({"category", "author"})
 
