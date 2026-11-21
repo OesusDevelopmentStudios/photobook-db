@@ -117,8 +117,9 @@ at <http://localhost:8737/admin>, create accounts for the other people who use t
 
 ## 6. Connect the desktop app
 
-In pictorio, connect to the server at `http://localhost:8737` and log in with your account. The app warns
-that the connection is not encrypted (plain HTTP): on your own computer that is fine.
+In pictorio, choose **Use a Local Server…** on the Welcome page, set the port if you changed it, connect,
+and log in with your account. The app warns that the connection is not encrypted (plain HTTP): on your own
+computer that is fine.
 
 ## Later
 
