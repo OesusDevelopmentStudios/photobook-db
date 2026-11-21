@@ -107,7 +107,7 @@ def test_namespace_filter(tags: TagsService) -> None:
 
 
 def test_contradicting_namespaces_find_nothing(tags: TagsService) -> None:
-    assert suggestions(tags, "author:pol", namespace="general") == []
+    assert suggestions(tags, "author:sam", namespace="general") == []
 
 
 def test_unknown_namespace_finds_nothing(tags: TagsService) -> None:

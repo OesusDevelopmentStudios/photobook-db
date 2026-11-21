@@ -33,7 +33,7 @@ class TagList(BaseModel):
 def list_tags(
     restrictions: CurrentRestrictions,
     tags: TagsServiceDependency,
-    prefix: Annotated[str, Query(max_length=200, description="May include a namespace: author:pol")] = "",
+    prefix: Annotated[str, Query(max_length=200, description="May include a namespace: author:sam")] = "",
     namespace: Annotated[str | None, Query(max_length=100, description="Only this namespace")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> TagList:

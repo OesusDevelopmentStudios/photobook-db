@@ -128,7 +128,7 @@ class TagsService:
         limit: int = 20,
         is_hidden: Callable[[TagName], bool] | None = None,
     ) -> list[TagCount]:
-        """Tags starting with `prefix`, most used first. "author:pol" searches one namespace, "pol" all of them.
+        """Tags starting with `prefix`, most used first. "author:sam" searches one namespace, "sam" all of them.
         Tags for which `is_hidden` says so are left out (a restricted user's tags). `image_count` counts all
         images, also ones a restricted user cannot see."""
         prefix_namespace, name_prefix = self._split_prefix(prefix)

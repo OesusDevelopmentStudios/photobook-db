@@ -71,7 +71,7 @@ def parsed(text: str) -> All:
             "(category:photo,-rating:nsfw)|category:artwork",
             query(AnyOf((All((tag("category", "photo"), Not(tag("rating", "nsfw")))), tag("category", "artwork")))),
         ),
-        ("author:pol*,mar*", query(All((starting("author", "pol"), starting("author", "mar"))))),
+        ("author:first*,second*", query(All((starting("author", "first"), starting("author", "second"))))),
         (
             "year:2024|2025 album:vacation*",
             query(
@@ -111,7 +111,7 @@ def test_star_alone_means_any_tag_in_the_namespace() -> None:
 
 
 def test_values_and_prefixes_are_normalised_like_tags() -> None:
-    assert parsed("Author:Pol* SUMMER") == query(starting("author", "pol"), tag("general", "summer"))
+    assert parsed("Author:First* SUMMER") == query(starting("author", "first"), tag("general", "summer"))
 
 
 def test_minus_at_the_start_of_a_term_negates_all_of_it() -> None:

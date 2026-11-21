@@ -1203,11 +1203,11 @@
             "schema": {
               "type": "string",
               "maxLength": 200,
-              "description": "May include a namespace: author:pol",
+              "description": "May include a namespace: author:sam",
               "default": "",
               "title": "Prefix"
             },
-            "description": "May include a namespace: author:pol"
+            "description": "May include a namespace: author:sam"
           },
           {
             "name": "namespace",

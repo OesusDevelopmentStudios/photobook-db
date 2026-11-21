@@ -69,7 +69,7 @@ def test_rejects_dot_names(name: str) -> None:
     assert invalid_tag_problem(name).detail == "A tag name cannot be '.' or '..'."
 
 
-@pytest.mark.parametrize("name", ["a,b", "a|b", "(a", "a)", "pol*"])
+@pytest.mark.parametrize("name", ["a,b", "a|b", "(a", "a)", "sam*"])
 def test_rejects_search_operators(name: str) -> None:
     assert "search operator" in invalid_tag_problem(name).detail
 

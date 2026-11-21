@@ -30,7 +30,7 @@ LIBRARY = {
     ),
     "sunset_art": (["category:artwork", "author:sample_artist", "rating:nsfw"], datetime(2025, 1, 10, 9, 0)),
     "duo": (
-        ["category:artwork", "author:pol_one", "author:mar_two", "rating:questionable"],
+        ["category:artwork", "author:first_artist", "author:second_artist", "rating:questionable"],
         datetime(2025, 6, 30, 23, 59),
     ),
     "family": (
@@ -101,7 +101,7 @@ def found(database: Database, query: str, hidden_filters: list[str] | None = Non
         ("-rating:nsfw|questionable", {"beach", "family", "untagged"}),  # untagged images are not excluded
         ("category:photo -album:vacation_2024", {"family"}),
         ("album:vacation*", {"beach", "family"}),
-        ("author:pol*,mar*", {"duo"}),
+        ("author:first*,second*", {"duo"}),
         ("character:*", {"family"}),
         ("(category:photo,rating:sfw)|(category:artwork,author:sample_artist)", {"beach", "family", "sunset_art"}),
         ("(category:photo,-rating:sfw)|category:artwork", {"sunset_art", "duo"}),
@@ -165,7 +165,14 @@ def test_lists_the_tags_a_query_mentions() -> None:
 
 @pytest.mark.parametrize(
     "query",
-    ["category:artwork", "-rating:nsfw|questionable", "author:pol*,mar*", "character:*", "year:2025", "summer,hero"],
+    [
+        "category:artwork",
+        "-rating:nsfw|questionable",
+        "author:first*,second*",
+        "character:*",
+        "year:2025",
+        "summer,hero",
+    ],
 )
 def test_tree_matches_agrees_with_the_database(library: Database, query: str) -> None:
     tree = parse_query(query, NAMESPACES)
