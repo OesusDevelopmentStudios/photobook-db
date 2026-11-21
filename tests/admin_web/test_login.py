@@ -83,7 +83,7 @@ def test_session_ends_after_twelve_hours(admin_browser: TestClient) -> None:
 
 
 def test_admin_who_became_a_user_is_logged_out(admin_browser: TestClient) -> None:
-    with admin_browser.app.state.database.session() as session:  # as the one-admin migration may do
+    with admin_browser.app.state.database.session() as session:  # the role is checked on every request
         session.execute(update(User).values(role=Role.USER))
         session.commit()
 

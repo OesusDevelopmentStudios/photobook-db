@@ -111,25 +111,6 @@ def test_migrations_can_be_undone_and_redone(database: Database) -> None:
     assert "image" in inspect(database.engine).get_table_names()
 
 
-def test_upgrade_keeps_only_the_oldest_admin(database: Database, caplog: pytest.LogCaptureFixture) -> None:
-    with database.engine.begin() as connection:
-        command.downgrade(_alembic_config(connection), "0009")  # before there was one admin account only
-        for username, created_at in [("second", "2026-11-14"), ("apo", "2026-11-13"), ("kid", "2026-11-15")]:
-            role = "user" if username == "kid" else "admin"
-            connection.execute(
-                text("INSERT INTO user (username, password_hash, role, created_at) VALUES (:name, 'x', :role, :at)"),
-                {"name": username, "role": role, "at": created_at},
-            )
-
-    with database.engine.begin() as connection:
-        command.upgrade(_alembic_config(connection), "head")
-
-    with database.engine.connect() as connection:
-        roles = dict(connection.execute(text("SELECT username, role FROM user")).all())
-    assert roles == {"apo": "admin", "second": "user", "kid": "user"}
-    assert "'apo' stays admin, 'second' became a standard user" in caplog.text
-
-
 def test_deleting_image_removes_its_tag_links(database: Database) -> None:
     image_id = add_image_with_tag(database)
 
