@@ -24,10 +24,20 @@ hand instead, follow the steps below.
 
 ## 1. Install Podman
 
+Fedora:
 ```sh
-sudo dnf install podman          # Ubuntu, Debian: sudo apt install podman
+sudo dnf install podman
 ```
 
+Ubuntu:
+```sh
+sudo apt install podman
+```
+
+Arch:
+```sh
+sudo pacman -S podman
+```
 
 ## 2. Make the folders
 
