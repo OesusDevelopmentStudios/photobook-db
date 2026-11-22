@@ -126,7 +126,6 @@ computer that is fine.
 - **Updates:** to install new releases by themselves, once a day:
   `systemctl --user enable --now podman-auto-update.timer`.
 - **Stop or start it:** `systemctl --user stop photobook-db`, `systemctl --user start photobook-db`.
-- **Backups:** copy the library folder, with `.photobook` in it. Stop the server first, so that the copy of
-  the database is complete.
+- **Backups:** copy the library folder, with `.photobook` in it. Stop the server first, so that the copy of the database is complete.
 - **Remove it:** `systemctl --user stop photobook-db`, remove the unit file, then
   `systemctl --user daemon-reload`. The library folder stays; delete it yourself if you want to.
