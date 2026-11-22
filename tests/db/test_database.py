@@ -13,6 +13,7 @@ from sqlalchemy import delete, inspect, select, text
 from sqlalchemy.exc import IntegrityError
 
 from photobook_db.db import DATABASE_FILE_NAME, Database, open_database
+from photobook_db.db._connection import create_sqlite_engine
 from photobook_db.db._migrations import _alembic_config
 from photobook_db.db.models import Base, Image, Namespace, Tag, image_tag
 
@@ -67,8 +68,9 @@ def test_adds_builtin_namespaces(database: Database) -> None:
     with database.session() as session:
         namespaces = {namespace.name: namespace for namespace in session.scalars(select(Namespace))}
 
-    assert set(namespaces) == {"category", "author", "character", "rating", "album", "general"}
+    assert set(namespaces) == {"category", "author", "character", "rating", "album", "general", "meta"}
     assert all(namespace.is_builtin for namespace in namespaces.values())
+    assert {name for name, namespace in namespaces.items() if not namespace.user_editable} == {"meta"}
     single_value_names = {name for name, namespace in namespaces.items() if namespace.single_value}
     assert single_value_names == {"category", "rating"}
 
@@ -91,7 +93,7 @@ def test_opening_again_keeps_data(database_path: Path) -> None:
     second_opening.close()
 
     assert image_count == 1
-    assert namespace_count == 6  # the built-in namespaces are not added twice
+    assert namespace_count == 7  # the built-in namespaces are not added twice
 
 
 def test_models_match_migrations(database: Database) -> None:
@@ -109,6 +111,77 @@ def test_migrations_can_be_undone_and_redone(database: Database) -> None:
     with database.engine.begin() as connection:
         command.upgrade(_alembic_config(connection), "head")
     assert "image" in inspect(database.engine).get_table_names()
+
+
+def migrate(database_path: Path, revision: str, downgrade: bool = False) -> None:
+    """To a revision before the latest, with foreign keys on, as the server opens the file."""
+    engine = create_sqlite_engine(database_path)
+    with engine.begin() as connection:
+        (command.downgrade if downgrade else command.upgrade)(_alembic_config(connection), revision)
+    engine.dispose()
+
+
+def tags_of(database: Database, image_id: int) -> set[str]:
+    with database.session() as session:
+        rows = session.execute(
+            select(Namespace.name, Tag.name)
+            .join(Tag, Tag.namespace_id == Namespace.id)
+            .join(image_tag, image_tag.c.tag_id == Tag.id)
+            .where(image_tag.c.image_id == image_id)
+        )
+        return {f"{namespace}:{name}" for namespace, name in rows}
+
+
+# --- 0002: the meta namespace
+
+def test_upgrade_from_0001_keeps_the_data_and_adds_meta(database_path: Path) -> None:
+    migrate(database_path, "0001")
+    engine = create_sqlite_engine(database_path)
+    with engine.begin() as connection:
+        connection.execute(text(
+            "INSERT INTO namespace (name, single_value, is_builtin, created_at) VALUES ('weather', 0, 0, :now)"
+        ), {"now": now().isoformat(sep=" ")})
+    engine.dispose()
+    old_database = open_database(database_path)
+    image_id = add_image_with_tag(old_database)  # tagged general:summer
+    old_database.close()
+
+    database = open_database(database_path)  # the server upgrades the file on opening
+    with database.session() as session:
+        editable = {namespace.name: namespace.user_editable for namespace in session.scalars(select(Namespace))}
+    image_tags = tags_of(database, image_id)
+    database.close()
+
+    assert editable == {name: name != "meta" for name in
+                        ["category", "author", "character", "rating", "album", "general", "weather", "meta"]}
+    assert image_tags == {"general:summer"}
+
+
+def test_undoing_0002_removes_the_meta_tags_and_keeps_the_others(database_path: Path) -> None:
+    database = open_database(database_path)
+    image_id = add_image_with_tag(database)
+    with database.session() as session:
+        meta = session.scalars(select(Namespace).where(Namespace.name == "meta")).one()
+        tag = Tag(namespace_id=meta.id, name="hi_res")
+        session.add(tag)
+        session.flush()
+        session.execute(image_tag.insert().values(image_id=image_id, tag_id=tag.id))
+        session.commit()
+    database.close()
+
+    migrate(database_path, "0001", downgrade=True)
+
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        namespaces = set(connection.execute(text("SELECT name FROM namespace")).scalars())
+        tags = set(connection.execute(text("SELECT name FROM tag")).scalars())
+        links = connection.execute(text("SELECT COUNT(*) FROM image_tag")).scalar()
+        columns = {column["name"] for column in inspect(connection).get_columns("namespace")}
+    engine.dispose()
+    assert "meta" not in namespaces
+    assert tags == {"summer"}
+    assert links == 1
+    assert "user_editable" not in columns
 
 
 def test_deleting_image_removes_its_tag_links(database: Database) -> None:

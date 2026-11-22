@@ -88,7 +88,7 @@ def test_import_page_has_a_tag_field_per_namespace(admin_browser: TestClient) ->
 
     page = admin_browser.get("/admin/import/new").text
 
-    assert re.findall(r'name="tag_(\w+)"', page) == [
+    assert re.findall(r'name="tag_(\w+)"', page) == [  # not "meta": the server sets those tags
         "category", "author", "character", "rating", "album", "general", "weather"
     ]
     assert '<select id="tag_rating" name="tag_rating">' in page and '<option value="private">private</option>' in page
@@ -118,6 +118,14 @@ def test_imports_a_folder_and_shows_the_result(admin_browser: TestClient) -> Non
     assert REFRESH not in page  # finished: nothing more to show
     assert f'<a href="/admin/import/{job_id}">{job_id}</a>' in admin_browser.get("/admin/import").text
     assert f'<a href="/admin/import/{job_id}">{job_id}</a>' in admin_browser.get("/admin").text
+
+
+# The form has no field for meta tags; one sent all the same is left out.
+def test_import_ignores_a_meta_field(admin_browser: TestClient) -> None:
+    response = start_import(admin_browser, source_subdir="holiday", tag_general="summer", tag_meta="video")
+
+    job = finished(admin_browser, int(response.headers["location"].rsplit("/", 1)[1]))
+    assert job.params["tags"] == ["general:summer"]
 
 
 @pytest.mark.parametrize(

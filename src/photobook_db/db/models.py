@@ -17,6 +17,7 @@ from sqlalchemy import (
     Table,
     UniqueConstraint,
     text,
+    true,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -53,6 +54,7 @@ class Namespace(Base):
     name: Mapped[str] = mapped_column(String(NAMESPACE_NAME_MAX_LENGTH), unique=True)
     single_value: Mapped[bool]  # a second tag in this namespace replaces the first one
     is_builtin: Mapped[bool]  # built-in namespaces cannot be deleted or renamed
+    user_editable: Mapped[bool] = mapped_column(default=True, server_default=true())  # false: only the server tags
     created_at: Mapped[datetime]
 
 

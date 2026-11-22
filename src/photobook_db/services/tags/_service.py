@@ -27,6 +27,7 @@ class NamespaceInfo:
     single_value: bool
     is_builtin: bool
     in_path_template: bool  # its tags form folder names in the library
+    user_editable: bool = True  # false: the server alone sets its tags, e.g. "meta"
     allowed_values: tuple[str, ...] | None = None  # the only names its tags may have, e.g. the ratings; None: any
 
 
@@ -251,5 +252,6 @@ def _namespace_info(namespace: Namespace, path_namespaces: frozenset[str], ratin
         single_value=namespace.single_value,
         is_builtin=namespace.is_builtin,
         in_path_template=namespace.name in path_namespaces,
+        user_editable=namespace.user_editable,
         allowed_values=tuple(rating_values) if namespace.name == RATING_NAMESPACE else None,
     )

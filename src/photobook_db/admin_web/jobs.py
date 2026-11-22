@@ -138,6 +138,9 @@ def _tag_texts(entered: dict[str, str], namespaces: list[NamespaceInfo]) -> list
     line breaks can be no part of a tag, so they separate tags; a one-tag-per-image field takes its text whole."""
     texts = []
     for namespace in namespaces:
+        if not namespace.user_editable:
+            continue  # the form has no field for it
+
         text = entered.get(namespace.name, "")
         if namespace.single_value and "," in text:
             raise Problem(
@@ -154,6 +157,9 @@ def _tag_fields(request: Request, entered: dict[str, str]) -> list[TagField]:
     tags = _tags(request)
     fields = []
     for namespace in tags.list_namespaces():
+        if not namespace.user_editable:
+            continue  # the server sets those tags itself
+
         value = entered.get(namespace.name, "")
         if namespace.name == RATING_NAMESPACE:
             fields.append(TagField(namespace.name, "choice", value, tags.rating_values()))

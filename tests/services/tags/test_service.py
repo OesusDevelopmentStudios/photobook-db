@@ -34,8 +34,9 @@ def add_tag(database: Database, namespace_name: str, tag_name: str) -> None:
 def test_lists_the_builtin_namespaces(tags: TagsService) -> None:
     namespaces = {namespace.name: namespace for namespace in tags.list_namespaces()}
 
-    assert list(namespaces) == ["category", "author", "character", "rating", "album", "general"]
+    assert list(namespaces) == ["category", "author", "character", "rating", "album", "general", "meta"]
     assert all(namespace.is_builtin for namespace in namespaces.values())
+    assert [name for name, namespace in namespaces.items() if not namespace.user_editable] == ["meta"]
     assert {name for name, namespace in namespaces.items() if namespace.in_path_template} == {"category", "author"}
     assert {name: namespace.allowed_values for name, namespace in namespaces.items() if namespace.allowed_values} == {
         "rating": ("public", "private")
