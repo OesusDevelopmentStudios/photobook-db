@@ -21,7 +21,7 @@ def csrf_token_in(html: str) -> str:
 
 @pytest.fixture
 def admin_browser(client: TestClient) -> TestClient:
-    client.app.state.auth.create_user("apo", PASSWORD, Role.ADMIN)
-    response = client.post("/admin/login", data={"username": "apo", "password": PASSWORD})
+    client.app.state.auth.create_user("admin_user", PASSWORD, Role.ADMIN)
+    response = client.post("/admin/login", data={"username": "admin_user", "password": PASSWORD})
     assert response.status_code == 200  # followed the redirect to the overview
     return client

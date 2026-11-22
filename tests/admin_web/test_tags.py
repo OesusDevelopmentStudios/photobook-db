@@ -23,7 +23,7 @@ def tags(admin_browser: TestClient) -> TagsService:
 @pytest.fixture
 def library(admin_browser: TestClient) -> None:
     """Three images: author:sample_artist on two of them, author:sam_other on one, summer on all."""
-    token = admin_browser.app.state.auth.create_token("apo", PASSWORD, "test").token
+    token = admin_browser.app.state.auth.create_token("admin_user", PASSWORD, "test").token
     for colour, author in [("red", "sample_artist"), ("teal", "sample_artist"), ("navy", "sam_other")]:
         buffer = io.BytesIO()
         Image.new("RGB", (8, 8), colour).save(buffer, format="JPEG")
