@@ -25,7 +25,7 @@ def user_menu_in(html: str) -> str:
 def test_tabs_leave_settings_to_the_user_menu(admin_browser: TestClient) -> None:
     html = admin_browser.get("/admin").text
 
-    assert tabs_in(html) == ["Overview", "User Management", "Namespaces", "Tags", "Jobs"]
+    assert tabs_in(html) == ["Overview", "User Management", "Namespaces", "Tags", "Import"]
 
 
 def test_user_menu_has_settings_and_log_out_under_the_username(admin_browser: TestClient) -> None:

@@ -31,8 +31,8 @@ def config(config: Config, tmp_path: Path) -> Config:
 
 
 def start_import(browser: TestClient, **fields: str):  # -> Response
-    form = {"csrf_token": csrf_token_in(browser.get("/admin/jobs").text)} | fields
-    return browser.post("/admin/jobs/import", data=form, follow_redirects=False)
+    form = {"csrf_token": csrf_token_in(browser.get("/admin/import").text)} | fields
+    return browser.post("/admin/import/new", data=form, follow_redirects=False)
 
 
 def finished(browser: TestClient, job_id: int) -> JobInfo:
@@ -49,7 +49,7 @@ def finished(browser: TestClient, job_id: int) -> JobInfo:
 
 
 def test_needs_a_login(client: TestClient) -> None:
-    assert client.get("/admin/jobs", follow_redirects=False).status_code == 303
+    assert client.get("/admin/import", follow_redirects=False).status_code == 303
 
 
 # --- Folder imports
@@ -59,7 +59,7 @@ def chosen_folder(page: str) -> list[str]:
 
 
 def test_import_page_lists_the_folders(admin_browser: TestClient) -> None:
-    page = admin_browser.get("/admin/jobs/import").text
+    page = admin_browser.get("/admin/import/new").text
 
     assert re.findall(r'<option value="([^"]*)"', page.split('name="source_subdir"')[1].split("</select>")[0]) == [
         "", "holiday", "holiday/day_2"
@@ -86,7 +86,7 @@ def test_import_page_has_a_tag_field_per_namespace(admin_browser: TestClient) ->
     location = start_import(admin_browser, source_subdir="holiday", tag_category="photo").headers["location"]
     finished(admin_browser, int(location.rsplit("/", 1)[1]))  # now an image has category:photo
 
-    page = admin_browser.get("/admin/jobs/import").text
+    page = admin_browser.get("/admin/import/new").text
 
     assert re.findall(r'name="tag_(\w+)"', page) == [
         "category", "author", "character", "rating", "album", "general", "weather"
@@ -107,17 +107,17 @@ def test_imports_a_folder_and_shows_the_result(admin_browser: TestClient) -> Non
         tag_album="",
     )
 
-    job_id = int(response.headers["location"].removeprefix("/admin/jobs/"))
+    job_id = int(response.headers["location"].removeprefix("/admin/import/"))
     job = finished(admin_browser, job_id)
     tags = ["author:sample_artist", "author:Other Artist", "rating:public", "general:summer"]
     assert job.params == {"source_subdir": "holiday", "remove_originals": False, "tags": tags}
-    page = admin_browser.get(f"/admin/jobs/{job_id}").text
+    page = admin_browser.get(f"/admin/import/{job_id}").text
     assert "Import of <code>holiday</code>" in page
     assert '<span class="status status-done">Done</span>' in page
     assert "<dt>Imported</dt><dd>1</dd>" in page
     assert REFRESH not in page  # finished: nothing more to show
-    assert f'<a href="/admin/jobs/{job_id}">{job_id}</a>' in admin_browser.get("/admin/jobs").text
-    assert f'<a href="/admin/jobs/{job_id}">{job_id}</a>' in admin_browser.get("/admin").text
+    assert f'<a href="/admin/import/{job_id}">{job_id}</a>' in admin_browser.get("/admin/import").text
+    assert f'<a href="/admin/import/{job_id}">{job_id}</a>' in admin_browser.get("/admin").text
 
 
 @pytest.mark.parametrize(
@@ -145,11 +145,11 @@ def test_unfinished_job_page_reloads_itself(admin_browser: TestClient) -> None:
     admin_browser.app.state.jobs.stop()  # the job stays queued
     job_id = int(start_import(admin_browser, source_subdir="holiday").headers["location"].rsplit("/", 1)[1])
 
-    page = admin_browser.get(f"/admin/jobs/{job_id}").text
+    page = admin_browser.get(f"/admin/import/{job_id}").text
 
     assert REFRESH in page
     assert '<span class="status status-queued">Waiting</span>' in page
-    assert REFRESH in admin_browser.get("/admin/jobs").text
+    assert REFRESH in admin_browser.get("/admin/import").text
 
 
 def test_failed_job_shows_why(admin_browser: TestClient) -> None:
@@ -159,7 +159,7 @@ def test_failed_job_shows_why(admin_browser: TestClient) -> None:
         session.execute(update(Job).values(status=JobStatus.FAILED, error="The disk is full."))
         session.commit()
 
-    page = admin_browser.get(f"/admin/jobs/{job_id}").text
+    page = admin_browser.get(f"/admin/import/{job_id}").text
 
     assert "The job failed: The disk is full." in page
     assert '<span class="status status-failed">Failed</span>' in page
@@ -172,32 +172,55 @@ def test_relayout_job_is_linked_from_the_settings(admin_browser: TestClient) -> 
     assert job is not None
 
     finished(admin_browser, job.id)
-    page = admin_browser.get(f"/admin/jobs/{job.id}").text
+    page = admin_browser.get(f"/admin/import/{job.id}").text
 
     assert "Moving files to the path template" in page
     assert "<dt>Moved</dt><dd>0</dd>" in page
 
 
 def start_removal(browser: TestClient):  # -> Response
-    form = {"csrf_token": csrf_token_in(browser.get("/admin/jobs").text)}
-    return browser.post("/admin/jobs/remove-finished", data=form, follow_redirects=False)
+    form = {"csrf_token": csrf_token_in(browser.get("/admin/import").text)}
+    return browser.post("/admin/import/remove-finished", data=form, follow_redirects=False)
 
 
 def test_removes_the_finished_jobs(admin_browser: TestClient) -> None:
     job_id = int(start_import(admin_browser, source_subdir="holiday").headers["location"].rsplit("/", 1)[1])
     finished(admin_browser, job_id)
-    assert "24 hours after they finish." in admin_browser.get("/admin/jobs").text
+    assert "24 hours after they finish." in admin_browser.get("/admin/import").text
 
     response = start_removal(admin_browser)
 
-    assert (response.status_code, response.headers["location"]) == (303, "/admin/jobs?removed=1")
+    assert (response.status_code, response.headers["location"]) == (303, "/admin/import?removed=1")
     page = admin_browser.get(response.headers["location"]).text
     assert "1 finished job removed." in page
     assert '<span class="disabled-reason" title="There are no finished jobs.">' in page
 
 
+def test_page_is_called_import(admin_browser: TestClient) -> None:
+    page = admin_browser.get("/admin/import").text
+
+    assert "<title>Import – photobook-db</title>" in page
+    assert "<h1>Import</h1>" in page
+
+
+@pytest.mark.parametrize(
+    "old_url, new_url",
+    [
+        ("/admin/jobs", "/admin/import"),
+        ("/admin/jobs/", "/admin/import"),
+        ("/admin/jobs/import", "/admin/import/new"),
+        ("/admin/jobs/7", "/admin/import/7"),
+        ("/admin/jobs//elsewhere.example", "/admin/import//elsewhere.example"),  # never leaves /admin/import
+    ],
+)
+def test_old_addresses_lead_to_the_import_pages(client: TestClient, old_url: str, new_url: str) -> None:
+    response = client.get(old_url, follow_redirects=False)
+
+    assert (response.status_code, response.headers["location"]) == (301, new_url)
+
+
 def test_unknown_job_is_a_404_page(admin_browser: TestClient) -> None:
-    response = admin_browser.get("/admin/jobs/999")
+    response = admin_browser.get("/admin/import/999")
 
     assert response.status_code == 404
     assert "This job does not exist." in response.text
@@ -209,13 +232,13 @@ class TestWithoutAnImportFolder:
         return dataclasses.replace(config, import_dir=None)
 
     def test_import_button_says_why_it_is_off(self, admin_browser: TestClient) -> None:
-        page = admin_browser.get("/admin/jobs").text
+        page = admin_browser.get("/admin/import").text
 
         assert 'title="Folder imports are off. Set PHOTOBOOK_IMPORT_DIR on the server to turn them on."' in page
         assert '<button type="button" disabled>+ Import Folder</button>' in page
 
     def test_import_page_explains_how_to_turn_imports_on(self, admin_browser: TestClient) -> None:
-        page = admin_browser.get("/admin/jobs/import").text
+        page = admin_browser.get("/admin/import/new").text
 
         assert "Folder imports are off." in page
         assert 'name="source_subdir"' not in page

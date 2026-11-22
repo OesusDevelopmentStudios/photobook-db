@@ -21,14 +21,14 @@
     <tr><th>Job</th><th>What</th><th>Status</th><th>Progress</th></tr>
     {% for job in recent_jobs %}
     <tr>
-        <td><a href="/admin/jobs/{{ job.id }}">{{ job.id }}</a></td>
+        <td><a href="/admin/import/{{ job.id }}">{{ job.id }}</a></td>
         <td>{{ job_title(job) }}</td>
         <td>{{ job_status(job) }}</td>
         <td>{{ job_progress(job) }}</td>
     </tr>
     {% endfor %}
 </table>
-<p><a href="/admin/jobs">All jobs</a></p>
+<p><a href="/admin/import">All jobs</a></p>
 {% else %}
 <p class="hint">No jobs yet.</p>
 {% endif %}

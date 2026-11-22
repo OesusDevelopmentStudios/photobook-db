@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""/admin/jobs: background jobs and their progress, and starting a folder import. Pages of unfinished jobs
+"""/admin/import: background jobs and their progress, and starting a folder import. Pages of unfinished jobs
 reload themselves, so progress shows without JavaScript."""
 
 import re
@@ -18,7 +18,8 @@ from photobook_db.services.jobs import SUCCESSFUL_JOB_LIFETIME, FolderImport, Jo
 from photobook_db.services.tags import RATING_NAMESPACE, NamespaceInfo, TagsService
 from photobook_db.utils.problems import Problem
 
-router = APIRouter(prefix="/jobs")
+router = APIRouter(prefix="/import")
+old_urls = APIRouter(prefix="/jobs")  # where these pages were before 0.2.0; bookmarks may still lead there
 
 REFRESH_SECONDS = 2  # the worker writes progress about once a second
 UNFINISHED = (JobStatus.QUEUED, JobStatus.RUNNING)
@@ -55,12 +56,12 @@ def jobs_page(request: Request, session: AdminPage, removed: int | None = None) 
 @router.post("/remove-finished")
 def remove_finished_jobs(request: Request, _session: AdminForm) -> RedirectResponse:
     removed = request.app.state.jobs.remove_finished_jobs()
-    return RedirectResponse(f"/admin/jobs?removed={removed}", status_code=303)
+    return RedirectResponse(f"/admin/import?removed={removed}", status_code=303)
 
 
 # --- Folder imports
 
-@router.get("/import", response_class=HTMLResponse)
+@router.get("/new", response_class=HTMLResponse)
 def import_page(request: Request, session: AdminPage) -> HTMLResponse:
     return _import_page(request, session)
 
@@ -72,7 +73,7 @@ async def _entered_tags(request: Request) -> dict[str, str]:
     return {key.removeprefix(TAG_FIELD_PREFIX): value for key, value in fields}
 
 
-@router.post("/import", response_class=HTMLResponse)
+@router.post("/new", response_class=HTMLResponse)
 def start_import(
     request: Request,
     session: AdminForm,
@@ -92,7 +93,7 @@ def start_import(
             request, session, source_subdir, entered_tags, remove_originals, problem_message(problem), problem.status
         )
 
-    return RedirectResponse(f"/admin/jobs/{job.id}", status_code=303)
+    return RedirectResponse(f"/admin/import/{job.id}", status_code=303)
 
 
 # --- One job
@@ -111,6 +112,17 @@ def job_page(request: Request, session: AdminPage, job_id: int) -> HTMLResponse:
         "refresh_seconds": REFRESH_SECONDS if job.status in UNFINISHED else None,
     }
     return templates.TemplateResponse(request, "job.html", context)
+
+
+# --- The old addresses
+
+@old_urls.get("")
+@old_urls.get("/{rest:path}")
+def moved_to_import(rest: str = "") -> RedirectResponse:
+    """/admin/jobs → /admin/import, /admin/jobs/import → /admin/import/new, /admin/jobs/7 → /admin/import/7.
+    The target always stays under /admin/import, whatever `rest` holds."""
+    target = "/admin/import/new" if rest == "import" else f"/admin/import/{rest}".removesuffix("/")
+    return RedirectResponse(target, status_code=301)
 
 
 def _folder_import(request: Request) -> FolderImport:

@@ -9,7 +9,7 @@
 {% elif saved %}
 <p class="success" role="status">The settings have been saved.
 {% if relayout_job is not none %}
-<a href="/admin/jobs/{{ relayout_job }}">Job {{ relayout_job }}</a> now moves the files to match the new path
+<a href="/admin/import/{{ relayout_job }}">Job {{ relayout_job }}</a> now moves the files to match the new path
 template.
 {% endif %}
 </p>

@@ -4,7 +4,7 @@
 {% from "_buttons.html" import back_button %}
 {% block title %}Import a folder{% endblock %}
 {% block heading %}Import a folder{% endblock %}
-{% block back %}{{ back_button("/admin/jobs", "Back to all jobs") }}{% endblock %}
+{% block back %}{{ back_button("/admin/import", "Back to Import") }}{% endblock %}
 {% block content %}
 {% if not import_dir %}
 <p class="error" role="alert">Folder imports are off. Set <code>PHOTOBOOK_IMPORT_DIR</code> on the server to the folder
@@ -14,7 +14,7 @@ to import from, then restart it.</p>
 <p class="error" role="alert">{{ error }}</p>
 {% endif %}
 
-<form method="post" action="/admin/jobs/import">
+<form method="post" action="/admin/import/new">
     <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
     {# Enter in a field presses the form's first button: this keeps that "Start import", not "Rescan". #}
     <button type="submit" name="action" value="start" class="default-button" tabindex="-1" aria-hidden="true">

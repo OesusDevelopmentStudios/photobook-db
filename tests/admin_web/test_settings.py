@@ -58,7 +58,7 @@ def test_a_new_path_template_starts_a_relayout_job(admin_browser: TestClient) ->
     assert job.kind == "relayout"
     assert response.headers["location"] == f"/admin/settings?saved=true&relayout_job={job.id}"
     page = admin_browser.get(response.headers["location"]).text
-    assert f'<a href="/admin/jobs/{job.id}">Job {job.id}</a> now moves the files' in page
+    assert f'<a href="/admin/import/{job.id}">Job {job.id}</a> now moves the files' in page
     assert server_settings(admin_browser).current().path_template == "{category}/{year}"
 
 

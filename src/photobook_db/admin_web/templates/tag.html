@@ -11,7 +11,7 @@
 {% elif renamed %}
 <p class="success" role="status">The images now have this tag instead of the old one.
 {% if relayout_job is not none %}
-<a href="/admin/jobs/{{ relayout_job }}">Job {{ relayout_job }}</a> moves the affected files to their new folders.
+<a href="/admin/import/{{ relayout_job }}">Job {{ relayout_job }}</a> moves the affected files to their new folders.
 {% endif %}
 </p>
 {% endif %}

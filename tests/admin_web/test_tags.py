@@ -121,7 +121,7 @@ def test_merging_into_a_path_tag_links_to_the_job_that_moves_the_files(
     job_id = int(location.rsplit("relayout_job=", 1)[1])
     assert location.startswith("/admin/tags/author/sample_artist?renamed=true&relayout_job=")
     assert tags.image_count(TagName("author", "sample_artist")) == 3
-    assert f'<a href="/admin/jobs/{job_id}">Job {job_id}</a> moves' in admin_browser.get(location).text
+    assert f'<a href="/admin/import/{job_id}">Job {job_id}</a> moves' in admin_browser.get(location).text
 
 
 def test_restricted_tags_follow_a_rename(admin_browser: TestClient, library: None) -> None:
