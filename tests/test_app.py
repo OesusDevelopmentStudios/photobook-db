@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
+import io
 import logging
+import time
 from datetime import datetime
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image as PillowImage
 from sqlalchemy import select
 
 from photobook_db.app import create_app
@@ -82,3 +85,34 @@ def test_finishes_interrupted_file_moves_when_it_starts(config: Config) -> None:
 
     assert stored_path == "new/beach.jpg"
     assert leftover_moves == []
+
+
+def test_gives_older_images_their_meta_tags_when_it_starts(config: Config) -> None:
+    # An image as a server before 0.2.0 stored it: no meta tags.
+    moment = datetime(2026, 11, 12, 12, 0)
+    (config.library_dir / "beach.png").write_bytes(_png_bytes())
+    database = open_database(config.data_dir / DATABASE_FILE_NAME)
+    with database.session() as session:
+        session.add(Image(
+            sha256="cd" * 32, storage_path="beach.png", original_filename="beach.png", mime_type="image/png",
+            width=8, height=8, file_size=1, taken_at=moment, taken_at_source="import_time",
+            imported_at=moment, updated_at=moment,
+        ))
+        session.commit()
+    database.close()
+
+    with TestClient(create_app(config)) as client:
+        images = client.app.state.images
+        deadline = time.monotonic() + 10
+        while not images.get_image(1).tags and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+        tags = [str(tag) for tag in images.get_image(1).tags]
+
+    assert tags == ["meta:low_res", "meta:png", "meta:still_image"]
+
+
+def _png_bytes() -> bytes:
+    buffer = io.BytesIO()
+    PillowImage.new("RGB", (8, 8), "teal").save(buffer, format="PNG")
+    return buffer.getvalue()

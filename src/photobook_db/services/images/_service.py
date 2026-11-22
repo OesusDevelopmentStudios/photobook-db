@@ -15,7 +15,7 @@ from photobook_db.db import Database
 from photobook_db.db.models import Image, Namespace, Tag, image_tag
 from photobook_db.services.access import Restrictions
 from photobook_db.services.storage import StorageService
-from photobook_db.services.tags import TagName, TagsService
+from photobook_db.services.tags import META_NAMESPACE, TagName, TagsService
 from photobook_db.utils.problems import Problem
 from photobook_db.utils.time import utc_now
 
@@ -135,6 +135,31 @@ class ImagesService:
 
         self._move_files_to_layout(changed_ids)
         return len(unique_ids)
+
+    def set_meta_tags(self, image_id: int, meta_tags: list[TagName]) -> None:
+        """The server's own tags of an image, read from its file, instead of those it had. No restrictions apply:
+        they describe the file, and no user asked for them. Raises 404 not_found."""
+        with self._database.session() as session:
+            image = session.get(Image, image_id)
+            if image is None:
+                raise Problem(404, "not_found", "Image not found")
+
+            current = _tags_of(session, [image_id]).get(image_id, [])
+            outdated = {tag for tag in current if tag.namespace == META_NAMESPACE and tag not in meta_tags}
+            self._change_tags(session, [image], [image_id], meta_tags, outdated, _no_check)
+            session.commit()
+
+    def ids_without_meta_tags(self) -> list[int]:
+        """Images stored before the server set meta tags on import."""
+        has_meta_tag = (
+            select(image_tag.c.image_id)
+            .join(Tag, Tag.id == image_tag.c.tag_id)
+            .join(Namespace, Namespace.id == Tag.namespace_id)
+            .where(Namespace.name == META_NAMESPACE, image_tag.c.image_id == Image.id)
+            .exists()
+        )
+        with self._database.session() as session:
+            return list(session.scalars(select(Image.id).where(~has_meta_tag).order_by(Image.id)))
 
     def replace_tag(self, old_tag: TagName, new_tag: TagName | None) -> list[int]:
         """For admins: every image with old_tag gets new_tag instead (a rename, or a merge if new_tag exists), or

@@ -37,6 +37,8 @@
     {% elif job.kind == "relayout" %}
     <dt>Moved</dt><dd>{{ job.result.moved }}</dd>
     <dt>In place already</dt><dd>{{ job.result.unchanged }}</dd>
+    {% elif job.kind == "meta_tags" %}
+    <dt>Tagged</dt><dd>{{ job.result.tagged }}</dd>
     {% endif %}
     <dt>Failed</dt><dd>{{ job.result.failed | length }}</dd>
 </dl>

@@ -31,6 +31,7 @@ _logger = logging.getLogger(__name__)
 class JobKind(StrEnum):
     FOLDER_IMPORT = "folder_import"
     RELAYOUT = "relayout"
+    META_TAGS = "meta_tags"  # the meta tags of images stored before the server set them
 
 
 class JobStatus(StrEnum):
@@ -161,6 +162,12 @@ class JobsService:
 
         with self._database.session() as session:
             return [_job_info(job) for job in session.scalars(query)]
+
+    def has_unfinished_job(self, kind: JobKind) -> bool:
+        """A job of this kind is waiting or running."""
+        query = select(Job.id).where(Job.kind == kind, Job.status.in_([JobStatus.QUEUED, JobStatus.RUNNING]))
+        with self._database.session() as session:
+            return session.scalar(query.limit(1)) is not None
 
     def remove_finished_jobs(self) -> int:
         """Removes the done and failed jobs; waiting and running ones stay. Returns how many were removed."""

@@ -21,7 +21,7 @@ from photobook_db.services.same_machine import SameMachine
 from photobook_db.services.search import SearchService
 from photobook_db.services.server_settings import ServerSettings
 from photobook_db.services.images import ImagesService
-from photobook_db.services.jobs import FolderImport, JobKind, JobsService, Relayout
+from photobook_db.services.jobs import FolderImport, JobKind, JobsService, MetaTagging, Relayout
 from photobook_db.services.importer import ImporterService
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
@@ -79,6 +79,8 @@ def _lifespan(config: Config) -> Callable[[FastAPI], AbstractAsyncContextManager
         app.state.jobs.register(JobKind.FOLDER_IMPORT, app.state.folder_import.run)
         relayout = Relayout(app.state.jobs, app.state.images)
         app.state.jobs.register(JobKind.RELAYOUT, relayout.run)
+        meta_tagging = MetaTagging(app.state.jobs, app.state.images, app.state.storage)
+        app.state.jobs.register(JobKind.META_TAGS, meta_tagging.run)
         app.state.server_settings = ServerSettings(
             app.state.storage, app.state.importer, app.state.tags, relayout, settings, config.import_dir
         )
@@ -88,6 +90,7 @@ def _lifespan(config: Config) -> Callable[[FastAPI], AbstractAsyncContextManager
         app.state.same_machine = SameMachine(
             config.host_machine_id_file, config.host_library_dir or config.library_dir
         )
+        meta_tagging.start_if_needed()  # images stored before 0.2.0
         app.state.jobs.start()
         _announce_setup_code(app.state.auth)
         yield

@@ -13,7 +13,7 @@ from sqlalchemy import update
 
 from photobook_db.config import Config
 from photobook_db.db.models import Job
-from photobook_db.services.jobs import JobInfo, JobStatus
+from photobook_db.services.jobs import JobInfo, JobKind, JobStatus
 from photobook_db.services.server_settings import SettingsChanges
 
 from .conftest import csrf_token_in
@@ -225,6 +225,16 @@ def test_old_addresses_lead_to_the_import_pages(client: TestClient, old_url: str
     response = client.get(old_url, follow_redirects=False)
 
     assert (response.status_code, response.headers["location"]) == (301, new_url)
+
+
+def test_shows_a_meta_tags_job(admin_browser: TestClient) -> None:
+    job = admin_browser.app.state.jobs.submit(JobKind.META_TAGS, {}, None)
+    finished(admin_browser, job.id)
+
+    page = admin_browser.get(f"/admin/import/{job.id}").text
+
+    assert "Meta tags for the images stored before" in page
+    assert "<dt>Tagged</dt><dd>0</dd>" in page
 
 
 def test_unknown_job_is_a_404_page(admin_browser: TestClient) -> None:

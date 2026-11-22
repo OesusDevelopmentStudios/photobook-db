@@ -7,6 +7,8 @@
 Import of {% if job.params.source_subdir %}<code>{{ job.params.source_subdir }}</code>{% else %}the whole import folder{% endif %}
 {%- elif job.kind == "relayout" -%}
 Moving files to the path template
+{%- elif job.kind == "meta_tags" -%}
+Meta tags for the images stored before
 {%- else -%}
 {{ job.kind }}
 {%- endif -%}

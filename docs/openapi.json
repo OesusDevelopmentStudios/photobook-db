@@ -3020,7 +3020,8 @@
         "type": "string",
         "enum": [
           "folder_import",
-          "relayout"
+          "relayout",
+          "meta_tags"
         ],
         "title": "JobKind"
       },
