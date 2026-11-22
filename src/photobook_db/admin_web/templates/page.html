@@ -1,28 +1,36 @@
 {# SPDX-License-Identifier: GPL-3.0-or-later #}
 {# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
-{# The layout of every page behind the login: the menu and the logout button. #}
+{# The layout of every page behind the login: the tabs, and the user menu with Settings and Log out. #}
 {% extends "base.html" %}
 {% block width %}wide{% endblock %}
 {% block nav %}
-<nav>
+<nav class="menu-bar">
     {% include "_brand.html" %}
-    {% set menu = [
+    {% set tabs = [
         ("/admin", "Overview"),
-        ("/admin/settings", "Settings"),
         ("/admin/users", "User Management"),
         ("/admin/namespaces", "Namespaces"),
         ("/admin/tags", "Tags"),
         ("/admin/jobs", "Jobs"),
     ] %}
-    {% for path, name in menu %}
-    {# A section's own pages count too, e.g. /admin/users/3 for Users; the overview has none. #}
-    {% set current = request.url.path == path or (path != "/admin" and request.url.path.startswith(path + "/")) %}
-    <a href="{{ path }}"{% if current %} aria-current="page"{% endif %}>{{ name }}</a>
-    {% endfor %}
-    <form method="post" action="/admin/logout">
-        <span class="hint">{{ session.user.username }}</span>
-        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
-        <button type="submit" class="secondary">Log out</button>
-    </form>
+    <div class="tabs">
+        {% for path, name in tabs %}
+        {# A section's own pages count too, e.g. /admin/users/3 for Users; the overview has none. #}
+        {% set current = request.url.path == path or (path != "/admin" and request.url.path.startswith(path + "/")) %}
+        <a href="{{ path }}"{% if current %} aria-current="page"{% endif %}>{{ name }}</a>
+        {% endfor %}
+    </div>
+    {# A <details> opens and closes the menu without JavaScript. #}
+    {% set on_settings = request.url.path == "/admin/settings" or request.url.path.startswith("/admin/settings/") %}
+    <details class="user-menu">
+        <summary{% if on_settings %} class="current"{% endif %}>{{ session.user.username }}</summary>
+        <div class="menu">
+            <a href="/admin/settings"{% if on_settings %} aria-current="page"{% endif %}>Settings</a>
+            <form method="post" action="/admin/logout">
+                <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                <button type="submit">Log out</button>
+            </form>
+        </div>
+    </details>
 </nav>
 {% endblock %}
