@@ -26,7 +26,7 @@ def log_in(client: TestClient, username: str, role: Role) -> dict[str, str]:
 
 @pytest.fixture
 def admin(client: TestClient) -> dict[str, str]:
-    return log_in(client, "apo", Role.ADMIN)
+    return log_in(client, "admin_user", Role.ADMIN)
 
 
 def upload(client: TestClient, headers: dict[str, str], tags: list[str], colour: str = "teal"):  # -> httpx Response
@@ -55,7 +55,7 @@ def test_admin_sees_the_settings(client: TestClient, admin: dict[str, str], conf
     assert response.json() == {
         "path_template": "{category}/{author}/{year}",
         "max_upload_bytes": 200 * 1024 * 1024,
-        "rating_values": ["sfw", "nsfw"],
+        "rating_values": ["public", "private"],
         "web_accent_color": "#3daee9",
         "library_dir": str(config.library_dir),
         "import_dir": None,
@@ -63,10 +63,12 @@ def test_admin_sees_the_settings(client: TestClient, admin: dict[str, str], conf
 
 
 def test_only_admins_see_and_change_settings(client: TestClient) -> None:
-    kid = log_in(client, "kid", Role.USER)
+    restricted_user = log_in(client, "restricted_user", Role.USER)
 
-    assert client.get("/api/v1/admin/settings", headers=kid).status_code == 403
-    assert client.patch("/api/v1/admin/settings", json={"max_upload_bytes": 1048576}, headers=kid).status_code == 403
+    assert client.get("/api/v1/admin/settings", headers=restricted_user).status_code == 403
+    assert client.patch(
+        "/api/v1/admin/settings", json={"max_upload_bytes": 1048576}, headers=restricted_user
+    ).status_code == 403
 
 
 def test_new_path_template_moves_the_files(client: TestClient, admin: dict[str, str]) -> None:
@@ -110,12 +112,12 @@ def test_changes_the_accent_colour_of_the_web_pages(client: TestClient, admin: d
 
 
 def test_ratings_follow_the_setting(client: TestClient, admin: dict[str, str]) -> None:
-    image_id = upload(client, admin, ["rating:nsfw"]).json()["id"]
+    image_id = upload(client, admin, ["rating:private"]).json()["id"]
 
     client.patch("/api/v1/admin/settings", json={"rating_values": ["safe", "explicit"]}, headers=admin)
 
-    refused = upload(client, admin, ["rating:nsfw"], colour="red")
+    refused = upload(client, admin, ["rating:private"], colour="red")
     assert (refused.status_code, refused.json()["code"]) == (422, "invalid_tag")
-    assert client.get(f"/api/v1/images/{image_id}", headers=admin).json()["tags"] == ["rating:nsfw"]  # kept
+    assert client.get(f"/api/v1/images/{image_id}", headers=admin).json()["tags"] == ["rating:private"]  # kept
     response = client.patch(f"/api/v1/images/{image_id}", json={"add_tags": ["rating:explicit"]}, headers=admin)
     assert response.json()["tags"] == ["rating:explicit"]

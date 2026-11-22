@@ -107,7 +107,7 @@ def test_unknown_image_is_not_found(images: ImagesService) -> None:
 
 def test_image_stays_when_its_importer_is_deleted(images: ImagesService, database: Database) -> None:
     with database.session() as session:
-        user = User(username="kid", password_hash="x", role="user", created_at=datetime(2026, 1, 1))
+        user = User(username="restricted_user", password_hash="x", role="user", created_at=datetime(2026, 1, 1))
         session.add(user)
         session.commit()
         user_id = user.id

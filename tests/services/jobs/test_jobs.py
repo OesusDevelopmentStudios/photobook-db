@@ -27,8 +27,8 @@ TEST_KIND = JobKind.RELAYOUT  # any kind will do; the tests register their own h
 def users(database: Database) -> dict[str, UserInfo]:
     auth = AuthService(database)
     return {
-        "admin": auth.create_user("apo", "correct horse battery", Role.ADMIN),
-        "kid": auth.create_user("kid", "correct horse battery", Role.USER),
+        "admin": auth.create_user("admin_user", "correct horse battery", Role.ADMIN),
+        "restricted_user": auth.create_user("restricted_user", "correct horse battery", Role.USER),
         "teen": auth.create_user("teen", "correct horse battery", Role.USER),
     }
 
@@ -66,8 +66,8 @@ def test_runs_a_job_and_keeps_its_result(jobs: JobsService, users: dict[str, Use
     jobs.register(TEST_KIND, count_items)
     jobs.start()
 
-    submitted = jobs.submit(TEST_KIND, {"items": 3}, users["kid"].id)
-    finished = wait_until_finished(jobs, submitted.id, users["kid"])
+    submitted = jobs.submit(TEST_KIND, {"items": 3}, users["restricted_user"].id)
+    finished = wait_until_finished(jobs, submitted.id, users["restricted_user"])
 
     assert submitted.status == JobStatus.QUEUED
     assert (finished.status, finished.result, finished.error) == (JobStatus.DONE, {"counted": 3}, None)
@@ -178,16 +178,16 @@ def test_job_left_running_by_a_crash_runs_again(
 # --- Who sees which jobs
 
 def test_users_see_only_their_own_jobs(jobs: JobsService, users: dict[str, UserInfo]) -> None:
-    kids_job = jobs.submit(TEST_KIND, {}, users["kid"].id)
+    restricted_users_job = jobs.submit(TEST_KIND, {}, users["restricted_user"].id)
     teens_job = jobs.submit(TEST_KIND, {}, users["teen"].id)
 
-    assert jobs.get_job(kids_job.id, users["kid"]).id == kids_job.id
+    assert jobs.get_job(restricted_users_job.id, users["restricted_user"]).id == restricted_users_job.id
     with pytest.raises(Problem) as raised:
-        jobs.get_job(teens_job.id, users["kid"])
+        jobs.get_job(teens_job.id, users["restricted_user"])
 
     assert raised.value.status == 404
-    assert [job.id for job in jobs.list_jobs(users["kid"])] == [kids_job.id]
-    assert [job.id for job in jobs.list_jobs(users["admin"])] == [teens_job.id, kids_job.id]  # newest first
+    assert [job.id for job in jobs.list_jobs(users["restricted_user"])] == [restricted_users_job.id]
+    assert [job.id for job in jobs.list_jobs(users["admin"])] == [teens_job.id, restricted_users_job.id]  # newest first
 
 
 def test_lists_jobs_by_status(jobs: JobsService, users: dict[str, UserInfo]) -> None:

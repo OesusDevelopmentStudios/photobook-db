@@ -21,8 +21,8 @@ def test_keeps_values_and_replaces_them(database: Database) -> None:
 def test_keeps_json_values(database: Database) -> None:
     settings = SettingsService(database)
 
-    settings.set("rating_values", ["sfw", "nsfw"])
+    settings.set("rating_values", ["public", "private"])
     settings.set("limits", {"max_upload_bytes": 209715200})
 
-    assert settings.get("rating_values") == ["sfw", "nsfw"]
+    assert settings.get("rating_values") == ["public", "private"]
     assert settings.get("limits") == {"max_upload_bytes": 209715200}

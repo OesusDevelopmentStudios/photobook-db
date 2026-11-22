@@ -48,7 +48,7 @@ def test_logs_the_setup_code_while_no_admin_exists(config: Config, caplog: pytes
 
 def test_does_not_log_a_setup_code_once_an_admin_exists(config: Config, caplog: pytest.LogCaptureFixture) -> None:
     with TestClient(create_app(config)) as client:
-        client.app.state.auth.create_user("apo", "correct horse battery", Role.ADMIN)
+        client.app.state.auth.create_user("admin_user", "correct horse battery", Role.ADMIN)
     caplog.clear()  # the first start had no admin yet and rightly logged a code
 
     with caplog.at_level(logging.WARNING), TestClient(create_app(config)):

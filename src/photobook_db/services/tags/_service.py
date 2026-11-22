@@ -38,7 +38,7 @@ class TagCount:
 
 RATING_NAMESPACE = "rating"
 RATING_VALUES_SETTING = "rating_values"
-DEFAULT_RATING_VALUES = ("sfw", "nsfw")
+DEFAULT_RATING_VALUES = ("public", "private")
 MAX_RATING_VALUES = 20
 
 # Sorts after every other character, so names from `prefix` up to `prefix + this` start with `prefix`.
@@ -57,7 +57,7 @@ class TagsService:
     def resolve_tags(self, texts: list[str]) -> list[TagName]:
         """Parses tags as given for an image: each tag once, and in a single-value namespace only the last
         one, because a later tag replaces an earlier one (category:photo, category:artwork → artwork).
-        Ratings must be one of rating_values(): a typo must not slip past a restriction such as rating:nsfw."""
+        Ratings must be one of rating_values(): a typo must not slip past a restriction such as rating:private."""
         tags = [self.parse_tag(text) for text in texts]
         self._check_ratings(tags, texts)
         single_value = {namespace.name for namespace in self.list_namespaces() if namespace.single_value}

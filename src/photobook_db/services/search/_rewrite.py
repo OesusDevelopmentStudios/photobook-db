@@ -20,7 +20,7 @@ def renamed_in_term(term: str, old_tag: TagName, new_tag: TagName, namespace_nam
 
 
 def without_tag_in_term(term: str, tag: TagName, namespace_names: Collection[str]) -> str | None:
-    """None if the term goes. In an OR only the tag goes (rating:nsfw|questionable → rating:questionable); a term
+    """None if the term goes. In an OR only the tag goes (rating:private|restricted → rating:restricted); a term
     that names the tag in any other way can no longer match as written, so it goes whole."""
     tree = _parse_term(term, namespace_names)
     if not _names_tag(tree, tag):

@@ -13,7 +13,7 @@ _USERNAME_PATTERN = re.compile(rf"[a-z0-9._-]{{1,{USERNAME_MAX_LENGTH}}}")
 
 
 def normalized_username(username: str) -> str:
-    """Usernames are compared in lowercase, so 'Apo' and 'apo' are the same account."""
+    """Usernames are compared in lowercase, so 'Admin_User' and 'admin_user' are the same account."""
     return username.strip().lower()
 
 

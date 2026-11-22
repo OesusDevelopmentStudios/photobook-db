@@ -13,7 +13,7 @@ from photobook_db.services.auth import Role
 from photobook_db.services.same_machine import app_specific_id
 
 MACHINE_ID = "0123456789abcdef0123456789abcdef"
-HOST_LIBRARY = Path("/home/kid/Pictures/photobook-library")
+HOST_LIBRARY = Path("/home/restricted_user/Pictures/photobook-library")
 PASSWORD = "correct horse battery"
 
 
@@ -26,8 +26,8 @@ def config(config: Config) -> Config:
 
 @pytest.fixture
 def headers(client: TestClient) -> dict[str, str]:
-    client.app.state.auth.create_user("kid", PASSWORD, Role.USER)
-    login = {"username": "kid", "password": PASSWORD, "device_name": "t"}
+    client.app.state.auth.create_user("restricted_user", PASSWORD, Role.USER)
+    login = {"username": "restricted_user", "password": PASSWORD, "device_name": "t"}
     return {"Authorization": f"Bearer {client.post('/api/v1/auth/tokens', json=login).json()['token']}"}
 
 
@@ -44,7 +44,7 @@ def test_server_info_is_public_and_names_the_server(client: TestClient) -> None:
 
 
 def test_setup_is_no_longer_required_once_an_admin_exists(client: TestClient) -> None:
-    client.app.state.auth.create_user("apo", "correct horse battery", Role.ADMIN)
+    client.app.state.auth.create_user("admin_user", "correct horse battery", Role.ADMIN)
 
     response = client.get("/api/v1/server/info")
 

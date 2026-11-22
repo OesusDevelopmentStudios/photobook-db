@@ -36,7 +36,7 @@ router = APIRouter(prefix="/images", tags=["images"])
 THUMBNAIL_CACHE_CONTROL = "private, max-age=31536000, immutable"
 
 # The parameters that choose which images a search finds, shared by the search and its count
-SearchText = Annotated[str, Query(max_length=2000, description="Search query, e.g. category:artwork -rating:nsfw")]
+SearchText = Annotated[str, Query(max_length=2000, description="Search query, e.g. category:artwork -rating:private")]
 ApplyHiddenFilters = Annotated[bool, Query(description="false skips your hidden-by-default filters")]
 
 

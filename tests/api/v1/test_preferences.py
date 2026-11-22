@@ -15,8 +15,8 @@ PASSWORD = "correct horse battery"
 
 @pytest.fixture
 def headers(client: TestClient) -> dict[str, str]:
-    client.app.state.auth.create_user("kid", PASSWORD, Role.USER)
-    login = {"username": "kid", "password": PASSWORD, "device_name": "t"}
+    client.app.state.auth.create_user("restricted_user", PASSWORD, Role.USER)
+    login = {"username": "restricted_user", "password": PASSWORD, "device_name": "t"}
     return {"Authorization": f"Bearer {client.post('/api/v1/auth/tokens', json=login).json()['token']}"}
 
 
@@ -38,28 +38,28 @@ def test_preferences_need_a_login(client: TestClient) -> None:
 def test_stores_and_returns_hidden_filters(client: TestClient, headers: dict[str, str]) -> None:
     assert client.get("/api/v1/preferences", headers=headers).json() == {"hidden_filters": []}
 
-    response = client.put("/api/v1/preferences", json={"hidden_filters": ["rating:nsfw"]}, headers=headers)
+    response = client.put("/api/v1/preferences", json={"hidden_filters": ["rating:private"]}, headers=headers)
 
     assert response.status_code == 200
-    assert client.get("/api/v1/preferences", headers=headers).json() == {"hidden_filters": ["rating:nsfw"]}
+    assert client.get("/api/v1/preferences", headers=headers).json() == {"hidden_filters": ["rating:private"]}
 
 
 def test_invalid_filter_is_named(client: TestClient, headers: dict[str, str]) -> None:
-    response = client.put("/api/v1/preferences", json={"hidden_filters": ["rating:sfw", "(a"]}, headers=headers)
+    response = client.put("/api/v1/preferences", json={"hidden_filters": ["rating:public", "(a"]}, headers=headers)
 
     assert response.status_code == 422
     assert response.json()["errors"][0]["field"] == "body.hidden_filters.1"
 
 
 def test_search_hides_filtered_images_by_default(client: TestClient, headers: dict[str, str]) -> None:
-    safe = upload(client, headers, "green", ["rating:sfw"])
-    hidden = upload(client, headers, "red", ["rating:nsfw"])
-    client.put("/api/v1/preferences", json={"hidden_filters": ["rating:nsfw"]}, headers=headers)
+    safe = upload(client, headers, "green", ["rating:public"])
+    hidden = upload(client, headers, "red", ["rating:private"])
+    client.put("/api/v1/preferences", json={"hidden_filters": ["rating:private"]}, headers=headers)
 
     def found(params: dict[str, object]) -> tuple[set[int], str]:
         body = client.get("/api/v1/images", params=params, headers=headers).json()
         return {item["id"] for item in body["items"]}, body["effective_query"]
 
-    assert found({}) == ({safe}, "-rating:nsfw")
+    assert found({}) == ({safe}, "-rating:private")
     assert found({"apply_hidden_filters": False}) == ({safe, hidden}, "")
-    assert found({"q": "rating:nsfw"}) == ({hidden}, "rating:nsfw")
+    assert found({"q": "rating:private"}) == ({hidden}, "rating:private")

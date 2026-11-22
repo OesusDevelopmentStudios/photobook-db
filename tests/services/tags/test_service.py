@@ -38,7 +38,7 @@ def test_lists_the_builtin_namespaces(tags: TagsService) -> None:
     assert all(namespace.is_builtin for namespace in namespaces.values())
     assert {name for name, namespace in namespaces.items() if namespace.in_path_template} == {"category", "author"}
     assert {name: namespace.allowed_values for name, namespace in namespaces.items() if namespace.allowed_values} == {
-        "rating": ("sfw", "nsfw")
+        "rating": ("public", "private")
     }
 
 
@@ -119,9 +119,9 @@ def test_resolve_keeps_each_tag_once_in_the_given_order(tags: TagsService) -> No
 
 
 def test_resolve_keeps_the_last_tag_of_a_single_value_namespace(tags: TagsService) -> None:
-    resolved = tags.resolve_tags(["category:photo", "summer", "category:artwork", "rating:sfw"])
+    resolved = tags.resolve_tags(["category:photo", "summer", "category:artwork", "rating:public"])
 
-    assert [str(tag) for tag in resolved] == ["general:summer", "category:artwork", "rating:sfw"]
+    assert [str(tag) for tag in resolved] == ["general:summer", "category:artwork", "rating:public"]
 
 
 def test_resolve_keeps_every_tag_of_a_multi_value_namespace(tags: TagsService) -> None:
@@ -132,30 +132,30 @@ def test_resolve_keeps_every_tag_of_a_multi_value_namespace(tags: TagsService) -
 
 # --- Ratings
 
-def test_ratings_are_sfw_and_nsfw_by_default(tags: TagsService) -> None:
-    assert tags.rating_values() == ["sfw", "nsfw"]
-    assert tags.resolve_tags(["Rating:NSFW"]) == [TagName("rating", "nsfw")]
+def test_ratings_are_public_and_private_by_default(tags: TagsService) -> None:
+    assert tags.rating_values() == ["public", "private"]
+    assert tags.resolve_tags(["Rating:PRIVATE"]) == [TagName("rating", "private")]
 
 
 def test_rating_that_is_not_listed_is_refused(tags: TagsService) -> None:
     problem = raised_problem(lambda: tags.resolve_tags(["summer", "rating:nsf"]))
 
     assert (problem.status, problem.code, problem.extra["tag"]) == (422, "invalid_tag", "rating:nsf")
-    assert "sfw, nsfw" in problem.detail
+    assert "public, private" in problem.detail
 
 
 def test_rating_values_are_normalised_and_kept_once(tags: TagsService) -> None:
-    assert tags.set_rating_values(["Safe", "Questionable", "safe", "Explicit"]) == ["safe", "questionable", "explicit"]
+    assert tags.set_rating_values(["Safe", "Restricted", "safe", "Explicit"]) == ["safe", "restricted", "explicit"]
 
-    assert tags.rating_values() == ["safe", "questionable", "explicit"]
-    assert tags.resolve_tags(["rating:questionable"]) == [TagName("rating", "questionable")]
+    assert tags.rating_values() == ["safe", "restricted", "explicit"]
+    assert tags.resolve_tags(["rating:restricted"]) == [TagName("rating", "restricted")]
 
 
 def test_removed_rating_can_still_be_named_for_removal(tags: TagsService) -> None:
-    tags.set_rating_values(["sfw"])
+    tags.set_rating_values(["public"])
 
-    assert raised_problem(lambda: tags.resolve_tags(["rating:nsfw"])).code == "invalid_tag"
-    assert tags.parse_tag("rating:nsfw") == TagName("rating", "nsfw")  # remove_tags parses without the check
+    assert raised_problem(lambda: tags.resolve_tags(["rating:private"])).code == "invalid_tag"
+    assert tags.parse_tag("rating:private") == TagName("rating", "private")  # remove_tags parses without the check
 
 
 @pytest.mark.parametrize(
@@ -163,10 +163,10 @@ def test_removed_rating_can_still_be_named_for_removal(tags: TagsService) -> Non
     [
         ([], "validation_error"),
         ([f"r{number}" for number in range(21)], "validation_error"),
-        (["sfw", "a|b"], "invalid_tag"),
+        (["public", "a|b"], "invalid_tag"),
     ],
     ids=["none", "too many", "invalid name"],
 )
 def test_invalid_rating_values_are_refused(tags: TagsService, values: list[str], code: str) -> None:
     assert raised_problem(lambda: tags.set_rating_values(values)).code == code
-    assert tags.rating_values() == ["sfw", "nsfw"]
+    assert tags.rating_values() == ["public", "private"]

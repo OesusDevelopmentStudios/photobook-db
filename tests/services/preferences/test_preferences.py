@@ -21,7 +21,7 @@ def preferences(database: Database) -> PreferencesService:
 @pytest.fixture
 def user_ids(database: Database) -> list[int]:
     auth = AuthService(database)
-    return [auth.create_user(name, "correct horse battery", Role.USER).id for name in ("kid", "teen")]
+    return [auth.create_user(name, "correct horse battery", Role.USER).id for name in ("restricted_user", "teen")]
 
 
 def invalid(action: object) -> dict[str, str]:
@@ -37,20 +37,20 @@ def test_no_hidden_filters_until_set(preferences: PreferencesService, user_ids: 
 
 
 def test_keeps_and_replaces_the_whole_list(preferences: PreferencesService, user_ids: list[int]) -> None:
-    preferences.set_hidden_filters(user_ids[0], ["rating:nsfw", " category:refs "])
-    preferences.set_hidden_filters(user_ids[0], ["rating:nsfw|questionable"])
+    preferences.set_hidden_filters(user_ids[0], ["rating:private", " category:refs "])
+    preferences.set_hidden_filters(user_ids[0], ["rating:private|restricted"])
 
-    assert preferences.hidden_filters(user_ids[0]) == ["rating:nsfw|questionable"]
+    assert preferences.hidden_filters(user_ids[0]) == ["rating:private|restricted"]
 
 
 def test_each_user_has_their_own(preferences: PreferencesService, user_ids: list[int]) -> None:
-    preferences.set_hidden_filters(user_ids[0], ["rating:nsfw"])
+    preferences.set_hidden_filters(user_ids[0], ["rating:private"])
 
     assert preferences.hidden_filters(user_ids[1]) == []
 
 
 def test_go_with_the_user(preferences: PreferencesService, user_ids: list[int], database: Database) -> None:
-    preferences.set_hidden_filters(user_ids[0], ["rating:nsfw"])
+    preferences.set_hidden_filters(user_ids[0], ["rating:private"])
 
     with database.session() as session:
         session.execute(delete(User).where(User.id == user_ids[0]))
@@ -62,9 +62,9 @@ def test_go_with_the_user(preferences: PreferencesService, user_ids: list[int], 
 @pytest.mark.parametrize(
     ("hidden_filters", "field", "message"),
     [
-        (["rating:nsfw category:refs"], "body.hidden_filters.0", "One search term: no spaces"),
-        (["rating:sfw", ""], "body.hidden_filters.1", "One search term: no spaces"),
-        (["-rating:nsfw"], "body.hidden_filters.0", "Write the term without a leading '-'"),
+        (["rating:private category:refs"], "body.hidden_filters.0", "One search term: no spaces"),
+        (["rating:public", ""], "body.hidden_filters.1", "One search term: no spaces"),
+        (["-rating:private"], "body.hidden_filters.0", "Write the term without a leading '-'"),
         (["a,,b"], "body.hidden_filters.0", "Expected a value (at position 2)"),
         ([f"tag_{number}" for number in range(51)], "body.hidden_filters", "At most 50 terms."),
     ],

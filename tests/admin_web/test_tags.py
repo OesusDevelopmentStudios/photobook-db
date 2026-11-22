@@ -125,12 +125,12 @@ def test_merging_into_a_path_tag_links_to_the_job_that_moves_the_files(
 
 
 def test_restricted_tags_follow_a_rename(admin_browser: TestClient, library: None) -> None:
-    kid = admin_browser.app.state.auth.create_user("kid", PASSWORD, Role.USER)
-    admin_browser.app.state.access.set_restricted_terms(kid.id, ["general:summer"])
+    restricted_user = admin_browser.app.state.auth.create_user("restricted_user", PASSWORD, Role.USER)
+    admin_browser.app.state.access.set_restricted_terms(restricted_user.id, ["general:summer"])
 
     post(admin_browser, "/admin/tags/general/summer/rename", new_tag="holiday")
 
-    assert admin_browser.app.state.access.restricted_terms(kid.id) == ["general:holiday"]
+    assert admin_browser.app.state.access.restricted_terms(restricted_user.id) == ["general:holiday"]
 
 
 def test_invalid_new_tag_shows_why(admin_browser: TestClient, tags: TagsService, library: None) -> None:

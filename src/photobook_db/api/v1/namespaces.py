@@ -19,7 +19,8 @@ class NamespaceDetails(BaseModel):
     is_builtin: bool = Field(description="Built-in namespaces cannot be deleted")
     in_path_template: bool = Field(description="Its tags form folder names in the library")
     allowed_values: list[str] | None = Field(
-        description="The only names its tags may have, e.g. the rating values; null: any", examples=[["sfw", "nsfw"]]
+        description="The only names its tags may have, e.g. the rating values; null: any",
+        examples=[["public", "private"]],
     )
 
 

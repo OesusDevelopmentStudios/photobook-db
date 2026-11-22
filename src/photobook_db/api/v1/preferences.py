@@ -20,7 +20,7 @@ class Preferences(BaseModel):
             "Search terms hidden from the default view unless a search mentions one of their tags; "
             f"one term each, without '-', at most {HIDDEN_FILTER_MAX_LENGTH} characters"
         ),
-        examples=[["rating:nsfw", "category:refs"]],
+        examples=[["rating:private", "category:refs"]],
     )
 
 

@@ -18,7 +18,7 @@ def save(browser: TestClient, **fields: str):  # -> Response
         "csrf_token": csrf_token_in(browser.get("/admin/settings").text),
         "path_template": "{category}/{author}/{year}",
         "max_upload_mib": "200",
-        "rating_values": "sfw\nnsfw",
+        "rating_values": "public\nprivate",
     }
     return browser.post("/admin/settings", data=form | fields, follow_redirects=False)
 
@@ -36,17 +36,17 @@ def test_shows_the_settings_and_the_folders(admin_browser: TestClient) -> None:
 
     assert 'value="{category}/{author}/{year}"' in page
     assert 'value="200"' in page
-    assert ">sfw\nnsfw</textarea>" in page
+    assert ">public\nprivate</textarea>" in page
     assert str(server_settings(admin_browser).current().library_dir) in page
     assert "folder imports are off" in page
 
 
 def test_saves_the_upload_limit_and_rating_values(admin_browser: TestClient) -> None:
-    response = save(admin_browser, max_upload_mib="50", rating_values="sfw\n\n Very Safe \n")
+    response = save(admin_browser, max_upload_mib="50", rating_values="public\n\n Very Safe \n")
 
     assert (response.status_code, response.headers["location"]) == (303, "/admin/settings?saved=true")
     settings = server_settings(admin_browser).current()
-    assert (settings.max_upload_bytes, settings.rating_values) == (50 * MIB, ["sfw", "very_safe"])
+    assert (settings.max_upload_bytes, settings.rating_values) == (50 * MIB, ["public", "very_safe"])
     assert admin_browser.app.state.jobs.list_jobs(admin_browser.app.state.auth.list_users()[0]) == []
     assert "The settings have been saved." in admin_browser.get(response.headers["location"]).text
 
@@ -65,19 +65,19 @@ def test_a_new_path_template_starts_a_relayout_job(admin_browser: TestClient) ->
 def test_an_unchanged_limit_keeps_its_exact_bytes(admin_browser: TestClient) -> None:
     server_settings(admin_browser).change(SettingsChanges(max_upload_bytes=50 * MIB + 123), user_id=None)
 
-    save(admin_browser, max_upload_mib="50", rating_values="sfw")
+    save(admin_browser, max_upload_mib="50", rating_values="public")
 
     assert server_settings(admin_browser).current().max_upload_bytes == 50 * MIB + 123
 
 
 def test_invalid_values_are_shown_in_the_form_and_nothing_is_saved(admin_browser: TestClient) -> None:
-    response = save(admin_browser, path_template="{category}/{nonsense}", rating_values="sfw")
+    response = save(admin_browser, path_template="{category}/{nonsense}", rating_values="public")
 
     assert response.status_code == 422
     assert "Path template: Unknown placeholder {nonsense}" in response.text
     assert 'value="{category}/{nonsense}"' in response.text  # what was entered stays in the form
     settings = server_settings(admin_browser).current()
-    assert (settings.path_template, settings.rating_values) == ("{category}/{author}/{year}", ["sfw", "nsfw"])
+    assert (settings.path_template, settings.rating_values) == ("{category}/{author}/{year}", ["public", "private"])
 
 
 def test_problems_without_a_field_are_shown_too(admin_browser: TestClient) -> None:

@@ -34,7 +34,7 @@ class UserDetails(BaseModel):
     created_at: datetime
 
 
-RESTRICTED_TAGS_DESCRIPTION = "Search terms, e.g. rating:nsfw or character:*; ignored for admins"
+RESTRICTED_TAGS_DESCRIPTION = "Search terms, e.g. rating:private or character:*; ignored for admins"
 
 
 class NewUser(BaseModel):
@@ -117,7 +117,9 @@ class Settings(BaseModel):
         examples=["{category}/{author}/{year}"],
     )
     max_upload_bytes: int
-    rating_values: list[str] = Field(description="The only values a rating: tag may have", examples=[["sfw", "nsfw"]])
+    rating_values: list[str] = Field(
+        description="The only values a rating: tag may have", examples=[["public", "private"]]
+    )
     web_accent_color: str = Field(description="Accent colour of the web admin pages", examples=["#3daee9"])
     library_dir: str = Field(description="Read-only: set with PHOTOBOOK_LIBRARY_DIR")
     import_dir: str | None = Field(

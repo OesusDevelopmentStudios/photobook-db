@@ -11,7 +11,7 @@ from photobook_db.utils.problems import Problem
 MACHINE_ID = "0123456789abcdef0123456789abcdef"
 # printf photobook-db | openssl dgst -sha256 -hmac 0123456789abcdef0123456789abcdef: what the desktop app sends
 CLIENT_ID = "68ca712866a854762ce8a71933440d7105df0c2debd2692ae766bbc0888bb323"
-LIBRARY = Path("/home/kid/Pictures/photobook-library")
+LIBRARY = Path("/home/restricted_user/Pictures/photobook-library")
 
 
 def same_machine(tmp_path: Path, machine_id_text: str | None) -> SameMachine:

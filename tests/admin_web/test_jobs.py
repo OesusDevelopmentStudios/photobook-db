@@ -91,7 +91,7 @@ def test_import_page_has_a_tag_field_per_namespace(admin_browser: TestClient) ->
     assert re.findall(r'name="tag_(\w+)"', page) == [
         "category", "author", "character", "rating", "album", "general", "weather"
     ]
-    assert '<select id="tag_rating" name="tag_rating">' in page and '<option value="nsfw">nsfw</option>' in page
+    assert '<select id="tag_rating" name="tag_rating">' in page and '<option value="private">private</option>' in page
     assert '<textarea id="tag_author" name="tag_author" rows="1"' in page  # several tags: a box that can grow
     assert re.search(r'<datalist id="tag_category-values">\s*<option value="photo">', page)
     assert 'list="tag_weather-values"' in page  # every one-tag-per-image namespace gets suggestions
@@ -102,14 +102,14 @@ def test_imports_a_folder_and_shows_the_result(admin_browser: TestClient) -> Non
         admin_browser,
         source_subdir=" holiday ",
         tag_author=" sample_artist,\n\n Other Artist ",
-        tag_rating="sfw",
+        tag_rating="public",
         tag_general="summer",
         tag_album="",
     )
 
     job_id = int(response.headers["location"].removeprefix("/admin/jobs/"))
     job = finished(admin_browser, job_id)
-    tags = ["author:sample_artist", "author:Other Artist", "rating:sfw", "general:summer"]
+    tags = ["author:sample_artist", "author:Other Artist", "rating:public", "general:summer"]
     assert job.params == {"source_subdir": "holiday", "remove_originals": False, "tags": tags}
     page = admin_browser.get(f"/admin/jobs/{job_id}").text
     assert "Import of <code>holiday</code>" in page

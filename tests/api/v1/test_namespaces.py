@@ -20,12 +20,12 @@ def headers_for(client: TestClient, username: str, role: Role) -> dict[str, str]
 
 @pytest.fixture
 def admin_headers(client: TestClient) -> dict[str, str]:
-    return headers_for(client, "apo", Role.ADMIN)
+    return headers_for(client, "admin_user", Role.ADMIN)
 
 
 @pytest.fixture
 def user_headers(client: TestClient) -> dict[str, str]:
-    return headers_for(client, "kid", Role.USER)
+    return headers_for(client, "restricted_user", Role.USER)
 
 
 def test_listing_needs_a_login(client: TestClient) -> None:
@@ -110,7 +110,7 @@ def test_ratings_list_their_allowed_values(
         items = client.get("/api/v1/namespaces", headers=user_headers).json()["items"]
         return next(item["allowed_values"] for item in items if item["name"] == "rating")
 
-    assert rating_values() == ["sfw", "nsfw"]
+    assert rating_values() == ["public", "private"]
 
     client.patch("/api/v1/admin/settings", json={"rating_values": ["safe", "explicit"]}, headers=admin_headers)
 

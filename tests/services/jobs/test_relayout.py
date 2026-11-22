@@ -34,7 +34,7 @@ class Library:
         self.jobs = JobsService(database)
         self.relayout = Relayout(self.jobs, self.images)
         self.jobs.register(JobKind.RELAYOUT, self.relayout.run)
-        self.admin = AuthService(database).create_user("apo", "correct horse battery", Role.ADMIN)
+        self.admin = AuthService(database).create_user("admin_user", "correct horse battery", Role.ADMIN)
 
     def add_image(self, colour: str, tags: tuple[str, ...]) -> ImageRecord:
         """Taken in 2024."""

@@ -19,7 +19,7 @@ from photobook_db.utils.problems import Problem
 DEFAULTS = ServerSettingsInfo(
     path_template="{category}/{author}/{year}",
     max_upload_bytes=DEFAULT_MAX_UPLOAD_BYTES,
-    rating_values=["sfw", "nsfw"],
+    rating_values=["public", "private"],
     web_accent_color="#3daee9",
     library_dir=Path("/srv/library"),
     import_dir=Path("/srv/import"),

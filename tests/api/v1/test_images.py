@@ -25,8 +25,8 @@ PASSWORD = "correct horse battery"
 
 @pytest.fixture
 def headers(client: TestClient) -> dict[str, str]:
-    client.app.state.auth.create_user("kid", PASSWORD, Role.USER)
-    login = {"username": "kid", "password": PASSWORD, "device_name": "t"}
+    client.app.state.auth.create_user("restricted_user", PASSWORD, Role.USER)
+    login = {"username": "restricted_user", "password": PASSWORD, "device_name": "t"}
     response = client.post("/api/v1/auth/tokens", json=login)
     return {"Authorization": f"Bearer {response.json()['token']}"}
 

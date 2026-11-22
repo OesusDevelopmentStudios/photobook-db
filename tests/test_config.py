@@ -86,13 +86,15 @@ def test_reads_where_the_host_keeps_its_machine_id_and_the_library() -> None:
     environment = HOME | {
         "PHOTOBOOK_LIBRARY_DIR": "/library",
         "PHOTOBOOK_HOST_MACHINE_ID_FILE": "/run/host/machine-id",
-        "PHOTOBOOK_HOST_LIBRARY_DIR": "/home/kid/Pictures/photobook-library",
+        "PHOTOBOOK_HOST_LIBRARY_DIR": "/home/restricted_user/Pictures/photobook-library",
     }
 
     config = config_from_environment(environment)
 
     assert config.host_machine_id_file == Path("/run/host/machine-id")
-    assert config.host_library_dir == Path("/home/kid/Pictures/photobook-library")  # need not exist in a container
+    assert config.host_library_dir == Path(
+        "/home/restricted_user/Pictures/photobook-library"
+    )  # need not exist in a container
 
 
 def test_uses_this_computers_machine_id_and_library_by_default() -> None:

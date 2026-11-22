@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Hidden-by-default filters: each user's filters (e.g. rating:nsfw) hide images from the default view, but
+"""Hidden-by-default filters: each user's filters (e.g. rating:private) hide images from the default view, but
 searching for one of the filter's tags shows them again."""
 
 from collections.abc import Collection

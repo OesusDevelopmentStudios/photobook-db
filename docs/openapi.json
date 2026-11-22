@@ -388,11 +388,11 @@
             "schema": {
               "type": "string",
               "maxLength": 2000,
-              "description": "Search query, e.g. category:artwork -rating:nsfw",
+              "description": "Search query, e.g. category:artwork -rating:private",
               "default": "",
               "title": "Q"
             },
-            "description": "Search query, e.g. category:artwork -rating:nsfw"
+            "description": "Search query, e.g. category:artwork -rating:private"
           },
           {
             "name": "sort",
@@ -650,11 +650,11 @@
             "schema": {
               "type": "string",
               "maxLength": 2000,
-              "description": "Search query, e.g. category:artwork -rating:nsfw",
+              "description": "Search query, e.g. category:artwork -rating:private",
               "default": "",
               "title": "Q"
             },
-            "description": "Search query, e.g. category:artwork -rating:nsfw"
+            "description": "Search query, e.g. category:artwork -rating:private"
           },
           {
             "name": "apply_hidden_filters",
@@ -2484,8 +2484,8 @@
             "description": "The only values a rating: tag may have",
             "examples": [
               [
-                "sfw",
-                "nsfw"
+                "public",
+                "private"
               ]
             ]
           },
@@ -3041,7 +3041,7 @@
             "title": "Library Dir",
             "description": "The library folder on this computer; an image's file is there at its storage_path",
             "examples": [
-              "/home/kid/Pictures/photobook-library"
+              "/home/restricted_user/Pictures/photobook-library"
             ]
           }
         },
@@ -3118,8 +3118,8 @@
             "description": "The only names its tags may have, e.g. the rating values; null: any",
             "examples": [
               [
-                "sfw",
-                "nsfw"
+                "public",
+                "private"
               ]
             ]
           }
@@ -3191,7 +3191,7 @@
             "type": "array",
             "maxItems": 100,
             "title": "Restricted Tags",
-            "description": "Search terms, e.g. rating:nsfw or character:*; ignored for admins",
+            "description": "Search terms, e.g. rating:private or character:*; ignored for admins",
             "default": []
           }
         },
@@ -3244,7 +3244,7 @@
             "description": "Search terms hidden from the default view unless a search mentions one of their tags; one term each, without '-', at most 200 characters",
             "examples": [
               [
-                "rating:nsfw",
+                "rating:private",
                 "category:refs"
               ]
             ]
@@ -3419,8 +3419,8 @@
             "description": "The only values a rating: tag may have",
             "examples": [
               [
-                "sfw",
-                "nsfw"
+                "public",
+                "private"
               ]
             ]
           },
@@ -3678,7 +3678,7 @@
               }
             ],
             "title": "Restricted Tags",
-            "description": "Replaces the whole list. Search terms, e.g. rating:nsfw or character:*; ignored for admins"
+            "description": "Replaces the whole list. Search terms, e.g. rating:private or character:*; ignored for admins"
           }
         },
         "additionalProperties": false,

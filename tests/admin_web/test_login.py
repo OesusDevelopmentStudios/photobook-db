@@ -21,7 +21,7 @@ def log_in(client: TestClient, username: str, password: str = PASSWORD, next: st
 
 @pytest.fixture
 def admin(client: TestClient) -> None:
-    client.app.state.auth.create_user("apo", PASSWORD, Role.ADMIN)
+    client.app.state.auth.create_user("admin_user", PASSWORD, Role.ADMIN)
 
 
 # --- Logging in
@@ -33,7 +33,7 @@ def test_admin_pages_send_you_to_the_login(client: TestClient) -> None:
 
 
 def test_login_sets_a_session_cookie_and_returns_to_the_page(client: TestClient, admin: None) -> None:
-    response = log_in(client, "apo", next="/admin")
+    response = log_in(client, "admin_user", next="/admin")
 
     assert (response.status_code, response.headers["location"]) == (303, "/admin")
     cookie = response.headers["set-cookie"]
@@ -41,20 +41,20 @@ def test_login_sets_a_session_cookie_and_returns_to_the_page(client: TestClient,
     for attribute in ("HttpOnly", "Path=/admin", "SameSite=strict"):
         assert attribute in cookie
     assert "Max-Age" not in cookie and "expires" not in cookie.lower()  # forgotten when the browser closes
-    assert "apo" in client.get("/admin").text
+    assert "admin_user" in client.get("/admin").text
 
 
 @pytest.mark.parametrize(
     "username, password, role, message",
     [
-        ("apo", "wrong password", Role.ADMIN, "Wrong username or password."),
+        ("admin_user", "wrong password", Role.ADMIN, "Wrong username or password."),
         ("nobody", PASSWORD, Role.ADMIN, "Wrong username or password."),
-        ("kid", PASSWORD, Role.USER, "Only admins can use these pages."),
+        ("restricted_user", PASSWORD, Role.USER, "Only admins can use these pages."),
     ],
     ids=["wrong password", "unknown user", "not an admin"],
 )
 def test_failed_login_says_why(client: TestClient, username: str, password: str, role: Role, message: str) -> None:
-    client.app.state.auth.create_user("kid" if role == Role.USER else "apo", PASSWORD, role)
+    client.app.state.auth.create_user("restricted_user" if role == Role.USER else "admin_user", PASSWORD, role)
 
     response = log_in(client, username, password)
 
@@ -65,7 +65,7 @@ def test_failed_login_says_why(client: TestClient, username: str, password: str,
 
 @pytest.mark.parametrize("next", ["https://example.org/", "//example.org/admin", "/api/v1/images"])
 def test_login_never_returns_to_another_site(client: TestClient, admin: None, next: str) -> None:
-    assert log_in(client, "apo", next=next).headers["location"] == "/admin"
+    assert log_in(client, "admin_user", next=next).headers["location"] == "/admin"
 
 
 def test_login_page_points_to_the_setup_until_an_admin_exists(client: TestClient) -> None:
@@ -91,9 +91,9 @@ def test_admin_who_became_a_user_is_logged_out(admin_browser: TestClient) -> Non
 
 
 def test_session_is_listed_with_the_devices(admin_browser: TestClient) -> None:
-    apo = admin_browser.app.state.auth.list_users()[0]
+    admin_user = admin_browser.app.state.auth.list_users()[0]
 
-    [token] = admin_browser.app.state.auth.list_tokens(apo.id)
+    [token] = admin_browser.app.state.auth.list_tokens(admin_user.id)
 
     assert token.device_name == "Web admin"
     assert token.expires_at is not None

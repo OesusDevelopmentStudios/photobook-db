@@ -38,8 +38,8 @@ def count_items(context: JobContext) -> dict[str, Any]:
 
 
 @pytest.fixture
-def kid(client: TestClient) -> tuple[dict[str, str], int]:
-    return log_in(client, "kid", Role.USER)
+def restricted_user(client: TestClient) -> tuple[dict[str, str], int]:
+    return log_in(client, "restricted_user", Role.USER)
 
 
 def wait_for_job(client: TestClient, headers: dict[str, str], job_id: int) -> dict[str, Any]:
@@ -59,22 +59,22 @@ def test_jobs_need_a_login(client: TestClient) -> None:
     assert client.get("/api/v1/jobs/1").status_code == 401
 
 
-def test_shows_a_finished_job(client: TestClient, kid: tuple[dict[str, str], int]) -> None:
-    headers, kid_id = kid
+def test_shows_a_finished_job(client: TestClient, restricted_user: tuple[dict[str, str], int]) -> None:
+    headers, restricted_user_id = restricted_user
     client.app.state.jobs.register(TEST_KIND, count_items)
-    job_id = client.app.state.jobs.submit(TEST_KIND, {"items": 2}, kid_id).id
+    job_id = client.app.state.jobs.submit(TEST_KIND, {"items": 2}, restricted_user_id).id
 
     job = wait_for_job(client, headers, job_id)
 
     assert job["status"] == "done"
     assert (job["kind"], job["params"], job["result"], job["error"]) == (TEST_KIND, {"items": 2}, {"counted": 2}, None)
-    assert (job["progress_done"], job["progress_total"], job["created_by"]) == (2, 2, kid_id)
+    assert (job["progress_done"], job["progress_total"], job["created_by"]) == (2, 2, restricted_user_id)
     assert job["created_at"].endswith("Z") and job["finished_at"].endswith("Z")
 
 
-def test_other_users_jobs_are_not_found(client: TestClient, kid: tuple[dict[str, str], int]) -> None:
-    headers, _kid_id = kid
-    admin_headers, admin_id = log_in(client, "apo", Role.ADMIN)
+def test_other_users_jobs_are_not_found(client: TestClient, restricted_user: tuple[dict[str, str], int]) -> None:
+    headers, _restricted_user_id = restricted_user
+    admin_headers, admin_id = log_in(client, "admin_user", Role.ADMIN)
     admins_job = client.app.state.jobs.submit(TEST_KIND, {}, admin_id).id
 
     response = client.get(f"/api/v1/jobs/{admins_job}", headers=headers)
@@ -84,10 +84,10 @@ def test_other_users_jobs_are_not_found(client: TestClient, kid: tuple[dict[str,
     assert [job["id"] for job in client.get("/api/v1/jobs", headers=admin_headers).json()] == [admins_job]
 
 
-def test_lists_jobs_by_status(client: TestClient, kid: tuple[dict[str, str], int]) -> None:
-    headers, kid_id = kid
+def test_lists_jobs_by_status(client: TestClient, restricted_user: tuple[dict[str, str], int]) -> None:
+    headers, restricted_user_id = restricted_user
     client.app.state.jobs.register(TEST_KIND, count_items)
-    done = client.app.state.jobs.submit(TEST_KIND, {"items": 1}, kid_id).id
+    done = client.app.state.jobs.submit(TEST_KIND, {"items": 1}, restricted_user_id).id
     wait_for_job(client, headers, done)
 
     def listed(status: str) -> list[int]:
@@ -97,14 +97,14 @@ def test_lists_jobs_by_status(client: TestClient, kid: tuple[dict[str, str], int
     assert client.get("/api/v1/jobs", params={"status": "paused"}, headers=headers).status_code == 422
 
 
-def test_admin_removes_the_finished_jobs(client: TestClient, kid: tuple[dict[str, str], int]) -> None:
-    kid_headers, kid_id = kid
-    admin_headers, _admin_id = log_in(client, "apo", Role.ADMIN)
+def test_admin_removes_the_finished_jobs(client: TestClient, restricted_user: tuple[dict[str, str], int]) -> None:
+    restricted_user_headers, restricted_user_id = restricted_user
+    admin_headers, _admin_id = log_in(client, "admin_user", Role.ADMIN)
     client.app.state.jobs.register(TEST_KIND, count_items)
-    finished = client.app.state.jobs.submit(TEST_KIND, {"items": 1}, kid_id).id
-    wait_for_job(client, kid_headers, finished)
+    finished = client.app.state.jobs.submit(TEST_KIND, {"items": 1}, restricted_user_id).id
+    wait_for_job(client, restricted_user_headers, finished)
 
-    assert client.delete("/api/v1/jobs", headers=kid_headers).status_code == 403
+    assert client.delete("/api/v1/jobs", headers=restricted_user_headers).status_code == 403
     response = client.delete("/api/v1/jobs", headers=admin_headers)
 
     assert response.json() == {"removed": 1}
@@ -128,7 +128,7 @@ def importing_client(config: Config, import_dir: Path) -> Iterator[TestClient]:
 
 
 def test_admin_imports_a_folder(importing_client: TestClient) -> None:
-    headers, _admin_id = log_in(importing_client, "apo", Role.ADMIN)
+    headers, _admin_id = log_in(importing_client, "admin_user", Role.ADMIN)
     body = {"source_subdir": "trip", "tags": ["album:trip"]}
 
     response = importing_client.post("/api/v1/admin/import-jobs", json=body, headers=headers)
@@ -143,7 +143,7 @@ def test_admin_imports_a_folder(importing_client: TestClient) -> None:
 
 
 def test_only_admins_import_folders(importing_client: TestClient) -> None:
-    headers, _kid_id = log_in(importing_client, "kid", Role.USER)
+    headers, _restricted_user_id = log_in(importing_client, "restricted_user", Role.USER)
 
     response = importing_client.post("/api/v1/admin/import-jobs", json={"source_subdir": "trip"}, headers=headers)
 
@@ -151,7 +151,7 @@ def test_only_admins_import_folders(importing_client: TestClient) -> None:
 
 
 def test_path_outside_the_import_folder_is_refused(importing_client: TestClient) -> None:
-    headers, _admin_id = log_in(importing_client, "apo", Role.ADMIN)
+    headers, _admin_id = log_in(importing_client, "admin_user", Role.ADMIN)
 
     response = importing_client.post("/api/v1/admin/import-jobs", json={"source_subdir": ".."}, headers=headers)
 
@@ -160,7 +160,7 @@ def test_path_outside_the_import_folder_is_refused(importing_client: TestClient)
 
 
 def test_folder_imports_are_off_without_an_import_folder(client: TestClient) -> None:
-    headers, _admin_id = log_in(client, "apo", Role.ADMIN)
+    headers, _admin_id = log_in(client, "admin_user", Role.ADMIN)
 
     response = client.post("/api/v1/admin/import-jobs", json={"source_subdir": ""}, headers=headers)
 

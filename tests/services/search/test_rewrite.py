@@ -7,18 +7,18 @@ from photobook_db.services.search import parse_query, renamed_in_term, term_text
 from photobook_db.services.tags import TagName
 
 NAMESPACES = {"general", "category", "author", "rating", "character"}
-NSFW = TagName("rating", "nsfw")
+PRIVATE = TagName("rating", "private")
 
 
 @pytest.mark.parametrize(
     "term",
     [
-        "rating:nsfw",
-        "rating:nsfw|questionable",
-        "category:photo,rating:nsfw",
-        "category:(photo|artwork),-rating:nsfw",
+        "rating:private",
+        "rating:private|restricted",
+        "category:photo,rating:private",
+        "category:(photo|artwork),-rating:private",
         "(category:photo,author:anon)|category:artwork",
-        "general:beach|-(rating:nsfw|questionable)",
+        "general:beach|-(rating:private|restricted)",
         "(category:photo|category:artwork)|general:beach",
         "character:*",
         "author:an*",
@@ -35,35 +35,37 @@ def test_text_parses_back_to_the_same_term(term: str) -> None:
 @pytest.mark.parametrize(
     "term, renamed",
     [
-        ("rating:nsfw", "rating:explicit"),
-        ("rating:nsfw|questionable", "rating:explicit|rating:questionable"),
-        ("rating:explicit|nsfw", "rating:explicit"),  # the two became one
-        ("category:photo,-rating:nsfw", "category:photo,-rating:explicit"),
-        ("rating:sfw|questionable", "rating:sfw|questionable"),  # not named: kept as written
+        ("rating:private", "rating:explicit"),
+        ("rating:private|restricted", "rating:explicit|rating:restricted"),
+        ("rating:explicit|private", "rating:explicit"),  # the two became one
+        ("category:photo,-rating:private", "category:photo,-rating:explicit"),
+        ("rating:public|restricted", "rating:public|restricted"),  # not named: kept as written
         ("rating:ns*", "rating:ns*"),  # a pattern, not the tag
     ],
 )
 def test_rename_replaces_the_tag(term: str, renamed: str) -> None:
-    assert renamed_in_term(term, NSFW, TagName("rating", "explicit"), NAMESPACES) == renamed
+    assert renamed_in_term(term, PRIVATE, TagName("rating", "explicit"), NAMESPACES) == renamed
 
 
 def test_rename_can_change_the_namespace() -> None:
-    assert renamed_in_term("general:nude|rating:nsfw", TagName("general", "nude"), NSFW, NAMESPACES) == "rating:nsfw"
+    assert renamed_in_term(
+        "general:nude|rating:private", TagName("general", "nude"), PRIVATE, NAMESPACES
+    ) == "rating:private"
 
 
 @pytest.mark.parametrize(
     "term, remaining",
     [
-        ("rating:nsfw", None),
-        ("rating:nsfw|questionable", "rating:questionable"),
-        ("rating:(nsfw|questionable),category:photo", "rating:questionable,category:photo"),
-        ("category:photo,rating:nsfw", None),
-        ("category:photo,-rating:nsfw", None),
-        ("general:beach|-rating:nsfw", "general:beach"),
-        ("rating:nsfw|-general:beach", "(-general:beach)"),  # no leading '-': stored terms refuse it
+        ("rating:private", None),
+        ("rating:private|restricted", "rating:restricted"),
+        ("rating:(private|restricted),category:photo", "rating:restricted,category:photo"),
+        ("category:photo,rating:private", None),
+        ("category:photo,-rating:private", None),
+        ("general:beach|-rating:private", "general:beach"),
+        ("rating:private|-general:beach", "(-general:beach)"),  # no leading '-': stored terms refuse it
         ("character:*", "character:*"),
-        ("rating:sfw", "rating:sfw"),
+        ("rating:public", "rating:public"),
     ],
 )
 def test_delete_drops_the_tag_from_an_or_and_otherwise_the_term(term: str, remaining: str | None) -> None:
-    assert without_tag_in_term(term, NSFW, NAMESPACES) == remaining
+    assert without_tag_in_term(term, PRIVATE, NAMESPACES) == remaining

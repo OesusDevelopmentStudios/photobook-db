@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""What a user with restricted tags can see and do. An admin uploads a safe and an nsfw image; the user
-"kid" is restricted from rating:nsfw."""
+"""What a user with restricted tags can see and do. An admin uploads a safe and an private image; the user
+"restricted_user" is restricted from rating:private."""
 
 import io
 import json
@@ -23,11 +23,11 @@ PASSWORD = "correct horse battery"
 @dataclass
 class Setup:
     admin: dict[str, str]  # request headers
-    kid: dict[str, str]
-    kid_id: int
+    restricted_user: dict[str, str]
+    restricted_user_id: int
     safe_id: int
-    nsfw_id: int
-    nsfw_bytes: bytes
+    private_id: int
+    private_bytes: bytes
 
 
 def jpeg(colour: str) -> bytes:
@@ -51,13 +51,13 @@ def log_in(client: TestClient, username: str, role: Role) -> tuple[dict[str, str
 
 @pytest.fixture
 def setup(client: TestClient) -> Setup:
-    admin, _admin_id = log_in(client, "apo", Role.ADMIN)
-    kid, kid_id = log_in(client, "kid", Role.USER)
-    client.app.state.access.set_restricted_terms(kid_id, ["rating:nsfw"])
-    nsfw_bytes = jpeg("red")
-    safe_id = upload(client, admin, jpeg("green"), ["rating:sfw", "summer"]).json()["id"]
-    nsfw_id = upload(client, admin, nsfw_bytes, ["rating:nsfw", "summer"]).json()["id"]
-    return Setup(admin, kid, kid_id, safe_id, nsfw_id, nsfw_bytes)
+    admin, _admin_id = log_in(client, "admin_user", Role.ADMIN)
+    restricted_user, restricted_user_id = log_in(client, "restricted_user", Role.USER)
+    client.app.state.access.set_restricted_terms(restricted_user_id, ["rating:private"])
+    private_bytes = jpeg("red")
+    safe_id = upload(client, admin, jpeg("green"), ["rating:public", "summer"]).json()["id"]
+    private_id = upload(client, admin, private_bytes, ["rating:private", "summer"]).json()["id"]
+    return Setup(admin, restricted_user, restricted_user_id, safe_id, private_id, private_bytes)
 
 
 def found(client: TestClient, headers: dict[str, str], params: dict[str, object]) -> tuple[set[int], str]:
@@ -73,25 +73,25 @@ def tags_of(client: TestClient, setup: Setup, image_id: int) -> list[str]:
 
 @pytest.mark.parametrize(
     "params",
-    [{}, {"q": "rating:nsfw"}, {"q": "summer", "apply_hidden_filters": False}],
+    [{}, {"q": "rating:private"}, {"q": "summer", "apply_hidden_filters": False}],
     ids=["everything", "searching for the restricted tag", "without hidden filters"],
 )
 def test_search_never_shows_restricted_images(client: TestClient, setup: Setup, params: dict[str, object]) -> None:
-    images, effective_query = found(client, setup.kid, params)
+    images, effective_query = found(client, setup.restricted_user, params)
 
-    assert setup.nsfw_id not in images
-    assert effective_query == params.get("q", "")  # kid has no hidden filters; restrictions are never shown
+    assert setup.private_id not in images
+    assert effective_query == params.get("q", "")  # restricted_user has no hidden filters; restrictions are never shown
 
 
 def test_admin_sees_everything(client: TestClient, setup: Setup) -> None:
-    assert found(client, setup.admin, {})[0] == {setup.safe_id, setup.nsfw_id}
+    assert found(client, setup.admin, {})[0] == {setup.safe_id, setup.private_id}
 
 
 @pytest.mark.parametrize("suffix", ["", "/file", "/thumbnail"])
 def test_restricted_image_does_not_exist_for_the_user(client: TestClient, setup: Setup, suffix: str) -> None:
-    assert client.get(f"/api/v1/images/{setup.nsfw_id}{suffix}", headers=setup.kid).status_code == 404
-    assert client.get(f"/api/v1/images/{setup.nsfw_id}{suffix}", headers=setup.admin).status_code == 200
-    assert client.get(f"/api/v1/images/{setup.safe_id}{suffix}", headers=setup.kid).status_code == 200
+    assert client.get(f"/api/v1/images/{setup.private_id}{suffix}", headers=setup.restricted_user).status_code == 404
+    assert client.get(f"/api/v1/images/{setup.private_id}{suffix}", headers=setup.admin).status_code == 200
+    assert client.get(f"/api/v1/images/{setup.safe_id}{suffix}", headers=setup.restricted_user).status_code == 200
 
 
 def test_restricted_tags_are_never_suggested(client: TestClient, setup: Setup) -> None:
@@ -99,29 +99,29 @@ def test_restricted_tags_are_never_suggested(client: TestClient, setup: Setup) -
         response = client.get("/api/v1/tags", params={"prefix": "rating:"}, headers=headers)
         return [item["tag"] for item in response.json()["items"]]
 
-    assert suggestions(setup.kid) == ["rating:sfw"]
-    assert set(suggestions(setup.admin)) == {"rating:nsfw", "rating:sfw"}
+    assert suggestions(setup.restricted_user) == ["rating:public"]
+    assert set(suggestions(setup.admin)) == {"rating:private", "rating:public"}
 
 
 def test_lifting_a_restriction_applies_at_once(client: TestClient, setup: Setup) -> None:
-    client.patch(f"/api/v1/admin/users/{setup.kid_id}", json={"restricted_tags": []}, headers=setup.admin)
+    client.patch(f"/api/v1/admin/users/{setup.restricted_user_id}", json={"restricted_tags": []}, headers=setup.admin)
 
-    assert setup.nsfw_id in found(client, setup.kid, {"apply_hidden_filters": False})[0]
+    assert setup.private_id in found(client, setup.restricted_user, {"apply_hidden_filters": False})[0]
 
 
 # --- Uploading and tagging
 
 def test_upload_with_a_restricted_tag_is_refused(client: TestClient, setup: Setup, config: Config) -> None:
-    response = upload(client, setup.kid, jpeg("blue"), ["rating:nsfw"])
+    response = upload(client, setup.restricted_user, jpeg("blue"), ["rating:private"])
 
     assert response.status_code == 403
-    assert (response.json()["code"], response.json()["tags"]) == ("tag_restricted", ["rating:nsfw"])
+    assert (response.json()["code"], response.json()["tags"]) == ("tag_restricted", ["rating:private"])
     assert os.listdir(config.library_dir / ".incoming") == []
     assert len(found(client, setup.admin, {})[0]) == 2  # nothing was stored
 
 
 def test_duplicate_of_a_restricted_image_does_not_say_which(client: TestClient, setup: Setup) -> None:
-    response = upload(client, setup.kid, setup.nsfw_bytes, ["summer"])
+    response = upload(client, setup.restricted_user, setup.private_bytes, ["summer"])
 
     assert response.status_code == 409
     assert "existing_image_id" not in response.json()
@@ -129,23 +129,27 @@ def test_duplicate_of_a_restricted_image_does_not_say_which(client: TestClient, 
 
 
 def test_adding_a_restricted_tag_is_refused(client: TestClient, setup: Setup) -> None:
-    response = client.patch(f"/api/v1/images/{setup.safe_id}", json={"add_tags": ["rating:nsfw"]}, headers=setup.kid)
+    response = client.patch(
+        f"/api/v1/images/{setup.safe_id}", json={"add_tags": ["rating:private"]}, headers=setup.restricted_user
+    )
 
     assert (response.status_code, response.json()["code"]) == (403, "tag_restricted")
-    assert "rating:sfw" in tags_of(client, setup, setup.safe_id)
+    assert "rating:public" in tags_of(client, setup, setup.safe_id)
 
 
 def test_restricted_image_cannot_be_tagged(client: TestClient, setup: Setup) -> None:
-    response = client.patch(f"/api/v1/images/{setup.nsfw_id}", json={"add_tags": ["beach"]}, headers=setup.kid)
+    response = client.patch(
+        f"/api/v1/images/{setup.private_id}", json={"add_tags": ["beach"]}, headers=setup.restricted_user
+    )
 
     assert response.status_code == 404
-    assert "general:beach" not in tags_of(client, setup, setup.nsfw_id)
+    assert "general:beach" not in tags_of(client, setup, setup.private_id)
 
 
 def test_bulk_change_with_a_restricted_image_changes_nothing(client: TestClient, setup: Setup) -> None:
-    body = {"image_ids": [setup.safe_id, setup.nsfw_id], "add_tags": ["album:trip"]}
+    body = {"image_ids": [setup.safe_id, setup.private_id], "add_tags": ["album:trip"]}
 
-    response = client.post("/api/v1/images/bulk-tags", json=body, headers=setup.kid)
+    response = client.post("/api/v1/images/bulk-tags", json=body, headers=setup.restricted_user)
 
     assert response.status_code == 404
     assert "album:trip" not in tags_of(client, setup, setup.safe_id)
@@ -156,44 +160,48 @@ def test_bulk_change_with_a_restricted_image_changes_nothing(client: TestClient,
 def expect_not_found(method: str, path: str) -> Callable[[TestClient, Setup], None]:
     def check(client: TestClient, setup: Setup) -> None:
         body = {"add_tags": ["beach"]} if method == "PATCH" else {"degrees": 90} if method == "POST" else None
-        response = client.request(method, path.format(image_id=setup.nsfw_id), json=body, headers=setup.kid)
+        response = client.request(
+            method, path.format(image_id=setup.private_id), json=body, headers=setup.restricted_user
+        )
         assert response.status_code == 404
 
     return check
 
 
 def check_search_excludes(client: TestClient, setup: Setup) -> None:
-    assert setup.nsfw_id not in found(client, setup.kid, {"q": "summer", "apply_hidden_filters": False})[0]
+    assert setup.private_id not in found(
+        client, setup.restricted_user, {"q": "summer", "apply_hidden_filters": False}
+    )[0]
 
 
 def check_count_excludes(client: TestClient, setup: Setup) -> None:
     params = {"q": "summer", "apply_hidden_filters": False}
-    assert client.get("/api/v1/images/count", params=params, headers=setup.kid).json()["count"] == 1
+    assert client.get("/api/v1/images/count", params=params, headers=setup.restricted_user).json()["count"] == 1
     assert client.get("/api/v1/images/count", params=params, headers=setup.admin).json()["count"] == 2
 
 
 def check_upload_refuses(client: TestClient, setup: Setup) -> None:
-    assert upload(client, setup.kid, jpeg("blue"), ["rating:nsfw"]).status_code == 403
-    duplicate = upload(client, setup.kid, setup.nsfw_bytes, [])
+    assert upload(client, setup.restricted_user, jpeg("blue"), ["rating:private"]).status_code == 403
+    duplicate = upload(client, setup.restricted_user, setup.private_bytes, [])
     assert duplicate.status_code == 409 and "existing_image_id" not in duplicate.json()
 
 
 def check_bulk_refuses(client: TestClient, setup: Setup) -> None:
-    body = {"image_ids": [setup.nsfw_id], "add_tags": ["beach"]}
-    assert client.post("/api/v1/images/bulk-tags", json=body, headers=setup.kid).status_code == 404
+    body = {"image_ids": [setup.private_id], "add_tags": ["beach"]}
+    assert client.post("/api/v1/images/bulk-tags", json=body, headers=setup.restricted_user).status_code == 404
 
 
 def check_autocomplete_hides(client: TestClient, setup: Setup) -> None:
-    response = client.get("/api/v1/tags", params={"prefix": "rating:"}, headers=setup.kid)
-    assert "rating:nsfw" not in [item["tag"] for item in response.json()["items"]]
+    response = client.get("/api/v1/tags", params={"prefix": "rating:"}, headers=setup.restricted_user)
+    assert "rating:private" not in [item["tag"] for item in response.json()["items"]]
 
 
 def expect_admins_only(method: str) -> Callable[[TestClient, Setup], None]:
     def check(client: TestClient, setup: Setup) -> None:
-        body = {"new_tag": "rating:sfw"} if method == "PATCH" else None
-        response = client.request(method, "/api/v1/tags/rating/nsfw", json=body, headers=setup.kid)
+        body = {"new_tag": "rating:public"} if method == "PATCH" else None
+        response = client.request(method, "/api/v1/tags/rating/private", json=body, headers=setup.restricted_user)
         assert response.status_code == 403
-        assert "rating:nsfw" in tags_of(client, setup, setup.nsfw_id)
+        assert "rating:private" in tags_of(client, setup, setup.private_id)
 
     return check
 

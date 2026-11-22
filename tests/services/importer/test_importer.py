@@ -108,7 +108,7 @@ def test_stores_the_image_where_its_tags_and_date_say(library: Library) -> None:
 
 def test_records_who_imported_the_image(library: Library) -> None:
     with library.database.session() as session:
-        user = User(username="kid", password_hash="x", role="user", created_at=IMPORT_TIME)
+        user = User(username="restricted_user", password_hash="x", role="user", created_at=IMPORT_TIME)
         session.add(user)
         session.commit()
         user_id = user.id
@@ -193,7 +193,7 @@ def test_refuses_a_duplicate_and_keeps_the_existing_image(library: Library) -> N
 
 
 def test_refuses_an_invalid_tag(library: Library) -> None:
-    metadata = UploadMetadata("a.jpg", tags=("rating:sfw", "a|b"))
+    metadata = UploadMetadata("a.jpg", tags=("rating:public", "a|b"))
 
     problem = refused(lambda: library.import_image(library.incoming_image(), metadata, user_id=None))
 

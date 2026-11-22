@@ -16,8 +16,10 @@ PASSWORD = "correct horse battery"
 
 @pytest.fixture
 def user_headers(client: TestClient) -> dict[str, str]:
-    client.app.state.auth.create_user("kid", PASSWORD, Role.USER)
-    response = client.post("/api/v1/auth/tokens", json={"username": "kid", "password": PASSWORD, "device_name": "t"})
+    client.app.state.auth.create_user("restricted_user", PASSWORD, Role.USER)
+    response = client.post(
+        "/api/v1/auth/tokens", json={"username": "restricted_user", "password": PASSWORD, "device_name": "t"}
+    )
     return {"Authorization": f"Bearer {response.json()['token']}"}
 
 
@@ -49,8 +51,10 @@ def test_limit_must_be_between_1_and_100(client: TestClient, user_headers: dict[
 
 @pytest.fixture
 def admin_headers(client: TestClient) -> dict[str, str]:
-    client.app.state.auth.create_user("apo", PASSWORD, Role.ADMIN)
-    response = client.post("/api/v1/auth/tokens", json={"username": "apo", "password": PASSWORD, "device_name": "t"})
+    client.app.state.auth.create_user("admin_user", PASSWORD, Role.ADMIN)
+    response = client.post(
+        "/api/v1/auth/tokens", json={"username": "admin_user", "password": PASSWORD, "device_name": "t"}
+    )
     return {"Authorization": f"Bearer {response.json()['token']}"}
 
 

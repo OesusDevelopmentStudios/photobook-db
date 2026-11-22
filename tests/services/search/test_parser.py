@@ -40,7 +40,7 @@ def parsed(text: str) -> All:
     [
         ("general:tag1,tag2,tag3", query(All(general("tag1", "tag2", "tag3")))),
         ("tag1,tag2,tag3", query(All(general("tag1", "tag2", "tag3")))),
-        ("rating:nsfw|sfw", query(AnyOf((tag("rating", "nsfw"), tag("rating", "sfw"))))),
+        ("rating:private|public", query(AnyOf((tag("rating", "private"), tag("rating", "public"))))),
         ("album:album_1,album_2", query(All((tag("album", "album_1"), tag("album", "album_2"))))),
         ("album:album_1|album_2", query(AnyOf((tag("album", "album_1"), tag("album", "album_2"))))),
         (
@@ -48,28 +48,28 @@ def parsed(text: str) -> All:
             query(AnyOf((All(general("tag_1", "tag_2")), All(general("tag_3", "tag_4"))))),
         ),
         (
-            "general:tag1,tag2,tag3 category:artwork rating:nsfw|sfw album:album_1,album_2",
+            "general:tag1,tag2,tag3 category:artwork rating:private|public album:album_1,album_2",
             query(
                 All(general("tag1", "tag2", "tag3")),
                 tag("category", "artwork"),
-                AnyOf((tag("rating", "nsfw"), tag("rating", "sfw"))),
+                AnyOf((tag("rating", "private"), tag("rating", "public"))),
                 All((tag("album", "album_1"), tag("album", "album_2"))),
             ),
         ),
         (
-            "(category:photo,rating:sfw)|(category:artwork,author:sample_artist)",
+            "(category:photo,rating:public)|(category:artwork,author:sample_artist)",
             query(
                 AnyOf((
-                    All((tag("category", "photo"), tag("rating", "sfw"))),
+                    All((tag("category", "photo"), tag("rating", "public"))),
                     All((tag("category", "artwork"), tag("author", "sample_artist"))),
                 ))
             ),
         ),
         ("category:artwork|author:x", query(AnyOf((tag("category", "artwork"), tag("author", "x"))))),
-        ("-rating:nsfw|questionable", query(Not(AnyOf((tag("rating", "nsfw"), tag("rating", "questionable")))))),
+        ("-rating:private|restricted", query(Not(AnyOf((tag("rating", "private"), tag("rating", "restricted")))))),
         (
-            "(category:photo,-rating:nsfw)|category:artwork",
-            query(AnyOf((All((tag("category", "photo"), Not(tag("rating", "nsfw")))), tag("category", "artwork")))),
+            "(category:photo,-rating:private)|category:artwork",
+            query(AnyOf((All((tag("category", "photo"), Not(tag("rating", "private")))), tag("category", "artwork")))),
         ),
         ("author:first*,second*", query(All((starting("author", "first"), starting("author", "second"))))),
         (

@@ -41,8 +41,8 @@ class Library:
         self.jobs.register(JobKind.RELAYOUT, relayout.run)
         self.tag_admin = TagAdmin(self.tags, self.images, self.access, self.preferences, self.storage, relayout)
         auth = AuthService(database)
-        self.admin = auth.create_user("apo", "correct horse battery", Role.ADMIN)
-        self.kid = auth.create_user("kid", "correct horse battery", Role.USER)
+        self.admin = auth.create_user("admin_user", "correct horse battery", Role.ADMIN)
+        self.restricted_user = auth.create_user("restricted_user", "correct horse battery", Role.USER)
 
     def add_image(self, colour: str, tags: tuple[str, ...]) -> ImageRecord:
         """Taken in 2024, so its folder is <category>/<author>/2024."""
@@ -157,12 +157,12 @@ def test_unknown_tag_is_not_found(library: Library, new_tag: str) -> None:
 
 
 def test_invalid_new_tag_changes_nothing(library: Library) -> None:
-    image = library.add_image("red", ("rating:sfw",))
+    image = library.add_image("red", ("rating:public",))
 
-    problem = problem_of(lambda: library.rename("rating:sfw", "rating:safe"))  # not an allowed rating
+    problem = problem_of(lambda: library.rename("rating:public", "rating:safe"))  # not an allowed rating
 
     assert problem.code == "invalid_tag"
-    assert library.tags_of(image) == ["rating:sfw"]
+    assert library.tags_of(image) == ["rating:public"]
 
 
 # --- Deleting
@@ -190,34 +190,38 @@ def test_deleting_an_unknown_tag_is_not_found(library: Library) -> None:
 # --- Restrictions and hidden filters follow
 
 def test_restrictions_and_hidden_filters_follow_a_rename(library: Library) -> None:
-    library.tags.set_rating_values(["sfw", "nsfw", "explicit"])
-    library.access.set_restricted_terms(library.kid.id, ["rating:nsfw", "character:*"])
-    library.preferences.set_hidden_filters(library.kid.id, ["rating:nsfw|sfw", "beach"])
-    image = library.add_image("red", ("rating:nsfw",))
+    library.tags.set_rating_values(["public", "private", "explicit"])
+    library.access.set_restricted_terms(library.restricted_user.id, ["rating:private", "character:*"])
+    library.preferences.set_hidden_filters(library.restricted_user.id, ["rating:private|public", "beach"])
+    image = library.add_image("red", ("rating:private",))
 
-    library.rename("rating:nsfw", "rating:explicit")
+    library.rename("rating:private", "rating:explicit")
 
-    assert library.access.restricted_terms(library.kid.id) == ["character:*", "rating:explicit"]
-    assert library.preferences.hidden_filters(library.kid.id) == ["rating:explicit|rating:sfw", "beach"]
-    kid_restrictions = library.access.restrictions_for(library.kid)
-    assert not library.images.is_visible(image.id, kid_restrictions)  # still hidden from the kid
+    assert library.access.restricted_terms(library.restricted_user.id) == ["character:*", "rating:explicit"]
+    assert library.preferences.hidden_filters(library.restricted_user.id) == ["rating:explicit|rating:public", "beach"]
+    restricted_user_restrictions = library.access.restrictions_for(library.restricted_user)
+    assert not library.images.is_visible(
+        image.id, restricted_user_restrictions
+    )  # still hidden from the restricted_user
 
 
 def test_restrictions_and_hidden_filters_lose_a_deleted_tag(library: Library) -> None:
-    library.access.set_restricted_terms(library.kid.id, ["rating:nsfw", "category:photo,rating:nsfw", "character:*"])
-    library.preferences.set_hidden_filters(library.kid.id, ["rating:nsfw|sfw"])
-    image = library.add_image("red", ("rating:nsfw",))
+    library.access.set_restricted_terms(
+        library.restricted_user.id, ["rating:private", "category:photo,rating:private", "character:*"]
+    )
+    library.preferences.set_hidden_filters(library.restricted_user.id, ["rating:private|public"])
+    image = library.add_image("red", ("rating:private",))
 
-    library.delete("rating:nsfw")
+    library.delete("rating:private")
 
-    assert library.access.restricted_terms(library.kid.id) == ["character:*"]
-    assert library.preferences.hidden_filters(library.kid.id) == ["rating:sfw"]
-    assert library.images.is_visible(image.id, library.access.restrictions_for(library.kid))  # expected
+    assert library.access.restricted_terms(library.restricted_user.id) == ["character:*"]
+    assert library.preferences.hidden_filters(library.restricted_user.id) == ["rating:public"]
+    assert library.images.is_visible(image.id, library.access.restrictions_for(library.restricted_user))  # expected
 
 
 def test_unknown_tag_leaves_the_lists_alone(library: Library) -> None:
-    library.access.set_restricted_terms(library.kid.id, ["rating:nsfw"])
+    library.access.set_restricted_terms(library.restricted_user.id, ["rating:private"])
 
-    problem_of(lambda: library.delete("rating:nsfw"))  # no image ever had it, so it does not exist
+    problem_of(lambda: library.delete("rating:private"))  # no image ever had it, so it does not exist
 
-    assert library.access.restricted_terms(library.kid.id) == ["rating:nsfw"]
+    assert library.access.restricted_terms(library.restricted_user.id) == ["rating:private"]

@@ -25,16 +25,16 @@ NAMESPACES = {"category", "author", "character", "rating", "album", "general"}
 # name → (tags, taken_at)
 LIBRARY = {
     "beach": (
-        ["category:photo", "rating:sfw", "general:summer", "general:on_the_beach", "album:vacation_2024"],
+        ["category:photo", "rating:public", "general:summer", "general:on_the_beach", "album:vacation_2024"],
         datetime(2024, 7, 14, 16, 2),
     ),
-    "sunset_art": (["category:artwork", "author:sample_artist", "rating:nsfw"], datetime(2025, 1, 10, 9, 0)),
+    "sunset_art": (["category:artwork", "author:sample_artist", "rating:private"], datetime(2025, 1, 10, 9, 0)),
     "duo": (
-        ["category:artwork", "author:first_artist", "author:second_artist", "rating:questionable"],
+        ["category:artwork", "author:first_artist", "author:second_artist", "rating:restricted"],
         datetime(2025, 6, 30, 23, 59),
     ),
     "family": (
-        ["category:photo", "rating:sfw", "character:hero", "album:vacation_2025"],
+        ["category:photo", "rating:public", "character:hero", "album:vacation_2025"],
         datetime(2025, 7, 1, 0, 0),
     ),
     "untagged": ([], datetime(2023, 3, 3, 3, 3)),
@@ -97,14 +97,14 @@ def found(database: Database, query: str, hidden_filters: list[str] | None = Non
         ("category:artwork", {"sunset_art", "duo"}),
         ("summer,on_the_beach", {"beach"}),
         ("summer,hero", set()),
-        ("rating:nsfw|questionable", {"sunset_art", "duo"}),
-        ("-rating:nsfw|questionable", {"beach", "family", "untagged"}),  # untagged images are not excluded
+        ("rating:private|restricted", {"sunset_art", "duo"}),
+        ("-rating:private|restricted", {"beach", "family", "untagged"}),  # untagged images are not excluded
         ("category:photo -album:vacation_2024", {"family"}),
         ("album:vacation*", {"beach", "family"}),
         ("author:first*,second*", {"duo"}),
         ("character:*", {"family"}),
-        ("(category:photo,rating:sfw)|(category:artwork,author:sample_artist)", {"beach", "family", "sunset_art"}),
-        ("(category:photo,-rating:sfw)|category:artwork", {"sunset_art", "duo"}),
+        ("(category:photo,rating:public)|(category:artwork,author:sample_artist)", {"beach", "family", "sunset_art"}),
+        ("(category:photo,-rating:public)|category:artwork", {"sunset_art", "duo"}),
         ("year:2025", {"sunset_art", "duo", "family"}),
         ("year:2024|2023", {"beach", "untagged"}),
         ("month:2025-07", {"family"}),
@@ -123,17 +123,17 @@ def effective_query(query: str, hidden_filters: list[str]) -> str:
 
 
 def test_hidden_filter_hides_images_from_the_default_view(library: Database) -> None:
-    assert found(library, "", ["rating:nsfw"]) == {"beach", "duo", "family", "untagged"}
-    assert effective_query("", ["rating:nsfw"]) == "-rating:nsfw"
+    assert found(library, "", ["rating:private"]) == {"beach", "duo", "family", "untagged"}
+    assert effective_query("", ["rating:private"]) == "-rating:private"
 
 
 def test_searching_for_a_hidden_tag_shows_it(library: Database) -> None:
-    assert found(library, "rating:nsfw", ["rating:nsfw"]) == {"sunset_art"}
-    assert effective_query("rating:nsfw", ["rating:nsfw"]) == "rating:nsfw"
+    assert found(library, "rating:private", ["rating:private"]) == {"sunset_art"}
+    assert effective_query("rating:private", ["rating:private"]) == "rating:private"
 
 
 def test_mentioning_the_tag_negatively_also_skips_the_filter() -> None:
-    assert effective_query("-rating:nsfw", ["rating:nsfw"]) == "-rating:nsfw"
+    assert effective_query("-rating:private", ["rating:private"]) == "-rating:private"
 
 
 def test_filter_and_query_overlap_through_wildcards() -> None:
@@ -142,21 +142,21 @@ def test_filter_and_query_overlap_through_wildcards() -> None:
 
 
 def test_filter_with_several_tags_is_added_as_one_term(library: Database) -> None:
-    hidden_filters = ["rating:nsfw|questionable"]
+    hidden_filters = ["rating:private|restricted"]
 
     assert found(library, "category:artwork", hidden_filters) == set()
-    assert effective_query("category:artwork", hidden_filters) == "category:artwork -rating:nsfw|questionable"
+    assert effective_query("category:artwork", hidden_filters) == "category:artwork -rating:private|restricted"
 
 
 def test_each_filter_is_checked_on_its_own() -> None:
-    assert effective_query("rating:nsfw", ["rating:nsfw", "category:refs"]) == "rating:nsfw -category:refs"
+    assert effective_query("rating:private", ["rating:private", "category:refs"]) == "rating:private -category:refs"
 
 
 def test_lists_the_tags_a_query_mentions() -> None:
-    tree = parse_query("-rating:nsfw|(album:a*,year:2025)", NAMESPACES)
+    tree = parse_query("-rating:private|(album:a*,year:2025)", NAMESPACES)
 
     assert mentioned_tags(tree) == [
-        TagMatch("rating", "nsfw"),
+        TagMatch("rating", "private"),
         TagMatch("album", "a", any_name_starting=True),
     ]
 
@@ -167,7 +167,7 @@ def test_lists_the_tags_a_query_mentions() -> None:
     "query",
     [
         "category:artwork",
-        "-rating:nsfw|questionable",
+        "-rating:private|restricted",
         "author:first*,second*",
         "character:*",
         "year:2025",

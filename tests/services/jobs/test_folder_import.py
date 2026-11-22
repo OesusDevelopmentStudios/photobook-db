@@ -36,7 +36,7 @@ class Server:
         self.jobs = JobsService(database)
         self.folder_import = FolderImport(self.jobs, importer, tags, import_dir)
         self.jobs.register(JobKind.FOLDER_IMPORT, self.folder_import.run)
-        self.admin = AuthService(database).create_user("apo", "correct horse battery", Role.ADMIN)
+        self.admin = AuthService(database).create_user("admin_user", "correct horse battery", Role.ADMIN)
 
     def import_folder(
         self, source_subdir: str, remove_originals: bool = False, tags: list[str] | None = None
