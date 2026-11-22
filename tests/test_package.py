@@ -19,12 +19,12 @@ def test_version_matches_pyproject() -> None:
     assert photobook_db.__version__ == pyproject()["project"]["version"]
 
 
-def test_installed_package_has_every_template() -> None:
-    """An editable install reads the source folder, so a template missing from package-data only fails in a
+def test_installed_package_has_every_template_and_static_file() -> None:
+    """An editable install reads the source folder, so a file missing from package-data only fails in a
     real install, e.g. the container image."""
     patterns = pyproject()["tool"]["setuptools"]["package-data"]["photobook_db.admin_web"]
     admin_web = PROJECT_DIR / "src" / "photobook_db" / "admin_web"
 
-    for template in (admin_web / "templates").iterdir():
-        relative = template.relative_to(admin_web).as_posix()
+    for file in [*(admin_web / "templates").iterdir(), *(admin_web / "static").iterdir()]:
+        relative = file.relative_to(admin_web).as_posix()
         assert any(fnmatch(relative, pattern) for pattern in patterns), f"{relative} is not installed"

@@ -41,7 +41,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "photobook_db.db" = ["migrations/script.py.mako"]  # template for new migrations
-"photobook_db.admin_web" = ["templates/*"]  # the pages, and the stylesheet they include
+"photobook_db.admin_web" = ["templates/*", "static/*"]  # the pages, the stylesheet they include, the icon
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
