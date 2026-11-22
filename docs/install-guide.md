@@ -1,4 +1,4 @@
-# A server on your own computer
+# Install guide
 
 This guide sets up photobook-db on the computer where you use the photobook desktop app, step by step. The
 server then runs in the background as a service of your user, never as root. For a server on a NAS or a
