@@ -42,11 +42,11 @@ def test_shows_the_settings_and_the_folders(admin_browser: TestClient) -> None:
 
 
 def test_saves_the_upload_limit_and_rating_values(admin_browser: TestClient) -> None:
-    response = save(admin_browser, max_upload_mib="50", rating_values="public\n\n Very Safe \n")
+    response = save(admin_browser, max_upload_mib="50", rating_values="public\n\n Members Only \n")
 
     assert (response.status_code, response.headers["location"]) == (303, "/admin/settings?saved=true")
     settings = server_settings(admin_browser).current()
-    assert (settings.max_upload_bytes, settings.rating_values) == (50 * MIB, ["public", "very_safe"])
+    assert (settings.max_upload_bytes, settings.rating_values) == (50 * MIB, ["public", "members_only"])
     assert admin_browser.app.state.jobs.list_jobs(admin_browser.app.state.auth.list_users()[0]) == []
     assert "The settings have been saved." in admin_browser.get(response.headers["location"]).text
 

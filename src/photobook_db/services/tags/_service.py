@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 
 from sqlalchemy import exists, func, select
@@ -38,6 +38,7 @@ class TagCount:
 
 
 RATING_NAMESPACE = "rating"
+META_NAMESPACE = "meta"
 RATING_VALUES_SETTING = "rating_values"
 DEFAULT_RATING_VALUES = ("public", "private")
 MAX_RATING_VALUES = 20
@@ -60,6 +61,7 @@ class TagsService:
         one, because a later tag replaces an earlier one (category:photo, category:artwork → artwork).
         Ratings must be one of rating_values(): a typo must not slip past a restriction such as rating:private."""
         tags = [self.parse_tag(text) for text in texts]
+        self.check_user_editable(tags)
         self._check_ratings(tags, texts)
         single_value = {namespace.name for namespace in self.list_namespaces() if namespace.single_value}
         kept: list[TagName] = []
@@ -74,6 +76,19 @@ class TagsService:
             kept.append(tag)
 
         return kept[::-1]
+
+    def check_user_editable(self, tags: Collection[TagName]) -> None:
+        """Raises 422 tag_read_only for tags of a namespace that only the server tags with, e.g. meta."""
+        read_only = {namespace.name for namespace in self.list_namespaces() if not namespace.user_editable}
+        refused = [str(tag) for tag in tags if tag.namespace in read_only]
+        if refused:
+            raise Problem(
+                422,
+                "tag_read_only",
+                "Tag set by the server",
+                "The server sets these tags from the file itself; they cannot be added or removed.",
+                tags=refused,
+            )
 
     def rating_values(self) -> list[str]:
         stored_values = self._settings.get(RATING_VALUES_SETTING)

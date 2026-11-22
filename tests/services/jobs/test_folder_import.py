@@ -22,6 +22,8 @@ from photobook_db.services.tags import TagsService
 from photobook_db.services.thumbnails import ThumbnailsService
 from photobook_db.utils.problems import Problem
 
+from ...tag_lists import user_tags
+
 
 class Server:
     def __init__(self, database: Database, tmp_path: Path, import_dir: Path | None) -> None:
@@ -114,7 +116,7 @@ def test_imported_images_get_the_tags_and_the_admin(server: Server, trip: Path) 
     server.import_folder("trip/day 2", tags=["album:trip", "summer"])
 
     [record] = server.images.get_images([1])
-    assert [str(tag) for tag in record.tags] == ["album:trip", "general:summer"]
+    assert user_tags(record.tags) == ["album:trip", "general:summer"]
     assert (record.original_filename, record.imported_by_user_id) == ("hills.jpg", server.admin.id)
     assert record.taken_at_source == "file_mtime"
 

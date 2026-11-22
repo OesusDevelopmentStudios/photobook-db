@@ -114,9 +114,11 @@ class ImagesService:
     ) -> int:
         """The same change for several images, in one transaction: if anything fails, nothing changes. Files
         are moved after the commit. Images the user is restricted from count as unknown. Raises 404 not_found
-        without saying which id, 403 tag_restricted if an image would become restricted, or 422 invalid_tag."""
+        without saying which id, 403 tag_restricted if an image would become restricted, 422 invalid_tag, or
+        422 tag_read_only for a tag only the server sets."""
         additions = self._tags.resolve_tags(add_tags)
         removals = {self._tags.parse_tag(text) for text in remove_tags}
+        self._tags.check_user_editable(removals)
         unique_ids = list(dict.fromkeys(image_ids))
         with self._database.session() as session:
             images = session.scalars(

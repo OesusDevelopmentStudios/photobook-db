@@ -45,6 +45,7 @@ class ImageFacts:
     type: ImageType
     width: int  # as the image is shown, i.e. after the EXIF orientation
     height: int
+    animated: bool  # more than one frame, e.g. an animated GIF
     taken_at: datetime | None  # local wall-clock time from EXIF; None if the file does not say
     taken_at_utc_offset_minutes: int | None
 
@@ -61,6 +62,7 @@ def inspect_image(path: Path) -> ImageFacts:
             width, height = image.size
             _check_pixel_count(width * height, image_format)
             exif = image.getexif()
+            animated = getattr(image, "is_animated", False)  # only formats that can be animated have it
     except Image.DecompressionBombError:
         raise _too_large("The image is too large to process.") from None
     except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
@@ -70,7 +72,7 @@ def inspect_image(path: Path) -> ImageFacts:
         width, height = height, width
 
     taken_at, utc_offset_minutes = _capture_time(exif)
-    return ImageFacts(image_type, width, height, taken_at, utc_offset_minutes)
+    return ImageFacts(image_type, width, height, animated, taken_at, utc_offset_minutes)
 
 
 def file_sha256(path: Path) -> str:

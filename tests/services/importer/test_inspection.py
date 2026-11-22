@@ -118,6 +118,15 @@ def test_reads_width_and_height(tmp_path: Path) -> None:
     assert (facts.width, facts.height) == (40, 30)
 
 
+def test_tells_an_animated_picture_from_a_still_one(tmp_path: Path) -> None:
+    frames = [Image.new("RGB", (8, 8), colour) for colour in ("red", "green")]
+    frames[0].save(tmp_path / "moving.gif", format="GIF", save_all=True, append_images=frames[1:])
+
+    assert inspect_image(tmp_path / "moving.gif").animated
+    assert not inspect_image(write_image(tmp_path / "still.gif", "GIF")).animated
+    assert not inspect_image(write_image(tmp_path / "photo.jpg", "JPEG")).animated  # a format that cannot move
+
+
 @pytest.mark.parametrize(("orientation", "shown_size"), [(1, (40, 30)), (3, (40, 30)), (6, (30, 40)), (8, (30, 40))])
 def test_size_is_as_shown_after_the_exif_orientation(
     tmp_path: Path, orientation: int, shown_size: tuple[int, int]

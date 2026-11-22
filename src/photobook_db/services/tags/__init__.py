@@ -14,6 +14,7 @@ from photobook_db.services.tags._names import (
 from photobook_db.services.tags._service import (
     DEFAULT_RATING_VALUES,
     MAX_RATING_VALUES,
+    META_NAMESPACE,
     RATING_NAMESPACE,
     NamespaceInfo,
     TagCount,
@@ -24,6 +25,7 @@ __all__ = [
     "DEFAULT_RATING_VALUES",
     "GENERAL_NAMESPACE",
     "MAX_RATING_VALUES",
+    "META_NAMESPACE",
     "NamespaceInfo",
     "RATING_NAMESPACE",
     "RESERVED_NAMESPACE_NAMES",

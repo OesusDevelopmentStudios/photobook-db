@@ -18,6 +18,7 @@ class NamespaceDetails(BaseModel):
     single_value: bool = Field(description="An image has at most one tag in this namespace")
     is_builtin: bool = Field(description="Built-in namespaces cannot be deleted")
     in_path_template: bool = Field(description="Its tags form folder names in the library")
+    user_editable: bool = Field(description="False: the server alone sets its tags (meta); users cannot change them")
     allowed_values: list[str] | None = Field(
         description="The only names its tags may have, e.g. the rating values; null: any",
         examples=[["public", "private"]],
@@ -66,5 +67,6 @@ def _namespace_details(namespace: NamespaceInfo) -> NamespaceDetails:
         single_value=namespace.single_value,
         is_builtin=namespace.is_builtin,
         in_path_template=namespace.in_path_template,
+        user_editable=namespace.user_editable,
         allowed_values=None if namespace.allowed_values is None else list(namespace.allowed_values),
     )

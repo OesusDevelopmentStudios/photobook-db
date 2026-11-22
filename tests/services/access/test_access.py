@@ -101,7 +101,7 @@ def test_replaces_the_whole_list_sorted_and_without_repeats(access: AccessServic
 
 
 def test_terms_may_name_tags_that_do_not_exist_yet(access: AccessService, users: dict[str, UserInfo]) -> None:
-    assert access.set_restricted_terms(users["restricted_user"].id, ["rating:explicit"]) == ["rating:explicit"]
+    assert access.set_restricted_terms(users["restricted_user"].id, ["rating:secret"]) == ["rating:secret"]
 
 
 @pytest.mark.parametrize("term", ["two terms", "-rating:private", "(a"])

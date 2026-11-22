@@ -29,6 +29,12 @@ def add_tag(database: Database, namespace_name: str, tag_name: str) -> None:
         session.commit()
 
 
+def test_refuses_tags_only_the_server_sets(tags: TagsService) -> None:
+    problem = raised_problem(lambda: tags.resolve_tags(["summer", "Meta:Hi Res"]))
+
+    assert (problem.status, problem.code, problem.extra["tags"]) == (422, "tag_read_only", ["meta:hi_res"])
+
+
 # --- Namespaces
 
 def test_lists_the_builtin_namespaces(tags: TagsService) -> None:
@@ -139,16 +145,16 @@ def test_ratings_are_public_and_private_by_default(tags: TagsService) -> None:
 
 
 def test_rating_that_is_not_listed_is_refused(tags: TagsService) -> None:
-    problem = raised_problem(lambda: tags.resolve_tags(["summer", "rating:nsf"]))
+    problem = raised_problem(lambda: tags.resolve_tags(["summer", "rating:privat"]))
 
-    assert (problem.status, problem.code, problem.extra["tag"]) == (422, "invalid_tag", "rating:nsf")
+    assert (problem.status, problem.code, problem.extra["tag"]) == (422, "invalid_tag", "rating:privat")
     assert "public, private" in problem.detail
 
 
 def test_rating_values_are_normalised_and_kept_once(tags: TagsService) -> None:
-    assert tags.set_rating_values(["Safe", "Restricted", "safe", "Explicit"]) == ["safe", "restricted", "explicit"]
+    assert tags.set_rating_values(["Public", "Restricted", "public", "Secret"]) == ["public", "restricted", "secret"]
 
-    assert tags.rating_values() == ["safe", "restricted", "explicit"]
+    assert tags.rating_values() == ["public", "restricted", "secret"]
     assert tags.resolve_tags(["rating:restricted"]) == [TagName("rating", "restricted")]
 
 

@@ -43,9 +43,9 @@ def test_shows_the_defaults(server_settings: ServerSettings) -> None:
 
 
 def test_changes_the_given_settings_only(server_settings: ServerSettings) -> None:
-    settings, job = server_settings.change(SettingsChanges(max_upload_bytes=50_000_000, rating_values=["Safe"]), None)
+    settings, job = server_settings.change(SettingsChanges(max_upload_bytes=50_000_000, rating_values=["Public"]), None)
 
-    assert (settings.max_upload_bytes, settings.rating_values) == (50_000_000, ["safe"])
+    assert (settings.max_upload_bytes, settings.rating_values) == (50_000_000, ["public"])
     assert settings.path_template == DEFAULTS.path_template
     assert job is None
     assert server_settings.current() == settings
@@ -65,8 +65,8 @@ def test_same_path_template_moves_nothing(server_settings: ServerSettings) -> No
 @pytest.mark.parametrize(
     "changes",
     [
-        SettingsChanges(path_template="{nonsense}", max_upload_bytes=50_000_000, rating_values=["safe"]),
-        SettingsChanges(path_template="{year}", max_upload_bytes=1, rating_values=["safe"]),
+        SettingsChanges(path_template="{nonsense}", max_upload_bytes=50_000_000, rating_values=["public"]),
+        SettingsChanges(path_template="{year}", max_upload_bytes=1, rating_values=["public"]),
         SettingsChanges(path_template="{year}", max_upload_bytes=50_000_000, rating_values=[]),
         SettingsChanges(path_template="{year}", web_accent_color="blue"),
     ],

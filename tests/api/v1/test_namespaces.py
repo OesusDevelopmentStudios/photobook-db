@@ -41,8 +41,15 @@ def test_every_user_can_list_namespaces(client: TestClient, user_headers: dict[s
         "single_value": True,
         "is_builtin": True,
         "in_path_template": True,
+        "user_editable": True,
         "allowed_values": None,
     }
+
+
+def test_users_cannot_edit_the_meta_namespace(client: TestClient, user_headers: dict[str, str]) -> None:
+    items = client.get("/api/v1/namespaces", headers=user_headers).json()["items"]
+
+    assert [item["name"] for item in items if not item["user_editable"]] == ["meta"]
 
 
 def test_only_admins_create_namespaces(client: TestClient, user_headers: dict[str, str]) -> None:
@@ -60,6 +67,7 @@ def test_admin_creates_a_namespace(client: TestClient, admin_headers: dict[str, 
         "single_value": False,
         "is_builtin": False,
         "in_path_template": False,
+        "user_editable": True,
         "allowed_values": None,
     }
 
@@ -112,6 +120,6 @@ def test_ratings_list_their_allowed_values(
 
     assert rating_values() == ["public", "private"]
 
-    client.patch("/api/v1/admin/settings", json={"rating_values": ["safe", "explicit"]}, headers=admin_headers)
+    client.patch("/api/v1/admin/settings", json={"rating_values": ["public", "secret"]}, headers=admin_headers)
 
-    assert rating_values() == ["safe", "explicit"]
+    assert rating_values() == ["public", "secret"]

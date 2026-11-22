@@ -52,7 +52,7 @@ def test_invalid_filter_is_named(client: TestClient, headers: dict[str, str]) ->
 
 
 def test_search_hides_filtered_images_by_default(client: TestClient, headers: dict[str, str]) -> None:
-    safe = upload(client, headers, "green", ["rating:public"])
+    shown = upload(client, headers, "green", ["rating:public"])
     hidden = upload(client, headers, "red", ["rating:private"])
     client.put("/api/v1/preferences", json={"hidden_filters": ["rating:private"]}, headers=headers)
 
@@ -60,6 +60,6 @@ def test_search_hides_filtered_images_by_default(client: TestClient, headers: di
         body = client.get("/api/v1/images", params=params, headers=headers).json()
         return {item["id"] for item in body["items"]}, body["effective_query"]
 
-    assert found({}) == ({safe}, "-rating:private")
-    assert found({"apply_hidden_filters": False}) == ({safe, hidden}, "")
+    assert found({}) == ({shown}, "-rating:private")
+    assert found({"apply_hidden_filters": False}) == ({shown, hidden}, "")
     assert found({"q": "rating:private"}) == ({hidden}, "rating:private")

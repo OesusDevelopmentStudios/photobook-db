@@ -42,8 +42,10 @@ def post(browser: TestClient, path: str, **fields: str):  # -> Response
     return browser.post(path, data=form, follow_redirects=False)
 
 
-def listed(page: str) -> list[str]:
-    return re.findall(r"<code>([^<]+)</code></a></td>\s*<td>(\d+)</td>", page)
+def listed(page: str) -> list[tuple[str, str]]:
+    """The tags and their counts, without the meta tags every image has."""
+    found = re.findall(r"<code>([^<]+)</code></a></td>\s*<td>(\d+)</td>", page)
+    return [(tag, count) for tag, count in found if not tag.startswith("meta:")]
 
 
 def test_needs_a_login(client: TestClient) -> None:

@@ -35,16 +35,16 @@ def test_text_parses_back_to_the_same_term(term: str) -> None:
 @pytest.mark.parametrize(
     "term, renamed",
     [
-        ("rating:private", "rating:explicit"),
-        ("rating:private|restricted", "rating:explicit|rating:restricted"),
-        ("rating:explicit|private", "rating:explicit"),  # the two became one
-        ("category:photo,-rating:private", "category:photo,-rating:explicit"),
+        ("rating:private", "rating:secret"),
+        ("rating:private|restricted", "rating:secret|rating:restricted"),
+        ("rating:secret|private", "rating:secret"),  # the two became one
+        ("category:photo,-rating:private", "category:photo,-rating:secret"),
         ("rating:public|restricted", "rating:public|restricted"),  # not named: kept as written
-        ("rating:ns*", "rating:ns*"),  # a pattern, not the tag
+        ("rating:pu*", "rating:pu*"),  # a pattern, not the tag
     ],
 )
 def test_rename_replaces_the_tag(term: str, renamed: str) -> None:
-    assert renamed_in_term(term, PRIVATE, TagName("rating", "explicit"), NAMESPACES) == renamed
+    assert renamed_in_term(term, PRIVATE, TagName("rating", "secret"), NAMESPACES) == renamed
 
 
 def test_rename_can_change_the_namespace() -> None:

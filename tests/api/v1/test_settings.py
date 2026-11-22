@@ -15,6 +15,8 @@ from PIL import Image
 from photobook_db.config import Config
 from photobook_db.services.auth import Role
 
+from ...tag_lists import user_tags
+
 PASSWORD = "correct horse battery"
 
 
@@ -114,10 +116,10 @@ def test_changes_the_accent_colour_of_the_web_pages(client: TestClient, admin: d
 def test_ratings_follow_the_setting(client: TestClient, admin: dict[str, str]) -> None:
     image_id = upload(client, admin, ["rating:private"]).json()["id"]
 
-    client.patch("/api/v1/admin/settings", json={"rating_values": ["safe", "explicit"]}, headers=admin)
+    client.patch("/api/v1/admin/settings", json={"rating_values": ["public", "secret"]}, headers=admin)
 
     refused = upload(client, admin, ["rating:private"], colour="red")
     assert (refused.status_code, refused.json()["code"]) == (422, "invalid_tag")
-    assert client.get(f"/api/v1/images/{image_id}", headers=admin).json()["tags"] == ["rating:private"]  # kept
-    response = client.patch(f"/api/v1/images/{image_id}", json={"add_tags": ["rating:explicit"]}, headers=admin)
-    assert response.json()["tags"] == ["rating:explicit"]
+    assert user_tags(client.get(f"/api/v1/images/{image_id}", headers=admin).json()["tags"]) == ["rating:private"]
+    response = client.patch(f"/api/v1/images/{image_id}", json={"add_tags": ["rating:secret"]}, headers=admin)
+    assert user_tags(response.json()["tags"]) == ["rating:secret"]

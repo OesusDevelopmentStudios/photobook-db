@@ -23,6 +23,8 @@ from photobook_db.services.tags import TagsService
 from photobook_db.services.thumbnails import ThumbnailsService
 from photobook_db.utils.problems import Problem
 
+from ...tag_lists import user_tags
+
 IMPORT_TIME = datetime(2026, 11, 12, 9, 30)
 NO_RESTRICTIONS = Restrictions([])
 
@@ -102,7 +104,9 @@ def test_stores_the_image_where_its_tags_and_date_say(library: Library) -> None:
     assert not incoming.exists()
     assert (record.mime_type, record.width, record.height, record.file_size) == ("image/jpeg", 40, 30, file_size)
     assert (record.taken_at, record.taken_at_source) == (datetime(2024, 7, 14, 18, 30, 5), "exif")
-    assert [str(tag) for tag in record.tags] == ["author:sample_artist", "category:photo", "general:summer"]
+    assert [str(tag) for tag in record.tags] == [  # with the file's meta tags, which the server adds
+        "author:sample_artist", "category:photo", "general:summer", "meta:jpeg", "meta:low_res", "meta:still_image"
+    ]
     assert library.thumbnails.thumbnail_path(sha256, 256).exists()
 
 
@@ -137,7 +141,7 @@ def test_later_tag_replaces_earlier_one_in_single_value_namespace(library: Libra
 
     record = library.import_image(library.incoming_image(), metadata, user_id=None)
 
-    assert [str(tag) for tag in record.tags] == ["category:artwork"]
+    assert user_tags(record.tags) == ["category:artwork"]
     assert record.storage_path.startswith("artwork/")
 
 
@@ -189,7 +193,7 @@ def test_refuses_a_duplicate_and_keeps_the_existing_image(library: Library) -> N
     assert not again.exists()
     assert library.library_files() == [first.storage_path]
     assert library.thumbnails.thumbnail_path(first.sha256, 256).exists()
-    assert library.images.get_image(first.id).tags == []
+    assert user_tags(library.images.get_image(first.id).tags) == []
 
 
 def test_refuses_an_invalid_tag(library: Library) -> None:

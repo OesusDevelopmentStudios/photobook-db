@@ -3102,6 +3102,11 @@
             "title": "In Path Template",
             "description": "Its tags form folder names in the library"
           },
+          "user_editable": {
+            "type": "boolean",
+            "title": "User Editable",
+            "description": "False: the server alone sets its tags (meta); users cannot change them"
+          },
           "allowed_values": {
             "anyOf": [
               {
@@ -3130,6 +3135,7 @@
           "single_value",
           "is_builtin",
           "in_path_template",
+          "user_editable",
           "allowed_values"
         ],
         "title": "NamespaceDetails"

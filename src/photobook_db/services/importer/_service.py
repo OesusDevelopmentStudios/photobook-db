@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 from photobook_db.services.access import Restrictions
 from photobook_db.services.images import ImageRecord, ImagesService, NewImage, duplicate_image
 from photobook_db.services.importer._inspection import ImageFacts, file_sha256, inspect_image
+from photobook_db.services.meta_tags import meta_tags_for
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService, file_name
 from photobook_db.services.tags import TagName, TagsService
@@ -75,7 +76,7 @@ class ImporterService:
     ) -> ImageRecord:
         """Takes over `incoming`: it ends up in the library or is deleted. Raises 409 duplicate_image,
         403 tag_restricted, 415 unsupported_media_type, 422 checksum_mismatch or 422 invalid_tag; nothing is
-        stored then."""
+        stored then. The server adds the file's meta tags; meta tags in the metadata raise 422 tag_read_only."""
         sha256, tags, facts, taken_at = self._checked_upload(incoming, metadata, restrictions)
         library_path = self._storage.path_for(
             tags, taken_at.time, file_name(metadata.original_filename, sha256, facts.type.extension)
@@ -115,8 +116,9 @@ class ImporterService:
             sha256 = file_sha256(incoming)
             _check_client_sha256(metadata.client_sha256, sha256)
             self._check_not_duplicate(sha256, restrictions)
-            tags = self._tags.resolve_tags(list(metadata.tags))
             facts = inspect_image(incoming)
+            tags = self._tags.resolve_tags(list(metadata.tags))
+            tags += meta_tags_for(facts.type.mime_type, facts.width, facts.height, facts.animated)
             taken_at = self._taken_at(metadata, facts)
             restrictions.check_tags_allowed(tags, taken_at.time)
         except Exception:

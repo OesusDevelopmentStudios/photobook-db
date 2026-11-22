@@ -11,6 +11,8 @@ from PIL import Image
 
 from photobook_db.services.auth import Role
 
+from ...tag_lists import user_tags
+
 PASSWORD = "correct horse battery"
 
 
@@ -79,7 +81,7 @@ def test_admin_renames_a_folder_tag(client: TestClient, admin_headers: dict[str,
         time.sleep(0.01)
 
     image = client.get(f"/api/v1/images/{image_id}", headers=admin_headers).json()
-    assert image["tags"] == ["author:anon_two"]
+    assert user_tags(image["tags"]) == ["author:anon_two"]
     assert "/anon_two/" in image["storage_path"]
 
 
@@ -89,7 +91,9 @@ def test_admin_deletes_a_tag(client: TestClient, admin_headers: dict[str, str]) 
     response = client.delete("/api/v1/tags/general/summer", headers=admin_headers)
 
     assert response.json() == {"job_id": None}
-    assert client.get(f"/api/v1/images/{image_id}", headers=admin_headers).json()["tags"] == ["general:beach"]
+    assert user_tags(client.get(f"/api/v1/images/{image_id}", headers=admin_headers).json()["tags"]) == [
+        "general:beach"
+    ]
 
 
 def test_unknown_tag_is_not_found(client: TestClient, admin_headers: dict[str, str]) -> None:

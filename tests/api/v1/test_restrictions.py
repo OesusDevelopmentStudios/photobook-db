@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""What a user with restricted tags can see and do. An admin uploads a safe and an private image; the user
+"""What a user with restricted tags can see and do. An admin uploads a public and a private image; the user
 "restricted_user" is restricted from rating:private."""
 
 import io

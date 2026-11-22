@@ -19,6 +19,8 @@ from photobook_db.services.tags import TagsService
 from photobook_db.services.thumbnails import ThumbnailsService
 from photobook_db.utils.problems import Problem
 
+from ...tag_lists import user_tags
+
 NO_RESTRICTIONS = Restrictions([])
 
 
@@ -62,7 +64,7 @@ def library(database: Database, tmp_path: Path) -> Library:
 
 
 def tag_texts(record: ImageRecord) -> list[str]:
-    return [str(tag) for tag in record.tags]
+    return user_tags(record.tags)
 
 
 def problem_of(action: object) -> Problem:
@@ -82,6 +84,17 @@ def test_adds_and_removes_tags(library: Library) -> None:
 
     assert tag_texts(changed) == ["author:sample_artist", "category:photo", "general:summer", "general:sunset_sky"]
     assert changed.updated_at >= image.updated_at
+
+
+@pytest.mark.parametrize("change", [{"add_tags": ["meta:video"]}, {"remove_tags": ["meta:jpeg"]}])
+def test_meta_tags_are_neither_added_nor_removed(library: Library, change: dict[str, list[str]]) -> None:
+    image = library.add_image("red", ("summer",))
+    before = [str(tag) for tag in library.images.get_image(image.id).tags]
+
+    problem = problem_of(lambda: library.change_tags(image.id, **({"add_tags": [], "remove_tags": []} | change)))
+
+    assert (problem.status, problem.code) == (422, "tag_read_only")
+    assert [str(tag) for tag in library.images.get_image(image.id).tags] == before
 
 
 def test_removing_a_tag_the_image_lacks_changes_nothing(library: Library) -> None:

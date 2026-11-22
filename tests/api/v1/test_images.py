@@ -20,6 +20,8 @@ from photobook_db.services.access import Restrictions
 from photobook_db.utils.exif_orientation import read_orientation
 from photobook_db.services.auth import Role
 
+from ...tag_lists import user_tags
+
 PASSWORD = "correct horse battery"
 
 
@@ -93,13 +95,32 @@ def test_upload_returns_the_image_object(client: TestClient, headers: dict[str, 
     assert image["sha256"] == hashlib.sha256(content).hexdigest()
     assert (image["mime_type"], image["width"], image["height"]) == ("image/jpeg", 40, 30)
     assert (image["taken_at"], image["taken_at_source"]) == ("2018-07-14T16:02:11", "file_mtime")
-    assert image["tags"] == ["category:photo", "general:summer"]
+    assert user_tags(image["tags"]) == ["category:photo", "general:summer"]
     assert image["imported_at"].endswith("Z")
     assert image["links"] == {
         "self": f"/api/v1/images/{image['id']}",
         "file": f"/api/v1/images/{image['id']}/file",
         "thumbnail": f"/api/v1/images/{image['id']}/thumbnail",
     }
+
+
+def test_upload_gets_its_meta_tags_from_the_server(client: TestClient, headers: dict[str, str]) -> None:
+    response = upload(client, headers, jpeg_bytes(size=(1600, 1200)))
+
+    assert [tag for tag in response.json()["tags"] if tag.startswith("meta:")] == [
+        "meta:hi_res", "meta:jpeg", "meta:still_image"
+    ]
+
+
+def test_upload_with_a_meta_tag_is_refused(client: TestClient, headers: dict[str, str], config: Config) -> None:
+    metadata = {"original_filename": "beach.jpg", "tags": ["meta:video"]}
+
+    response = upload(client, headers, jpeg_bytes(), metadata)
+
+    assert (response.status_code, response.json()["code"], response.json()["tags"]) == (
+        422, "tag_read_only", ["meta:video"]
+    )
+    assert incoming_files(config) == []
 
 
 def test_upload_needs_a_login(client: TestClient) -> None:
@@ -424,7 +445,7 @@ def test_search_returns_image_objects(client: TestClient, headers: dict[str, str
     assert response.status_code == 200
     body = response.json()
     assert [item["id"] for item in body["items"]] == [uploaded["id"]]
-    assert body["items"][0]["tags"] == ["category:photo", "general:summer"]
+    assert user_tags(body["items"][0]["tags"]) == ["category:photo", "general:summer"]
     assert body["next_cursor"] is None
     assert body["effective_query"] == "category:photo summer"
 
@@ -488,7 +509,7 @@ def test_patch_adds_and_removes_tags(client: TestClient, headers: dict[str, str]
     )
 
     assert response.status_code == 200
-    assert response.json()["tags"] == ["category:photo", "general:sunset"]
+    assert user_tags(response.json()["tags"]) == ["category:photo", "general:sunset"]
 
 
 def test_patch_moves_the_file_with_a_folder_forming_tag(
@@ -508,6 +529,8 @@ def test_patch_moves_the_file_with_a_folder_forming_tag(
     [
         (None, {"add_tags": ["a|b"]}, 422, "invalid_tag"),
         (999, {"add_tags": ["summer"]}, 404, "not_found"),
+        (None, {"add_tags": ["meta:video"]}, 422, "tag_read_only"),
+        (None, {"remove_tags": ["meta:jpeg"]}, 422, "tag_read_only"),
     ],
 )
 def test_patch_refusals(
@@ -527,7 +550,15 @@ def test_bulk_changes_every_image(client: TestClient, headers: dict[str, str]) -
 
     assert response.json() == {"updated": 2}
     for image_id in ids:
-        assert client.get(f"/api/v1/images/{image_id}", headers=headers).json()["tags"] == ["album:trip"]
+        assert user_tags(client.get(f"/api/v1/images/{image_id}", headers=headers).json()["tags"]) == ["album:trip"]
+
+
+def test_bulk_refuses_meta_tags(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
+    body = {"image_ids": [uploaded["id"]], "add_tags": ["meta:video"]}
+
+    response = client.post("/api/v1/images/bulk-tags", json=body, headers=headers)
+
+    assert (response.status_code, response.json()["code"]) == (422, "tag_read_only")
 
 
 def test_bulk_with_an_unknown_id_changes_nothing(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:

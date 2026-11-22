@@ -24,6 +24,8 @@ from photobook_db.services.tags import TagName, TagsService
 from photobook_db.services.thumbnails import ThumbnailsService
 from photobook_db.utils.problems import Problem
 
+from ...tag_lists import user_tags
+
 
 class Library:
     def __init__(self, database: Database, tmp_path: Path) -> None:
@@ -59,7 +61,7 @@ class Library:
         return self.tag_admin.delete_tag(TagName(*tag.split(":")), self.admin.id)
 
     def tags_of(self, image: ImageRecord) -> list[str]:
-        return [str(tag) for tag in self.images.get_image(image.id).tags]
+        return user_tags(self.images.get_image(image.id).tags)
 
     def folder_of(self, image: ImageRecord) -> str:
         return str(PurePosixPath(self.images.get_image(image.id).storage_path).parent)
@@ -159,7 +161,7 @@ def test_unknown_tag_is_not_found(library: Library, new_tag: str) -> None:
 def test_invalid_new_tag_changes_nothing(library: Library) -> None:
     image = library.add_image("red", ("rating:public",))
 
-    problem = problem_of(lambda: library.rename("rating:public", "rating:safe"))  # not an allowed rating
+    problem = problem_of(lambda: library.rename("rating:public", "rating:secret"))  # not an allowed rating
 
     assert problem.code == "invalid_tag"
     assert library.tags_of(image) == ["rating:public"]
@@ -190,15 +192,15 @@ def test_deleting_an_unknown_tag_is_not_found(library: Library) -> None:
 # --- Restrictions and hidden filters follow
 
 def test_restrictions_and_hidden_filters_follow_a_rename(library: Library) -> None:
-    library.tags.set_rating_values(["public", "private", "explicit"])
+    library.tags.set_rating_values(["public", "private", "secret"])
     library.access.set_restricted_terms(library.restricted_user.id, ["rating:private", "character:*"])
     library.preferences.set_hidden_filters(library.restricted_user.id, ["rating:private|public", "beach"])
     image = library.add_image("red", ("rating:private",))
 
-    library.rename("rating:private", "rating:explicit")
+    library.rename("rating:private", "rating:secret")
 
-    assert library.access.restricted_terms(library.restricted_user.id) == ["character:*", "rating:explicit"]
-    assert library.preferences.hidden_filters(library.restricted_user.id) == ["rating:explicit|rating:public", "beach"]
+    assert library.access.restricted_terms(library.restricted_user.id) == ["character:*", "rating:secret"]
+    assert library.preferences.hidden_filters(library.restricted_user.id) == ["rating:secret|rating:public", "beach"]
     restricted_user_restrictions = library.access.restrictions_for(library.restricted_user)
     assert not library.images.is_visible(
         image.id, restricted_user_restrictions
