@@ -4,7 +4,7 @@
 #
 # Installs photobook-db on this computer: a Podman container that systemd runs as a service of your user,
 # never as root. It asks where things go, each with a default, writes the Quadlet unit, starts the server
-# and tells you how to create the admin account. docs/local-server.md does the same by hand.
+# and tells you how to create the admin account.
 #
 #   curl -fsSL https://github.com/OesusDevelopmentStudios/photobook-db/releases/latest/download/install.sh | sh
 #   curl -fsSL …/install.sh | sh -s -- --version 0.1.0     # a fixed release instead of the latest
