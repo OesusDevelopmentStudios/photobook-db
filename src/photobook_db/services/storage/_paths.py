@@ -89,7 +89,10 @@ def _parse_folder(folder_text: str, allowed_placeholders: set[str]) -> tuple[str
         parts.extend(_fixed_text(folder_text[position:match.start()]))
         name = match.group(1)
         if name not in allowed_placeholders:
-            raise _invalid_template(f"Unknown placeholder {{{name}}}: use a namespace, {{year}} or {{month}}")
+            allowed = [f"{{{placeholder}}}" for placeholder in sorted(allowed_placeholders - DATE_PLACEHOLDERS)]
+            raise _invalid_template(
+                f"Unknown placeholder {{{name}}}: use {', '.join(allowed + ['{year}'])} or {{month}}"
+            )
 
         parts.append(Placeholder(name))
         position = match.end()

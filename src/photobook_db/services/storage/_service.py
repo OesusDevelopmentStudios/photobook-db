@@ -35,8 +35,7 @@ _logger = logging.getLogger(__name__)
 
 
 class StorageService:
-    """The library folder and its layout. `namespace_names` returns the namespaces that exist, which the
-    path template may use."""
+    """The library folder and its layout. `namespace_names` returns the namespaces the path template may use."""
 
     def __init__(
         self,

@@ -106,6 +106,14 @@ def test_invalid_setting_is_refused(client: TestClient, admin: dict[str, str], c
     assert client.get("/api/v1/admin/settings", headers=admin).json() == before
 
 
+def test_meta_tags_cannot_form_folders(client: TestClient, admin: dict[str, str]) -> None:
+    response = client.patch("/api/v1/admin/settings", json={"path_template": "{category}/{meta}"}, headers=admin)
+
+    assert (response.status_code, response.json()["code"]) == (422, "validation_error")
+    message = response.json()["errors"][0]["message"]
+    assert "Unknown placeholder {meta}" in message and "{category}" in message and "{meta}," not in message
+
+
 def test_changes_the_accent_colour_of_the_web_pages(client: TestClient, admin: dict[str, str]) -> None:
     response = client.patch("/api/v1/admin/settings", json={"web_accent_color": "#E93A9A"}, headers=admin)
 

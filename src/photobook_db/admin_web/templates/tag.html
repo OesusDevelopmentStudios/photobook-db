@@ -19,6 +19,9 @@
 <p>{{ image_count }} image{% if image_count != 1 %}s{% endif %} {% if image_count == 1 %}has{% else %}have{% endif %}
 this tag.</p>
 
+{% if read_only %}
+<p class="hint">The server sets this tag from the files themselves, so it cannot be renamed, merged or deleted.</p>
+{% else %}
 <h2>Rename or merge</h2>
 <form method="post" action="{{ tag_path }}/rename">
     <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
@@ -35,4 +38,5 @@ this tag.</p>
 <form method="get" action="{{ tag_path }}/delete">
     <button type="submit" class="danger">Delete Tag</button>
 </form>
+{% endif %}
 {% endblock %}

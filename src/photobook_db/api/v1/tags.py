@@ -70,7 +70,7 @@ def rename_tag(
 @router.delete(
     "/{namespace}/{name}",
     summary="Remove a tag from every image and delete it",
-    responses=problem_responses(401, 403, 404),
+    responses=problem_responses(401, 403, 404, 422),
 )
 def delete_tag(namespace: str, name: str, admin: CurrentAdmin, tag_admin: TagAdminDependency) -> DeletedTag:
     job = tag_admin.delete_tag(TagName(namespace, name), admin.user.id)

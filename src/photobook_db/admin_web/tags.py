@@ -93,8 +93,11 @@ def confirm_deletion(request: Request, session: AdminPage, namespace: str, name:
 def delete_tag(request: Request, session: AdminForm, namespace: str, name: str) -> RedirectResponse:
     try:
         job = _tag_admin(request).delete_tag(TagName(namespace, name), session.user.id)
-    except Problem:
-        raise PageError(404, "This tag does not exist (any more).") from None
+    except Problem as problem:
+        if problem.status == 404:
+            raise PageError(404, "This tag does not exist (any more).") from None
+
+        raise PageError(problem.status, problem_message(problem)) from None  # e.g. a tag the server sets
 
     return RedirectResponse(_with_job("/admin/tags?deleted=true", job), status_code=303)
 
@@ -141,6 +144,7 @@ def _tag_page(
         "tag": tag,
         "tag_path": _tag_path(tag),
         "image_count": _existing_image_count(request, tag),
+        "read_only": tag.namespace in _tags(request).read_only_namespace_names(),
         "new_tag": new_tag,
         "error": error,
         "renamed": renamed,

@@ -1443,14 +1443,14 @@
             "description": "Problem details (RFC 9457)"
           },
           "422": {
-            "description": "Validation Error",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblemModel"
                 }
               }
-            }
+            },
+            "description": "Problem details (RFC 9457)"
           }
         }
       }

@@ -79,7 +79,7 @@ class TagsService:
 
     def check_user_editable(self, tags: Collection[TagName]) -> None:
         """Raises 422 tag_read_only for tags of a namespace that only the server tags with, e.g. meta."""
-        read_only = {namespace.name for namespace in self.list_namespaces() if not namespace.user_editable}
+        read_only = self.read_only_namespace_names()
         refused = [str(tag) for tag in tags if tag.namespace in read_only]
         if refused:
             raise Problem(
@@ -210,6 +210,17 @@ class TagsService:
     def namespace_names(self) -> set[str]:
         with self._database.session() as session:
             return set(session.scalars(select(Namespace.name)))
+
+    def read_only_namespace_names(self) -> set[str]:
+        """The namespaces whose tags only the server sets, e.g. meta."""
+        with self._database.session() as session:
+            return set(session.scalars(select(Namespace.name).where(Namespace.user_editable.is_(False))))
+
+    def folder_namespace_names(self) -> set[str]:
+        """The namespaces the path template may use: not the server's own, as a file always has several of those.
+        Read here, not through list_namespaces(), which asks the path template."""
+        with self._database.session() as session:
+            return set(session.scalars(select(Namespace.name).where(Namespace.user_editable.is_(True))))
 
     def list_namespaces(self) -> list[NamespaceInfo]:
         """Built-in namespaces first, then the others in the order they were created."""

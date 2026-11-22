@@ -36,8 +36,10 @@ class TagAdmin:
     def rename_tag(self, old_tag: TagName, new_tag_text: str, user_id: int | None) -> tuple[TagName, JobInfo | None]:
         """Gives every image with old_tag the new tag instead; an existing new tag is merged with it. In a
         single-value namespace the new tag replaces the image's current one. Returns the new tag and the job
-        that moves the affected files, if the path template uses either namespace. Raises 404 not_found or
-        422 invalid_tag."""
+        that moves the affected files, if the path template uses either namespace. Raises 404 not_found,
+        422 invalid_tag, or 422 namespace_read_only for the server's own tags (meta), either one."""
+        self._check_admin_may_change(old_tag.namespace)
+        self._check_admin_may_change(self._tags.parse_tag(new_tag_text).namespace)
         [new_tag] = self._tags.resolve_tags([new_tag_text])
         self._check_exists(old_tag)
         if new_tag == old_tag:
@@ -50,12 +52,22 @@ class TagAdmin:
 
     def delete_tag(self, tag: TagName, user_id: int | None) -> JobInfo | None:
         """Removes the tag from every image and deletes it. Returns the job that moves the affected files, if
-        the path template uses its namespace. Raises 404 not_found."""
+        the path template uses its namespace. Raises 404 not_found or 422 namespace_read_only."""
+        self._check_admin_may_change(tag.namespace)
         self._check_exists(tag)
         namespace_names = self._tags.namespace_names()
         self._rewrite_terms(lambda term: without_tag_in_term(term, tag, namespace_names))
         changed_ids = self._images.replace_tag(tag, None)
         return self._relayout_if_needed(changed_ids, {tag.namespace}, user_id)
+
+    def _check_admin_may_change(self, namespace: str) -> None:
+        if namespace in self._tags.read_only_namespace_names():
+            raise Problem(
+                422,
+                "namespace_read_only",
+                "Tags set by the server",
+                f"The server sets the {namespace} tags from the files; they cannot be renamed, merged or deleted.",
+            )
 
     def _check_exists(self, tag: TagName) -> None:
         if not self._tags.tag_exists(tag):

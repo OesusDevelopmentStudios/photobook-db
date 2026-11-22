@@ -48,6 +48,18 @@ def listed(page: str) -> list[tuple[str, str]]:
     return [(tag, count) for tag, count in found if not tag.startswith("meta:")]
 
 
+def test_tags_the_server_sets_have_no_rename_or_delete(admin_browser: TestClient, library: None) -> None:
+    page = admin_browser.get("/admin/tags/meta/jpeg").text
+
+    assert "cannot be renamed, merged or deleted" in page
+    assert "/rename" not in page and "Delete Tag" not in page
+
+    response = post(admin_browser, "/admin/tags/meta/jpeg/delete")  # sent all the same
+
+    assert response.status_code == 422
+    assert "The server sets the meta tags from the files" in response.text
+
+
 def test_needs_a_login(client: TestClient) -> None:
     assert client.get("/admin/tags", follow_redirects=False).status_code == 303
 

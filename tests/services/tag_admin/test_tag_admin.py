@@ -167,7 +167,29 @@ def test_invalid_new_tag_changes_nothing(library: Library) -> None:
     assert library.tags_of(image) == ["rating:public"]
 
 
+@pytest.mark.parametrize(
+    ("old_tag", "new_tag"), [("meta:jpeg", "meta:png"), ("meta:jpeg", "general:jpeg"), ("general:sunset", "meta:dusk")]
+)
+def test_the_servers_own_tags_are_not_renamed(library: Library, old_tag: str, new_tag: str) -> None:
+    image = library.add_image("red", ("sunset",))
+    before = [str(tag) for tag in library.images.get_image(image.id).tags]
+
+    problem = problem_of(lambda: library.rename(old_tag, new_tag))
+
+    assert (problem.status, problem.code) == (422, "namespace_read_only")
+    assert [str(tag) for tag in library.images.get_image(image.id).tags] == before
+
+
 # --- Deleting
+
+def test_the_servers_own_tags_are_not_deleted(library: Library) -> None:
+    image = library.add_image("red", ("sunset",))
+
+    problem = problem_of(lambda: library.delete("meta:jpeg"))
+
+    assert (problem.status, problem.code) == (422, "namespace_read_only")
+    assert "meta:jpeg" in [str(tag) for tag in library.images.get_image(image.id).tags]
+
 
 def test_deletes_a_tag_from_every_image(library: Library) -> None:
     images = [library.add_image(colour, ("sunset", "beach")) for colour in ("red", "green")]

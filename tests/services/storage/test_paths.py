@@ -53,8 +53,11 @@ def test_empty_template_stores_files_in_the_library_folder() -> None:
     assert folder_path(template(""), {}, TAKEN_AT) == PurePosixPath(".")
 
 
-def test_rejects_unknown_placeholders() -> None:
-    assert "Unknown placeholder {weather}" in template_problem("{category}/{weather}")
+def test_rejects_unknown_placeholders_and_names_the_allowed_ones() -> None:
+    message = template_problem("{category}/{weather}")
+
+    assert message.startswith("Unknown placeholder {weather}: use {")
+    assert message.endswith("{year} or {month}")
 
 
 @pytest.mark.parametrize("text", ["{category}//{year}", "/{category}", "{category}/", "./{year}", "{year}/.."])

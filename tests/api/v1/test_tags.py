@@ -101,6 +101,16 @@ def test_unknown_tag_is_not_found(client: TestClient, admin_headers: dict[str, s
     assert client.patch("/api/v1/tags/nowhere/x", json={"new_tag": "y"}, headers=admin_headers).status_code == 404
 
 
+def test_the_servers_own_tags_cannot_be_renamed_or_deleted(client: TestClient, admin_headers: dict[str, str]) -> None:
+    upload(client, admin_headers, ["summer"])
+
+    deleted = client.delete("/api/v1/tags/meta/jpeg", headers=admin_headers)
+    renamed = client.patch("/api/v1/tags/meta/jpeg", json={"new_tag": "meta:png"}, headers=admin_headers)
+
+    assert (deleted.status_code, deleted.json()["code"]) == (422, "namespace_read_only")
+    assert (renamed.status_code, renamed.json()["code"]) == (422, "namespace_read_only")
+
+
 def test_users_cannot_rename_or_delete_tags(client: TestClient, user_headers: dict[str, str]) -> None:
     assert client.delete("/api/v1/tags/general/summer", headers=user_headers).status_code == 403
     assert client.patch("/api/v1/tags/general/summer", json={"new_tag": "y"}, headers=user_headers).status_code == 403
