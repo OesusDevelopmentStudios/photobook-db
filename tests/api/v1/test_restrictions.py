@@ -206,6 +206,11 @@ def expect_admins_only(method: str) -> Callable[[TestClient, Setup], None]:
     return check
 
 
+def check_creating_is_for_admins(client: TestClient, setup: Setup) -> None:
+    response = client.post("/api/v1/tags", json={"tag": "rating:public"}, headers=setup.restricted_user)
+    assert response.status_code == 403
+
+
 # Every route that reads or changes images, and how it must treat a restricted image. A new image route
 # must be added here; test_every_image_route_is_checked fails until it is.
 ACCESS_RULES = {
@@ -219,6 +224,7 @@ ACCESS_RULES = {
     ("GET", "/api/v1/images/{image_id}/thumbnail"): expect_not_found("GET", "/api/v1/images/{image_id}/thumbnail"),
     ("POST", "/api/v1/images/{image_id}/rotation"): expect_not_found("POST", "/api/v1/images/{image_id}/rotation"),
     ("GET", "/api/v1/tags"): check_autocomplete_hides,
+    ("POST", "/api/v1/tags"): check_creating_is_for_admins,
     ("PATCH", "/api/v1/tags/{namespace}/{name}"): expect_admins_only("PATCH"),
     ("DELETE", "/api/v1/tags/{namespace}/{name}"): expect_admins_only("DELETE"),
 }

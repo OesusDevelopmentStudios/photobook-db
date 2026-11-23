@@ -38,7 +38,7 @@ def test_returns_items_with_tag_and_count(client: TestClient, user_headers: dict
     response = client.get("/api/v1/tags", params={"prefix": "sum"}, headers=user_headers)
 
     assert response.status_code == 200
-    assert response.json() == {"items": [{"tag": "general:summer", "image_count": 0}]}
+    assert response.json() == {"items": [{"tag": "general:summer", "image_count": 0}], "next_cursor": None}
 
 
 @pytest.mark.parametrize("limit", [0, 101])
@@ -49,7 +49,42 @@ def test_limit_must_be_between_1_and_100(client: TestClient, user_headers: dict[
     assert response.json()["errors"][0]["field"] == "query.limit"
 
 
-# --- Renaming and deleting, for admins
+def general_tag_pages(client: TestClient, headers: dict[str, str], limit: int) -> list[list[tuple[str, int]]]:
+    """Every page of the general tags, as (tag, count); stops after 10, so a cursor that never ends fails."""
+    pages: list[list[tuple[str, int]]] = []
+    cursor = None
+    while len(pages) < 10:
+        params = {"namespace": "general", "limit": limit} | ({} if cursor is None else {"cursor": cursor})
+        body = client.get("/api/v1/tags", params=params, headers=headers).json()
+        pages.append([(item["tag"], item["image_count"]) for item in body["items"]])
+        cursor = body["next_cursor"]
+        if cursor is None:
+            break
+
+    return pages
+
+
+def test_pages_through_a_namespace(client: TestClient, user_headers: dict[str, str]) -> None:
+    with client.app.state.database.engine.begin() as connection:
+        for name in ("harbour", "hills", "lake", "market", "station"):
+            connection.exec_driver_sql(
+                f"INSERT INTO tag (namespace_id, name) SELECT id, '{name}' FROM namespace WHERE name = 'general'"
+            )
+
+    pages = general_tag_pages(client, user_headers, limit=2)
+
+    assert [[tag for tag, _count in page] for page in pages] == [  # the same count: by name
+        ["general:harbour", "general:hills"], ["general:lake", "general:market"], ["general:station"]
+    ]
+
+
+def test_a_damaged_cursor_is_refused(client: TestClient, user_headers: dict[str, str]) -> None:
+    response = client.get("/api/v1/tags", params={"cursor": "not a cursor"}, headers=user_headers)
+
+    assert (response.status_code, response.json()["errors"][0]["field"]) == (422, "query.cursor")
+
+
+# --- Adding, renaming and deleting, for admins
 
 @pytest.fixture
 def admin_headers(client: TestClient) -> dict[str, str]:
@@ -60,12 +95,57 @@ def admin_headers(client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {response.json()['token']}"}
 
 
-def upload(client: TestClient, headers: dict[str, str], tags: list[str]) -> int:
+def upload(client: TestClient, headers: dict[str, str], tags: list[str], colour: str = "teal") -> int:
     buffer = io.BytesIO()
-    Image.new("RGB", (8, 8), "teal").save(buffer, format="JPEG")
+    Image.new("RGB", (8, 8), colour).save(buffer, format="JPEG")
     metadata = json.dumps({"original_filename": "beach.jpg", "tags": tags})
     files = {"file": ("beach.jpg", buffer.getvalue())}
     return client.post("/api/v1/images", headers=headers, files=files, data={"metadata": metadata}).json()["id"]
+
+
+def test_admin_adds_a_tag_that_is_then_suggested(
+    client: TestClient, admin_headers: dict[str, str], user_headers: dict[str, str]
+) -> None:
+    client.app.state.tags.create_namespace("location", single_value=False)
+
+    response = client.post("/api/v1/tags", json={"tag": "Location:Old Harbour"}, headers=admin_headers)
+
+    assert (response.status_code, response.json()) == (201, {"tag": "location:old_harbour", "image_count": 0})
+    suggested = client.get("/api/v1/tags", params={"prefix": "location:old"}, headers=user_headers).json()["items"]
+    assert suggested == [{"tag": "location:old_harbour", "image_count": 0}]
+
+
+@pytest.mark.parametrize(
+    ("tag", "status", "code"),
+    [
+        ("general:summer", 409, "already_exists"),
+        ("meta:video", 422, "namespace_read_only"),
+        ("rating:secret", 422, "invalid_tag"),  # not one of the rating values
+        ("a|b", 422, "invalid_tag"),
+    ],
+)
+def test_adding_a_tag_is_refused(
+    client: TestClient, admin_headers: dict[str, str], tag: str, status: int, code: str
+) -> None:
+    upload(client, admin_headers, ["summer"])
+
+    response = client.post("/api/v1/tags", json={"tag": tag}, headers=admin_headers)
+
+    assert (response.status_code, response.json()["code"]) == (status, code)
+
+
+def test_pages_follow_the_counts(client: TestClient, admin_headers: dict[str, str]) -> None:
+    upload(client, admin_headers, ["summer", "beach"], colour="red")
+    upload(client, admin_headers, ["summer"], colour="green")
+    client.post("/api/v1/tags", json={"tag": "lake"}, headers=admin_headers)
+
+    pages = general_tag_pages(client, admin_headers, limit=1)
+
+    assert pages == [[("general:summer", 2)], [("general:beach", 1)], [("general:lake", 0)]]
+
+
+def test_users_cannot_add_tags(client: TestClient, user_headers: dict[str, str]) -> None:
+    assert client.post("/api/v1/tags", json={"tag": "harbour"}, headers=user_headers).status_code == 403
 
 
 def test_admin_renames_a_folder_tag(client: TestClient, admin_headers: dict[str, str]) -> None:

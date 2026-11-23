@@ -1239,6 +1239,25 @@
               "default": 20,
               "title": "Limit"
             }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "next_cursor of the previous page",
+              "title": "Cursor"
+            },
+            "description": "next_cursor of the previous page"
           }
         ],
         "responses": {
@@ -1253,6 +1272,80 @@
             }
           },
           "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "tags"
+        ],
+        "summary": "Add a tag that no image has yet, so that it is suggested",
+        "operationId": "create_tag_api_v1_tags_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTag"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagWithCount"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "409": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3179,6 +3272,23 @@
         ],
         "title": "NewNamespace"
       },
+      "NewTag": {
+        "properties": {
+          "tag": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Tag",
+            "examples": [
+              "location:harbour"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "tag"
+        ],
+        "title": "NewTag"
+      },
       "NewUser": {
         "properties": {
           "username": {
@@ -3596,11 +3706,24 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` for the next page; null on the last page"
           }
         },
         "type": "object",
         "required": [
-          "items"
+          "items",
+          "next_cursor"
         ],
         "title": "TagList"
       },

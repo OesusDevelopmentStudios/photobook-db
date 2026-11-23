@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
+import base64
+import binascii
+import json
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import and_, exists, func, or_, select, tuple_
 from sqlalchemy.exc import IntegrityError
 
 from photobook_db.db import Database
@@ -29,6 +32,12 @@ class NamespaceInfo:
     in_path_template: bool  # its tags form folder names in the library
     user_editable: bool = True  # false: the server alone sets its tags, e.g. "meta"
     allowed_values: tuple[str, ...] | None = None  # the only names its tags may have, e.g. the ratings; None: any
+
+
+@dataclass(frozen=True)
+class TagPage:
+    items: list["TagCount"]
+    next_cursor: str | None  # None on the last page
 
 
 @dataclass(frozen=True)
@@ -147,6 +156,43 @@ class TagsService:
         """Tags starting with `prefix`, most used first. "author:sam" searches one namespace, "sam" all of them.
         Tags for which `is_hidden` says so are left out (a restricted user's tags). `image_count` counts all
         images, also ones a restricted user cannot see."""
+        return self._most_used(prefix, namespace, limit, is_hidden, after=None)
+
+    def tag_page(
+        self,
+        prefix: str = "",
+        namespace: str | None = None,
+        limit: int = 20,
+        is_hidden: Callable[[TagName], bool] | None = None,
+        cursor: str | None = None,
+    ) -> TagPage:
+        """As autocomplete(), a page at a time, for browsing every tag of a namespace. Images tagged meanwhile
+        change the counts, so a tag may be skipped or repeated across pages. Raises 422 validation_error for a
+        damaged cursor."""
+        after = None if cursor is None else _decode_cursor(cursor)
+        found = self._most_used(prefix, namespace, limit + 1, is_hidden, after)
+        items = found[:limit]
+        return TagPage(items, _encode_cursor(items[-1]) if len(found) > limit else None)
+
+    def create_tag(self, tag: TagName) -> None:
+        """A tag that no image has yet. Raises 409 already_exists."""
+        with self._database.session() as session:
+            namespace_id = session.scalar(select(Namespace.id).where(Namespace.name == tag.namespace))
+            session.add(Tag(namespace_id=namespace_id, name=tag.name))
+            try:
+                session.commit()
+            except IntegrityError:
+                raise Problem(409, "already_exists", "Tag exists", f"The tag {tag} exists already.") from None
+
+    def _most_used(
+        self,
+        prefix: str,
+        namespace: str | None,
+        limit: int,
+        is_hidden: Callable[[TagName], bool] | None,
+        after: TagCount | None,
+    ) -> list[TagCount]:
+        """Most used first, then by namespace and name; with `after`, the tags that come after that one."""
         prefix_namespace, name_prefix = self._split_prefix(prefix)
         namespaces = {name for name in (prefix_namespace, namespace and namespace.lower()) if name}
         if len(namespaces) > 1:
@@ -165,6 +211,13 @@ class TagsService:
 
         if name_prefix:
             query = query.where(Tag.name >= name_prefix, Tag.name < name_prefix + _LAST_CHARACTER)
+
+        if after is not None:
+            same_count_later = and_(
+                image_count == after.image_count,
+                tuple_(Namespace.name, Tag.name) > tuple_(after.tag.namespace, after.tag.name),
+            )
+            query = query.having(or_(image_count < after.image_count, same_count_later))
 
         # Hidden tags are dropped after reading, so more rows are read until the page is full.
         found: list[TagCount] = []
@@ -281,3 +334,28 @@ def _namespace_info(namespace: Namespace, path_namespaces: frozenset[str], ratin
         user_editable=namespace.user_editable,
         allowed_values=tuple(rating_values) if namespace.name == RATING_NAMESPACE else None,
     )
+
+
+def _encode_cursor(last: TagCount) -> str:
+    """base64url JSON {"count": <its image count>, "tag": "<namespace>:<name>"} of the page's last tag."""
+    text = json.dumps({"count": last.image_count, "tag": str(last.tag)}, separators=(",", ":"))
+    return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
+
+
+def _decode_cursor(cursor: str) -> TagCount:
+    try:
+        content = json.loads(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
+        count, text = content["count"], content["tag"]
+        namespace, separator, name = text.partition(":")
+        if not isinstance(count, int) or not separator:
+            raise ValueError
+
+        return TagCount(TagName(namespace, name), count)
+    except (binascii.Error, ValueError, TypeError, KeyError, AttributeError, UnicodeDecodeError):
+        raise Problem(
+            422,
+            "validation_error",
+            "Invalid request",
+            "The request body or parameters are invalid.",
+            errors=[{"field": "query.cursor", "message": "Use next_cursor of the previous page."}],
+        ) from None

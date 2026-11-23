@@ -18,6 +18,7 @@ from photobook_db.services.tags._service import (
     RATING_NAMESPACE,
     NamespaceInfo,
     TagCount,
+    TagPage,
     TagsService,
 )
 
@@ -31,6 +32,7 @@ __all__ = [
     "RESERVED_NAMESPACE_NAMES",
     "TagCount",
     "TagName",
+    "TagPage",
     "TagsService",
     "normalized_namespace_name",
     "normalized_tag_name",

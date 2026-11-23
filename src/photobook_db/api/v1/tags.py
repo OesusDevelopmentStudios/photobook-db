@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""/tags: autocomplete and browsing tags; renaming and deleting them for admins."""
+"""/tags: autocomplete and browsing tags; adding, renaming and deleting them for admins."""
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, Field
 
 from photobook_db.api.v1.dependencies import (
@@ -27,6 +27,11 @@ class TagWithCount(BaseModel):
 
 class TagList(BaseModel):
     items: list[TagWithCount]
+    next_cursor: str | None = Field(description="Pass as `cursor` for the next page; null on the last page")
+
+
+class NewTag(BaseModel):
+    tag: str = Field(max_length=300, examples=["location:harbour"])
 
 
 @router.get("", summary="Tags starting with a prefix, most used first", responses=problem_responses(401, 422))
@@ -36,10 +41,22 @@ def list_tags(
     prefix: Annotated[str, Query(max_length=200, description="May include a namespace: author:sam")] = "",
     namespace: Annotated[str | None, Query(max_length=100, description="Only this namespace")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    cursor: Annotated[str | None, Query(max_length=500, description="next_cursor of the previous page")] = None,
 ) -> TagList:
     is_hidden = restrictions.is_tag_hidden if restrictions.active else None  # restricted tags are never suggested
-    matches = tags.autocomplete(prefix, namespace, limit, is_hidden)
-    return TagList(items=[TagWithCount(tag=str(match.tag), image_count=match.image_count) for match in matches])
+    page = tags.tag_page(prefix, namespace, limit, is_hidden, cursor)
+    items = [TagWithCount(tag=str(match.tag), image_count=match.image_count) for match in page.items]
+    return TagList(items=items, next_cursor=page.next_cursor)
+
+
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a tag that no image has yet, so that it is suggested",
+    responses=problem_responses(401, 403, 409, 422),
+)
+def create_tag(new_tag: NewTag, _admin: CurrentAdmin, tag_admin: TagAdminDependency) -> TagWithCount:
+    return TagWithCount(tag=str(tag_admin.create_tag(new_tag.tag)), image_count=0)
 
 
 class TagRename(BaseModel):

@@ -50,6 +50,14 @@ class TagAdmin:
         changed_ids = self._images.replace_tag(old_tag, new_tag)
         return new_tag, self._relayout_if_needed(changed_ids, {old_tag.namespace, new_tag.namespace}, user_id)
 
+    def create_tag(self, tag_text: str) -> TagName:
+        """A tag no image has yet, so that it is suggested to users. Raises 409 already_exists, 422 invalid_tag
+        (also for a rating that is not allowed) or 422 namespace_read_only."""
+        self._check_admin_may_change(self._tags.parse_tag(tag_text).namespace)
+        [tag] = self._tags.resolve_tags([tag_text])
+        self._tags.create_tag(tag)
+        return tag
+
     def delete_tag(self, tag: TagName, user_id: int | None) -> JobInfo | None:
         """Removes the tag from every image and deletes it. Returns the job that moves the affected files, if
         the path template uses its namespace. Raises 404 not_found or 422 namespace_read_only."""
