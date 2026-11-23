@@ -22,7 +22,7 @@
     <tr><th>Namespace</th><th>Tags per image</th><th>Kind</th><th>Folders</th><th></th></tr>
     {% for namespace in namespaces %}
     <tr>
-        <td><code>{{ namespace.name }}:</code></td>
+        <td><a href="/admin/namespaces/{{ namespace.name }}/tags"><code>{{ namespace.name }}:</code></a></td>
         <td>{% if namespace.single_value %}one{% else %}any number{% endif %}</td>
         <td>{% if namespace.is_builtin %}built-in{% else %}custom{% endif %}</td>
         <td>{% if namespace.in_path_template %}in the path template{% else %}<span class="hint">no</span>{% endif %}</td>

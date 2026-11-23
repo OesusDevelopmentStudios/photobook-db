@@ -36,7 +36,8 @@ def tags_page(
     context = {
         "session": session,
         "matches": [
-            (match, _tag_path(match.tag)) for match in tags.autocomplete(search.strip(), namespace or None, LIST_LIMIT)
+            (match, tag_page_path(match.tag))
+            for match in tags.autocomplete(search.strip(), namespace or None, LIST_LIMIT)
         ],
         "namespaces": [info.name for info in tags.list_namespaces()],
         "search": search,
@@ -73,7 +74,7 @@ def rename_tag(
     except Problem as problem:
         return _tag_page(request, session, tag, new_tag, problem_message(problem), problem.status)
 
-    return RedirectResponse(_with_job(f"{_tag_path(renamed)}?renamed=true", job), status_code=303)
+    return RedirectResponse(_with_job(f"{tag_page_path(renamed)}?renamed=true", job), status_code=303)
 
 
 @router.get("/{namespace}/{name}/delete", response_class=HTMLResponse)
@@ -83,7 +84,7 @@ def confirm_deletion(request: Request, session: AdminPage, namespace: str, name:
     context = {
         "session": session,
         "tag": tag,
-        "tag_path": _tag_path(tag),
+        "tag_path": tag_page_path(tag),
         "image_count": _existing_image_count(request, tag),
     }
     return templates.TemplateResponse(request, "tag_delete.html", context)
@@ -120,7 +121,8 @@ def _existing_image_count(request: Request, tag: TagName) -> int:
     return image_count
 
 
-def _tag_path(tag: TagName) -> str:
+def tag_page_path(tag: TagName) -> str:
+    """Its page, where it is renamed or deleted."""
     return f"/admin/tags/{quote(tag.namespace, safe='')}/{quote(tag.name, safe='')}"
 
 
@@ -142,7 +144,7 @@ def _tag_page(
     context = {
         "session": session,
         "tag": tag,
-        "tag_path": _tag_path(tag),
+        "tag_path": tag_page_path(tag),
         "image_count": _existing_image_count(request, tag),
         "read_only": tag.namespace in _tags(request).read_only_namespace_names(),
         "new_tag": new_tag,

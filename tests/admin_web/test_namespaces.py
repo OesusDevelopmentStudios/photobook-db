@@ -114,3 +114,93 @@ def test_namespace_with_tags_is_not_removed(admin_browser: TestClient, tags: Tag
     assert response.status_code == 409
     assert "Tags in this namespace exist; rename or delete them first." in response.text
     assert namespace(tags, "weather") is not None
+
+
+# --- One namespace's page with its tags
+
+def add_tags(admin_browser: TestClient, namespace_name: str, names: list[str]) -> None:
+    """Tags no image has, straight into the database."""
+    with admin_browser.app.state.database.session() as session:
+        namespace_id = session.scalar(select(Namespace.id).where(Namespace.name == namespace_name))
+        session.add_all(Tag(namespace_id=namespace_id, name=name) for name in names)
+        session.commit()
+
+
+def listed_tags(page: str) -> list[str]:
+    return re.findall(r"<td><a href=\"[^\"]+\"><code>([^<]+)</code></a></td>", page)
+
+
+def test_the_list_links_to_each_namespace(admin_browser: TestClient) -> None:
+    page = admin_browser.get("/admin/namespaces").text
+
+    assert '<a href="/admin/namespaces/author/tags"><code>author:</code></a>' in page
+
+
+def test_shows_the_namespace_and_its_tags(admin_browser: TestClient) -> None:
+    add_tags(admin_browser, "author", ["sample_artist", "anon_one"])
+
+    page = admin_browser.get("/admin/namespaces/author/tags").text
+
+    assert "Namespace <code>author:</code>" in page
+    assert "<dt>Folders</dt><dd>in the path template</dd>" in page
+    assert listed_tags(page) == ["anon_one", "sample_artist"]  # the same count: by name
+    assert '<a href="/admin/tags/author/anon_one">' in page  # its page renames or deletes it
+
+
+def test_finds_tags_starting_with_the_search(admin_browser: TestClient) -> None:
+    add_tags(admin_browser, "general", ["harbour", "hills", "lake"])
+
+    page = admin_browser.get("/admin/namespaces/general/tags", params={"search": "h"}).text
+
+    assert listed_tags(page) == ["harbour", "hills"]
+
+
+def test_pages_through_many_tags(admin_browser: TestClient) -> None:
+    add_tags(admin_browser, "general", [f"tag_{number:03}" for number in range(101)])
+
+    first = admin_browser.get("/admin/namespaces/general/tags").text
+    next_path = re.search(r'href="([^"]+)">Next page</a>', first)
+
+    assert len(listed_tags(first)) == 100 and "First page" not in first
+    assert next_path is not None
+    second = admin_browser.get(next_path.group(1).replace("&amp;", "&")).text
+    assert listed_tags(second) == ["tag_100"]
+    assert "Next page" not in second and "First page" in second
+
+
+def test_adds_a_tag_that_users_then_get_as_a_suggestion(admin_browser: TestClient) -> None:
+    response = post(admin_browser, "/admin/namespaces/general/tags", tag_name=" Old Harbour ")
+
+    assert (response.status_code, response.headers["location"]) == (
+        303, "/admin/namespaces/general/tags?added=old_harbour"
+    )
+    page = admin_browser.get(response.headers["location"]).text
+    assert "The tag <code>general:old_harbour</code> has been added." in page
+    assert listed_tags(page) == ["old_harbour"]
+
+
+@pytest.mark.parametrize(
+    ("tag_name", "status", "message"),
+    [("harbour", 409, "exists already"), ("a|b", 422, "Invalid tag")],
+)
+def test_says_why_a_tag_cannot_be_added(admin_browser: TestClient, tag_name: str, status: int, message: str) -> None:
+    add_tags(admin_browser, "general", ["harbour"])
+
+    response = post(admin_browser, "/admin/namespaces/general/tags", tag_name=tag_name)
+
+    assert response.status_code == status
+    assert message in response.text
+    assert f'value="{tag_name}"' in response.text  # kept, to correct
+
+
+def test_the_meta_namespace_takes_no_new_tags(admin_browser: TestClient) -> None:
+    page = admin_browser.get("/admin/namespaces/meta/tags").text
+
+    assert "cannot be added, renamed or deleted here" in page
+    assert 'name="tag_name"' not in page
+    assert post(admin_browser, "/admin/namespaces/meta/tags", tag_name="video").status_code == 422
+
+
+@pytest.mark.parametrize("path", ["/admin/namespaces/nowhere/tags", "/admin/namespaces/general/tags?cursor=broken"])
+def test_unknown_namespace_or_page_is_not_found(admin_browser: TestClient, path: str) -> None:
+    assert admin_browser.get(path).status_code == 404

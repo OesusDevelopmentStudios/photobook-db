@@ -1,0 +1,74 @@
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
+{% extends "page.html" %}
+{% from "_buttons.html" import back_button %}
+{% set path = "/admin/namespaces/" ~ namespace.name ~ "/tags" %}
+{% block title %}Namespace {{ namespace.name }}{% endblock %}
+{% block heading %}Namespace <code>{{ namespace.name }}:</code>{% endblock %}
+{% block back %}{{ back_button("/admin/namespaces", "Back to all namespaces") }}{% endblock %}
+{% block content %}
+<dl>
+    <dt>Tags per image</dt><dd>{% if namespace.single_value %}one{% else %}any number{% endif %}</dd>
+    <dt>Kind</dt><dd>{% if namespace.is_builtin %}built-in{% else %}custom{% endif %}</dd>
+    <dt>Folders</dt><dd>{% if namespace.in_path_template %}in the path template{% else %}no{% endif %}</dd>
+</dl>
+
+{% if error %}
+<p class="error" role="alert">{{ error }}</p>
+{% elif added %}
+<p class="success" role="status">The tag <code>{{ namespace.name }}:{{ added }}</code> has been added. Users get it
+as a suggestion.</p>
+{% elif deleted %}
+<p class="success" role="status">The tag has been deleted.</p>
+{% endif %}
+
+{% if namespace.user_editable %}
+<h2>Add a tag</h2>
+<form method="post" action="{{ path }}" class="field-with-button">
+    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+    <input name="tag_name" required autocomplete="off" spellcheck="false" value="{{ new_tag_name }}"
+           aria-label="New tag" placeholder="A tag no image has yet, so that users get it as a suggestion">
+    <button type="submit">Add Tag</button>
+</form>
+{% else %}
+<p class="hint">The server sets these tags from the files themselves,
+so they cannot be added, renamed or deleted here.</p>
+{% endif %}
+
+<h2>Tags</h2>
+<div class="toolbar">
+    <form method="get" action="{{ path }}" role="search">
+        <input name="search" type="search" value="{{ search }}" placeholder="Tags starting with…"
+               aria-label="Tags starting with" spellcheck="false">
+        <button type="submit" class="secondary">Search</button>
+    </form>
+</div>
+
+{% if tags %}
+<table>
+    <tr><th>Tag</th><th>Images</th></tr>
+    {% for match, tag_path in tags %}
+    <tr>
+        <td><a href="{{ tag_path }}"><code>{{ match.tag.name }}</code></a></td>
+        <td>{{ match.image_count }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p class="hint">No tags{% if search %} start with that{% endif %}.</p>
+{% endif %}
+
+<p class="hint">Most used first.
+{% if namespace.user_editable %}A tag's page renames, merges or deletes it.{% endif %}</p>
+{% if next_cursor or not first_page %}
+{% set first_page_path = path ~ "?search=" ~ (search | urlencode) %}
+<div class="toolbar">
+    {% if not first_page %}
+    <a class="button secondary" href="{{ first_page_path }}">First page</a>
+    {% endif %}
+    {% if next_cursor %}
+    <a class="button secondary" href="{{ first_page_path }}&amp;cursor={{ next_cursor | urlencode }}">Next page</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
