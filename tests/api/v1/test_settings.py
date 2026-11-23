@@ -57,7 +57,6 @@ def test_admin_sees_the_settings(client: TestClient, admin: dict[str, str], conf
     assert response.json() == {
         "path_template": "{category}/{author}/{year}",
         "max_upload_bytes": 200 * 1024 * 1024,
-        "rating_values": ["public", "private"],
         "web_accent_color": "#3daee9",
         "library_dir": str(config.library_dir),
         "import_dir": None,
@@ -94,8 +93,8 @@ def test_other_changes_start_no_job(client: TestClient, admin: dict[str, str]) -
 
 @pytest.mark.parametrize(
     "changes",
-    [{"path_template": "{nonsense}"}, {"max_upload_bytes": 1000}, {"rating_values": []}, {"web_accent_color": "red"}],
-    ids=["unknown placeholder", "upload limit too small", "no ratings", "not a colour"],
+    [{"path_template": "{nonsense}"}, {"max_upload_bytes": 1000}, {"web_accent_color": "red"}],
+    ids=["unknown placeholder", "upload limit too small", "not a colour"],
 )
 def test_invalid_setting_is_refused(client: TestClient, admin: dict[str, str], changes: dict[str, Any]) -> None:
     before = client.get("/api/v1/admin/settings", headers=admin).json()
@@ -121,13 +120,16 @@ def test_changes_the_accent_colour_of_the_web_pages(client: TestClient, admin: d
     assert "--accent: #e93a9a;" in client.get("/admin/login").text
 
 
-def test_ratings_follow_the_setting(client: TestClient, admin: dict[str, str]) -> None:
+def test_ratings_are_the_rating_tags(client: TestClient, admin: dict[str, str]) -> None:
     image_id = upload(client, admin, ["rating:private"]).json()["id"]
-
-    client.patch("/api/v1/admin/settings", json={"rating_values": ["public", "secret"]}, headers=admin)
-
-    refused = upload(client, admin, ["rating:private"], colour="red")
+    refused = upload(client, admin, ["rating:secret"], colour="red")
     assert (refused.status_code, refused.json()["code"]) == (422, "invalid_tag")
-    assert user_tags(client.get(f"/api/v1/images/{image_id}", headers=admin).json()["tags"]) == ["rating:private"]
+
+    assert client.post("/api/v1/tags", json={"tag": "rating:secret"}, headers=admin).status_code == 201
     response = client.patch(f"/api/v1/images/{image_id}", json={"add_tags": ["rating:secret"]}, headers=admin)
     assert user_tags(response.json()["tags"]) == ["rating:secret"]
+
+    client.delete("/api/v1/tags/rating/secret", headers=admin)  # taken off the image, and no longer allowed
+    assert user_tags(client.get(f"/api/v1/images/{image_id}", headers=admin).json()["tags"]) == []
+    refused = upload(client, admin, ["rating:secret"], colour="red")
+    assert (refused.status_code, refused.json()["code"]) == (422, "invalid_tag")

@@ -77,9 +77,11 @@ def test_most_used_tags_come_first(tags: TagsService) -> None:
 
 
 def test_tags_without_images_come_last(tags: TagsService) -> None:
-    last = tags.autocomplete()[-1]
+    found = tags.autocomplete(limit=100)
+    counts = [match.image_count for match in found]
 
-    assert (str(last.tag), last.image_count) == ("character:nobody_yet", 0)
+    assert counts == sorted(counts, reverse=True) and counts[-1] == 0
+    assert "character:nobody_yet" in [str(match.tag) for match in found if match.image_count == 0]
 
 
 def test_equally_used_tags_are_in_alphabetical_order(tags: TagsService) -> None:

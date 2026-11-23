@@ -12,7 +12,6 @@ from sqlalchemy.exc import IntegrityError
 
 from photobook_db.db import Database
 from photobook_db.db.models import Namespace, Tag, image_tag
-from photobook_db.services.settings import SettingsService
 from photobook_db.services.tags._names import (
     TagName,
     normalized_name_prefix,
@@ -31,7 +30,7 @@ class NamespaceInfo:
     is_builtin: bool
     in_path_template: bool  # its tags form folder names in the library
     user_editable: bool = True  # false: the server alone sets its tags, e.g. "meta"
-    allowed_values: tuple[str, ...] | None = None  # the only names its tags may have, e.g. the ratings; None: any
+    allowed_values: tuple[str, ...] | None = None  # a namespace with fixed values: its tags, e.g. the ratings
 
 
 @dataclass(frozen=True)
@@ -46,11 +45,7 @@ class TagCount:
     image_count: int
 
 
-RATING_NAMESPACE = "rating"
 META_NAMESPACE = "meta"
-RATING_VALUES_SETTING = "rating_values"
-DEFAULT_RATING_VALUES = ("public", "private")
-MAX_RATING_VALUES = 20
 
 # Sorts after every other character, so names from `prefix` up to `prefix + this` start with `prefix`.
 _LAST_CHARACTER = "\U0010ffff"
@@ -62,16 +57,18 @@ class TagsService:
 
     def __init__(self, database: Database, path_template_namespaces: Callable[[], frozenset[str]]) -> None:
         self._database = database
-        self._settings = SettingsService(database)
         self._path_template_namespaces = path_template_namespaces
 
-    def resolve_tags(self, texts: list[str]) -> list[TagName]:
+    def resolve_tags(self, texts: list[str], new_values_allowed: bool = False) -> list[TagName]:
         """Parses tags as given for an image: each tag once, and in a single-value namespace only the last
         one, because a later tag replaces an earlier one (category:photo, category:artwork → artwork).
-        Ratings must be one of rating_values(): a typo must not slip past a restriction such as rating:private."""
+        In a namespace with fixed values (ratings) a tag must exist, unless an admin adds a value
+        (`new_values_allowed`): a typo must not slip past a restriction such as rating:private."""
         tags = [self.parse_tag(text) for text in texts]
         self.check_user_editable(tags)
-        self._check_ratings(tags, texts)
+        if not new_values_allowed:
+            self._check_fixed_values(tags, texts)
+
         single_value = {namespace.name for namespace in self.list_namespaces() if namespace.single_value}
         kept: list[TagName] = []
         seen_single_value: set[str] = set()
@@ -99,24 +96,22 @@ class TagsService:
                 tags=refused,
             )
 
-    def rating_values(self) -> list[str]:
-        stored_values = self._settings.get(RATING_VALUES_SETTING)
-        return list(DEFAULT_RATING_VALUES) if stored_values is None else stored_values
+    def fixed_values(self) -> dict[str, list[str]]:
+        """The namespaces with fixed values and their values (their tags), in the order they were added."""
+        query = (
+            select(Namespace.name, Tag.name)
+            .join(Tag, Tag.namespace_id == Namespace.id)
+            .where(Namespace.fixed_values.is_(True))
+            .order_by(Tag.id)
+        )
+        values: dict[str, list[str]] = {}
+        with self._database.session() as session:
+            for name in session.scalars(select(Namespace.name).where(Namespace.fixed_values.is_(True))):
+                values[name] = []
 
-    def checked_rating_values(self, texts: list[str]) -> list[str]:
-        """Normalized, each once. Raises 422 invalid_tag or validation_error."""
-        values = list(dict.fromkeys(normalized_tag_name(text) for text in texts))
-        if not 1 <= len(values) <= MAX_RATING_VALUES:
-            raise Problem(
-                422, "validation_error", "Invalid ratings", f"Give from 1 to {MAX_RATING_VALUES} rating values."
-            )
+            for namespace_name, tag_name in session.execute(query):
+                values[namespace_name].append(tag_name)
 
-        return values
-
-    def set_rating_values(self, texts: list[str]) -> list[str]:
-        """Images keep a rating that is no longer listed; it just cannot be given again."""
-        values = self.checked_rating_values(texts)
-        self._settings.set(RATING_VALUES_SETTING, values)
         return values
 
     def parse_tag(self, text: str) -> TagName:
@@ -238,15 +233,16 @@ class TagsService:
 
         return found[:limit]
 
-    def _check_ratings(self, tags: list[TagName], texts: list[str]) -> None:
-        allowed = self.rating_values()
+    def _check_fixed_values(self, tags: list[TagName], texts: list[str]) -> None:
+        fixed_values = self.fixed_values()
         for tag, text in zip(tags, texts):
-            if tag.namespace == RATING_NAMESPACE and tag.name not in allowed:
+            allowed = fixed_values.get(tag.namespace)
+            if allowed is not None and tag.name not in allowed:
                 raise Problem(
                     422,
                     "invalid_tag",
                     "Invalid tag",
-                    f"A rating is one of: {', '.join(allowed)}. An admin can add more in the settings.",
+                    f"{tag.namespace} is one of: {', '.join(allowed)}. An admin can add more on the namespace's page.",
                     tag=text,
                 )
 
@@ -278,10 +274,10 @@ class TagsService:
     def list_namespaces(self) -> list[NamespaceInfo]:
         """Built-in namespaces first, then the others in the order they were created."""
         path_namespaces = self._path_template_namespaces()
-        rating_values = self.rating_values()
+        fixed_values = self.fixed_values()
         with self._database.session() as session:
             namespaces = session.scalars(select(Namespace).order_by(Namespace.id))
-            return [_namespace_info(namespace, path_namespaces, rating_values) for namespace in namespaces]
+            return [_namespace_info(namespace, path_namespaces, fixed_values) for namespace in namespaces]
 
     def create_namespace(self, name: str, single_value: bool) -> NamespaceInfo:
         name = normalized_namespace_name(name)
@@ -295,7 +291,7 @@ class TagsService:
                     409, "already_exists", "Namespace exists", f"A namespace {name!r} exists already."
                 ) from None
 
-            return _namespace_info(namespace, self._path_template_namespaces(), self.rating_values())
+            return _namespace_info(namespace, self._path_template_namespaces(), {})  # a new one has no fixed values
 
     def check_namespace_removable(self, name: str) -> None:
         """Custom namespaces that the path template does not use. Raises 404 not_found or 409 namespace_in_use."""
@@ -337,14 +333,17 @@ class TagsService:
         return None
 
 
-def _namespace_info(namespace: Namespace, path_namespaces: frozenset[str], rating_values: list[str]) -> NamespaceInfo:
+def _namespace_info(
+    namespace: Namespace, path_namespaces: frozenset[str], fixed_values: dict[str, list[str]]
+) -> NamespaceInfo:
+    allowed_values = fixed_values.get(namespace.name)
     return NamespaceInfo(
         name=namespace.name,
         single_value=namespace.single_value,
         is_builtin=namespace.is_builtin,
         in_path_template=namespace.name in path_namespaces,
         user_editable=namespace.user_editable,
-        allowed_values=tuple(rating_values) if namespace.name == RATING_NAMESPACE else None,
+        allowed_values=None if allowed_values is None else tuple(allowed_values),
     )
 
 

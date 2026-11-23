@@ -40,7 +40,7 @@ class TagAdmin:
         422 invalid_tag, or 422 namespace_read_only for the server's own tags (meta), either one."""
         self._check_admin_may_change(old_tag.namespace)
         self._check_admin_may_change(self._tags.parse_tag(new_tag_text).namespace)
-        [new_tag] = self._tags.resolve_tags([new_tag_text])
+        [new_tag] = self._tags.resolve_tags([new_tag_text], new_values_allowed=True)  # renaming a rating renames it
         self._check_exists(old_tag)
         if new_tag == old_tag:
             return new_tag, None
@@ -51,10 +51,10 @@ class TagAdmin:
         return new_tag, self._relayout_if_needed(changed_ids, {old_tag.namespace, new_tag.namespace}, user_id)
 
     def create_tag(self, tag_text: str) -> TagName:
-        """A tag no image has yet, so that it is suggested to users. Raises 409 already_exists, 422 invalid_tag
-        (also for a rating that is not allowed) or 422 namespace_read_only."""
+        """A tag no image has yet, so that it is suggested to users; in a namespace with fixed values (ratings) a
+        new value. Raises 409 already_exists, 422 invalid_tag or 422 namespace_read_only."""
         self._check_admin_may_change(self._tags.parse_tag(tag_text).namespace)
-        [tag] = self._tags.resolve_tags([tag_text])
+        [tag] = self._tags.resolve_tags([tag_text], new_values_allowed=True)  # a new rating is a new value
         self._tags.create_tag(tag)
         return tag
 

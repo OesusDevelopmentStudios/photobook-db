@@ -2569,20 +2569,6 @@
             "type": "integer",
             "title": "Max Upload Bytes"
           },
-          "rating_values": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Rating Values",
-            "description": "The only values a rating: tag may have",
-            "examples": [
-              [
-                "public",
-                "private"
-              ]
-            ]
-          },
           "web_accent_color": {
             "type": "string",
             "title": "Web Accent Color",
@@ -2625,7 +2611,6 @@
         "required": [
           "path_template",
           "max_upload_bytes",
-          "rating_values",
           "web_accent_color",
           "library_dir",
           "import_dir",
@@ -3528,20 +3513,6 @@
             "type": "integer",
             "title": "Max Upload Bytes"
           },
-          "rating_values": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Rating Values",
-            "description": "The only values a rating: tag may have",
-            "examples": [
-              [
-                "public",
-                "private"
-              ]
-            ]
-          },
           "web_accent_color": {
             "type": "string",
             "title": "Web Accent Color",
@@ -3572,7 +3543,6 @@
         "required": [
           "path_template",
           "max_upload_bytes",
-          "rating_values",
           "web_accent_color",
           "library_dir",
           "import_dir"
@@ -3606,23 +3576,6 @@
               }
             ],
             "title": "Max Upload Bytes"
-          },
-          "rating_values": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array",
-                "maxItems": 20,
-                "minItems": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rating Values",
-            "description": "Images keep a rating that is removed here, but it cannot be given again"
           },
           "web_accent_color": {
             "anyOf": [

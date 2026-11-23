@@ -149,7 +149,7 @@ def test_resolve_keeps_every_tag_of_a_multi_value_namespace(tags: TagsService) -
 # --- Ratings
 
 def test_ratings_are_public_and_private_by_default(tags: TagsService) -> None:
-    assert tags.rating_values() == ["public", "private"]
+    assert tags.fixed_values() == {"rating": ["public", "private"]}
     assert tags.resolve_tags(["Rating:PRIVATE"]) == [TagName("rating", "private")]
 
 
@@ -160,29 +160,12 @@ def test_rating_that_is_not_listed_is_refused(tags: TagsService) -> None:
     assert "public, private" in problem.detail
 
 
-def test_rating_values_are_normalised_and_kept_once(tags: TagsService) -> None:
-    assert tags.set_rating_values(["Public", "Restricted", "public", "Secret"]) == ["public", "restricted", "secret"]
+def test_a_new_rating_is_a_value_an_admin_adds(tags: TagsService) -> None:
+    [secret] = tags.resolve_tags(["rating:Secret"], new_values_allowed=True)
+    tags.create_tag(secret)
 
-    assert tags.rating_values() == ["public", "restricted", "secret"]
-    assert tags.resolve_tags(["rating:restricted"]) == [TagName("rating", "restricted")]
-
-
-def test_removed_rating_can_still_be_named_for_removal(tags: TagsService) -> None:
-    tags.set_rating_values(["public"])
-
-    assert raised_problem(lambda: tags.resolve_tags(["rating:private"])).code == "invalid_tag"
-    assert tags.parse_tag("rating:private") == TagName("rating", "private")  # remove_tags parses without the check
-
-
-@pytest.mark.parametrize(
-    "values, code",
-    [
-        ([], "validation_error"),
-        ([f"r{number}" for number in range(21)], "validation_error"),
-        (["public", "a|b"], "invalid_tag"),
-    ],
-    ids=["none", "too many", "invalid name"],
-)
-def test_invalid_rating_values_are_refused(tags: TagsService, values: list[str], code: str) -> None:
-    assert raised_problem(lambda: tags.set_rating_values(values)).code == code
-    assert tags.rating_values() == ["public", "private"]
+    assert tags.fixed_values() == {"rating": ["public", "private", "secret"]}
+    assert tags.resolve_tags(["rating:secret"]) == [TagName("rating", "secret")]
+    assert next(info for info in tags.list_namespaces() if info.name == "rating").allowed_values == (
+        "public", "private", "secret"
+    )

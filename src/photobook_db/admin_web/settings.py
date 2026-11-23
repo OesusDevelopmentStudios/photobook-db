@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""/admin/settings: the path template, the upload limit, the rating values and the accent colour of these pages."""
+"""/admin/settings: the path template, the upload limit and the accent colour of these pages. Rating values are
+managed on the rating namespace's page."""
 
 from dataclasses import dataclass
 from typing import Annotated
@@ -15,7 +16,6 @@ from photobook_db.admin_web._templates import templates
 from photobook_db.admin_web._theme import PLASMA_ACCENT_COLORS
 from photobook_db.services.importer import UPLOAD_LIMIT_RANGE
 from photobook_db.services.server_settings import ServerSettings, SettingsChanges
-from photobook_db.services.tags import MAX_RATING_VALUES
 from photobook_db.utils.problems import Problem
 
 router = APIRouter()
@@ -29,7 +29,6 @@ class SettingsForm:
 
     path_template: str
     max_upload_mib: int
-    rating_values: str  # one per line
 
 
 @router.get("/settings", response_class=HTMLResponse)
@@ -50,7 +49,6 @@ def save_settings(
     session: AdminForm,
     path_template: Annotated[str, Form()],
     max_upload_mib: Annotated[int, Form()],
-    rating_values: Annotated[str, Form()],
 ) -> Response:
     server_settings = _server_settings(request)
     unchanged_mib = server_settings.current().max_upload_bytes // MIB
@@ -58,12 +56,11 @@ def save_settings(
         path_template=path_template,
         # The form shows whole MiB, so an untouched field keeps a limit the API set in bytes.
         max_upload_bytes=None if max_upload_mib == unchanged_mib else max_upload_mib * MIB,
-        rating_values=[line for line in rating_values.splitlines() if line.strip()],
     )
     try:
         _settings, relayout_job = server_settings.change(changes, session.user.id)
     except Problem as problem:
-        form = SettingsForm(path_template, max_upload_mib, rating_values)
+        form = SettingsForm(path_template, max_upload_mib)
         return _page(request, session, form, error=problem_message(problem), status_code=problem.status)
 
     # Back to the page with a GET, so reloading it does not send the form again.
@@ -98,7 +95,7 @@ def _server_settings(request: Request) -> ServerSettings:
 
 def _stored_form(request: Request) -> SettingsForm:
     settings = _server_settings(request).current()
-    return SettingsForm(settings.path_template, settings.max_upload_bytes // MIB, "\n".join(settings.rating_values))
+    return SettingsForm(settings.path_template, settings.max_upload_bytes // MIB)
 
 
 def _page(
@@ -122,7 +119,6 @@ def _page(
         "library_dir": settings.library_dir,
         "import_dir": settings.import_dir,
         "upload_limit_mib": (UPLOAD_LIMIT_RANGE[0] // MIB, UPLOAD_LIMIT_RANGE[1] // MIB),
-        "max_rating_values": MAX_RATING_VALUES,
         "accent_error": accent_error,
         "accent_saved": accent_saved,
         "plasma_accent_colors": PLASMA_ACCENT_COLORS,

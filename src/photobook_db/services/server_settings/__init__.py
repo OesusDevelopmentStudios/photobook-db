@@ -11,7 +11,6 @@ from photobook_db.services.importer import ImporterService, check_upload_limit
 from photobook_db.services.jobs import JobInfo, Relayout
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
-from photobook_db.services.tags import TagsService
 from photobook_db.utils.problems import Problem
 
 WEB_ACCENT_COLOR_SETTING = "web_accent_color"
@@ -23,7 +22,6 @@ _COLOR_PATTERN = re.compile("#[0-9a-f]{6}")
 class ServerSettingsInfo:
     path_template: str
     max_upload_bytes: int
-    rating_values: list[str]
     web_accent_color: str  # "#rrggbb"
     library_dir: Path  # from the environment; read-only here
     import_dir: Path | None
@@ -35,7 +33,6 @@ class SettingsChanges:
 
     path_template: str | None = None
     max_upload_bytes: int | None = None
-    rating_values: list[str] | None = None
     web_accent_color: str | None = None
 
 
@@ -44,14 +41,12 @@ class ServerSettings:
         self,
         storage: StorageService,
         importer: ImporterService,
-        tags: TagsService,
         relayout: Relayout,
         settings: SettingsService,
         import_dir: Path | None,
     ) -> None:
         self._storage = storage
         self._importer = importer
-        self._tags = tags
         self._relayout = relayout
         self._settings = settings
         self._import_dir = import_dir
@@ -60,7 +55,6 @@ class ServerSettings:
         return ServerSettingsInfo(
             path_template=self._storage.path_template().text,
             max_upload_bytes=self._importer.max_upload_bytes(),
-            rating_values=self._tags.rating_values(),
             web_accent_color=self.web_accent_color(),
             library_dir=self._storage.library_dir,
             import_dir=self._import_dir,
@@ -68,14 +62,10 @@ class ServerSettings:
 
     def change(self, changes: SettingsChanges, user_id: int | None) -> tuple[ServerSettingsInfo, JobInfo | None]:
         """All or nothing: every value is checked before any is stored. A different path template starts a
-        relayout job, which is returned. Raises 422 validation_error or invalid_tag."""
+        relayout job, which is returned. Raises 422 validation_error."""
         template = None
         if changes.path_template is not None:
             template = self._storage.checked_path_template(changes.path_template)
-
-        rating_values = None
-        if changes.rating_values is not None:
-            rating_values = self._tags.checked_rating_values(changes.rating_values)
 
         if changes.max_upload_bytes is not None:
             check_upload_limit(changes.max_upload_bytes)
@@ -89,9 +79,6 @@ class ServerSettings:
 
         if changes.max_upload_bytes is not None:
             self._importer.set_max_upload_bytes(changes.max_upload_bytes)
-
-        if rating_values is not None:
-            self._tags.set_rating_values(rating_values)
 
         relayout_job = None
         if template is not None and template.text != self._storage.path_template().text:

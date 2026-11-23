@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     Table,
     UniqueConstraint,
+    false,
     text,
     true,
 )
@@ -55,6 +56,8 @@ class Namespace(Base):
     single_value: Mapped[bool]  # a second tag in this namespace replaces the first one
     is_builtin: Mapped[bool]  # built-in namespaces cannot be deleted or renamed
     user_editable: Mapped[bool] = mapped_column(default=True, server_default=true())  # false: only the server tags
+    # true: its tags are the only values an image may have, e.g. the ratings; only admins add one
+    fixed_values: Mapped[bool] = mapped_column(default=False, server_default=false())
     created_at: Mapped[datetime]
 
 

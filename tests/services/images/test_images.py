@@ -70,7 +70,7 @@ def test_reuses_existing_tags_and_ignores_repeats(images: ImagesService, databas
     images.create_image(another_image(2), [TagName("general", "summer")])
 
     with database.session() as session:
-        assert session.scalar(select(func.count()).select_from(Tag)) == 1
+        assert session.scalar(select(func.count()).select_from(Tag).where(Tag.name == "summer")) == 1
 
 
 def test_same_sha256_is_a_duplicate(images: ImagesService) -> None:

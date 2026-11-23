@@ -29,11 +29,8 @@ template.
     </label>
     <span class="hint">The largest image that can be uploaded, from {{ upload_limit_mib[0] }} to
         {{ upload_limit_mib[1] }} MiB.</span>
-    <label>Rating values
-        <textarea name="rating_values" rows="4" required spellcheck="false">{{ form.rating_values }}</textarea>
-    </label>
-    <span class="hint">One per line, at most {{ max_rating_values }}. Images keep a rating that is removed here,
-        but it cannot be given again.</span>
+    <span class="hint">Rating values are added, renamed and removed on the
+        <a href="/admin/namespaces/rating/tags">rating</a> namespace's page.</span>
     <button type="submit">Save</button>
 </form>
 

@@ -19,7 +19,6 @@ from photobook_db.utils.problems import Problem
 DEFAULTS = ServerSettingsInfo(
     path_template="{category}/{author}/{year}",
     max_upload_bytes=DEFAULT_MAX_UPLOAD_BYTES,
-    rating_values=["public", "private"],
     web_accent_color="#3daee9",
     library_dir=Path("/srv/library"),
     import_dir=Path("/srv/import"),
@@ -35,7 +34,7 @@ def server_settings(database: Database, tmp_path: Path) -> ServerSettings:
     images = ImagesService(database, tags, storage)
     importer = ImporterService(images, tags, storage, ThumbnailsService(tmp_path / "thumbnails"), settings)
     relayout = Relayout(JobsService(database), images)
-    return ServerSettings(storage, importer, tags, relayout, settings, Path("/srv/import"))
+    return ServerSettings(storage, importer, relayout, settings, Path("/srv/import"))
 
 
 def test_shows_the_defaults(server_settings: ServerSettings) -> None:
@@ -43,9 +42,9 @@ def test_shows_the_defaults(server_settings: ServerSettings) -> None:
 
 
 def test_changes_the_given_settings_only(server_settings: ServerSettings) -> None:
-    settings, job = server_settings.change(SettingsChanges(max_upload_bytes=50_000_000, rating_values=["Public"]), None)
+    settings, job = server_settings.change(SettingsChanges(max_upload_bytes=50_000_000), None)
 
-    assert (settings.max_upload_bytes, settings.rating_values) == (50_000_000, ["public"])
+    assert settings.max_upload_bytes == 50_000_000
     assert settings.path_template == DEFAULTS.path_template
     assert job is None
     assert server_settings.current() == settings
@@ -65,12 +64,11 @@ def test_same_path_template_moves_nothing(server_settings: ServerSettings) -> No
 @pytest.mark.parametrize(
     "changes",
     [
-        SettingsChanges(path_template="{nonsense}", max_upload_bytes=50_000_000, rating_values=["public"]),
-        SettingsChanges(path_template="{year}", max_upload_bytes=1, rating_values=["public"]),
-        SettingsChanges(path_template="{year}", max_upload_bytes=50_000_000, rating_values=[]),
+        SettingsChanges(path_template="{nonsense}", max_upload_bytes=50_000_000),
+        SettingsChanges(path_template="{year}", max_upload_bytes=1),
         SettingsChanges(path_template="{year}", web_accent_color="blue"),
     ],
-    ids=["template", "upload limit", "ratings", "accent colour"],
+    ids=["template", "upload limit", "accent colour"],
 )
 def test_one_invalid_setting_changes_nothing(server_settings: ServerSettings, changes: SettingsChanges) -> None:
     with pytest.raises(Problem) as raised:

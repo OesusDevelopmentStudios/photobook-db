@@ -18,7 +18,6 @@ from photobook_db.api.v1.dependencies import (
 from photobook_db.services.auth import PASSWORD_MAX_LENGTH, Role, UserInfo
 from photobook_db.services.importer import UPLOAD_LIMIT_RANGE
 from photobook_db.services.server_settings import ServerSettingsInfo, SettingsChanges
-from photobook_db.services.tags import MAX_RATING_VALUES
 from photobook_db.utils.problems import problem_responses
 from photobook_db.utils.time import as_utc
 
@@ -117,9 +116,6 @@ class Settings(BaseModel):
         examples=["{category}/{author}/{year}"],
     )
     max_upload_bytes: int
-    rating_values: list[str] = Field(
-        description="The only values a rating: tag may have", examples=[["public", "private"]]
-    )
     web_accent_color: str = Field(description="Accent colour of the web admin pages", examples=["#3daee9"])
     library_dir: str = Field(description="Read-only: set with PHOTOBOOK_LIBRARY_DIR")
     import_dir: str | None = Field(
@@ -138,12 +134,6 @@ class SettingsChangeRequest(BaseModel):
         default=None, max_length=1000, description="A different template starts a job that moves every file"
     )
     max_upload_bytes: int | None = Field(default=None, ge=UPLOAD_LIMIT_RANGE[0], le=UPLOAD_LIMIT_RANGE[1])
-    rating_values: list[str] | None = Field(
-        default=None,
-        min_length=1,
-        max_length=MAX_RATING_VALUES,
-        description="Images keep a rating that is removed here, but it cannot be given again",
-    )
     web_accent_color: str | None = Field(default=None, max_length=20, description="A colour as #rrggbb")
 
 
@@ -163,7 +153,6 @@ def change_settings(
     changes = SettingsChanges(
         path_template=request.path_template,
         max_upload_bytes=request.max_upload_bytes,
-        rating_values=request.rating_values,
         web_accent_color=request.web_accent_color,
     )
     settings, job = server_settings.change(changes, admin.user.id)
@@ -174,7 +163,6 @@ def _settings_fields(settings: ServerSettingsInfo) -> dict[str, object]:
     return {
         "path_template": settings.path_template,
         "max_upload_bytes": settings.max_upload_bytes,
-        "rating_values": settings.rating_values,
         "web_accent_color": settings.web_accent_color,
         "library_dir": str(settings.library_dir),
         "import_dir": None if settings.import_dir is None else str(settings.import_dir),

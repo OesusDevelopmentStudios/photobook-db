@@ -46,7 +46,8 @@ def library(database: Database) -> Database:
     with database.session() as session:
         namespace_rows = session.execute(select(Namespace.name, Namespace.id))
         namespace_ids = {name: namespace_id for name, namespace_id in namespace_rows}
-        tag_ids: dict[str, int] = {}
+        existing = session.execute(select(Namespace.name, Tag.name, Tag.id).join(Tag, Tag.namespace_id == Namespace.id))
+        tag_ids = {f"{namespace}:{name}": tag_id for namespace, name, tag_id in existing}  # e.g. the ratings
         for number, (name, (tags, taken_at)) in enumerate(LIBRARY.items()):
             image = Image(
                 sha256=f"{number:064x}",

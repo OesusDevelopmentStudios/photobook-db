@@ -120,7 +120,6 @@ def test_admin_adds_a_tag_that_is_then_suggested(
     [
         ("general:summer", 409, "already_exists"),
         ("meta:video", 422, "namespace_read_only"),
-        ("rating:secret", 422, "invalid_tag"),  # not one of the rating values
         ("a|b", 422, "invalid_tag"),
     ],
 )
@@ -142,6 +141,14 @@ def test_pages_follow_the_counts(client: TestClient, admin_headers: dict[str, st
     pages = general_tag_pages(client, admin_headers, limit=1)
 
     assert pages == [[("general:summer", 2)], [("general:beach", 1)], [("general:lake", 0)]]
+
+
+def test_an_admin_adds_a_rating_value(client: TestClient, admin_headers: dict[str, str]) -> None:
+    response = client.post("/api/v1/tags", json={"tag": "rating:secret"}, headers=admin_headers)
+
+    assert response.status_code == 201
+    items = client.get("/api/v1/namespaces", headers=admin_headers).json()["items"]
+    assert next(item["allowed_values"] for item in items if item["name"] == "rating") == ["public", "private", "secret"]
 
 
 def test_users_cannot_add_tags(client: TestClient, user_headers: dict[str, str]) -> None:

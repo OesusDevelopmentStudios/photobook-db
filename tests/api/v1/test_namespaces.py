@@ -143,6 +143,7 @@ def test_ratings_list_their_allowed_values(
 
     assert rating_values() == ["public", "private"]
 
-    client.patch("/api/v1/admin/settings", json={"rating_values": ["public", "secret"]}, headers=admin_headers)
+    client.post("/api/v1/tags", json={"tag": "rating:secret"}, headers=admin_headers)
+    client.delete("/api/v1/tags/rating/private", headers=admin_headers)
 
     assert rating_values() == ["public", "secret"]

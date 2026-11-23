@@ -15,7 +15,7 @@ from photobook_db.admin_web._messages import problem_message
 from photobook_db.admin_web._session import AdminForm, AdminPage, AdminSession, PageError
 from photobook_db.admin_web._templates import templates
 from photobook_db.services.jobs import SUCCESSFUL_JOB_LIFETIME, FolderImport, JobInfo, JobStatus
-from photobook_db.services.tags import RATING_NAMESPACE, NamespaceInfo, TagsService
+from photobook_db.services.tags import NamespaceInfo, TagsService
 from photobook_db.utils.problems import Problem
 
 router = APIRouter(prefix="/import")
@@ -32,7 +32,7 @@ class TagField:
     """One namespace's field in the import form."""
 
     namespace: str
-    kind: str  # "choice": a fixed list (ratings); "single": one tag, with suggestions; "several": comma-separated
+    kind: str  # "choice": fixed values (ratings); "single": one tag, with suggestions; "several": comma-separated
     value: str
     options: list[str]
 
@@ -161,8 +161,8 @@ def _tag_fields(request: Request, entered: dict[str, str]) -> list[TagField]:
             continue  # the server sets those tags itself
 
         value = entered.get(namespace.name, "")
-        if namespace.name == RATING_NAMESPACE:
-            fields.append(TagField(namespace.name, "choice", value, tags.rating_values()))
+        if namespace.allowed_values is not None:  # fixed values, e.g. the ratings
+            fields.append(TagField(namespace.name, "choice", value, list(namespace.allowed_values)))
         elif namespace.single_value:
             known = [match.tag.name for match in tags.autocomplete(namespace=namespace.name, limit=SUGGESTIONS)]
             fields.append(TagField(namespace.name, "single", value, known))

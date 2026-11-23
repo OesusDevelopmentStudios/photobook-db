@@ -161,7 +161,7 @@ def test_unknown_tag_is_not_found(library: Library, new_tag: str) -> None:
 def test_invalid_new_tag_changes_nothing(library: Library) -> None:
     image = library.add_image("red", ("rating:public",))
 
-    problem = problem_of(lambda: library.rename("rating:public", "rating:secret"))  # not an allowed rating
+    problem = problem_of(lambda: library.rename("rating:public", "rating:a|b"))
 
     assert problem.code == "invalid_tag"
     assert library.tags_of(image) == ["rating:public"]
@@ -214,7 +214,6 @@ def test_deleting_an_unknown_tag_is_not_found(library: Library) -> None:
 # --- Restrictions and hidden filters follow
 
 def test_restrictions_and_hidden_filters_follow_a_rename(library: Library) -> None:
-    library.tags.set_rating_values(["public", "private", "secret"])
     library.access.set_restricted_terms(library.restricted_user.id, ["rating:private", "character:*"])
     library.preferences.set_hidden_filters(library.restricted_user.id, ["rating:private|public", "beach"])
     image = library.add_image("red", ("rating:private",))
@@ -269,8 +268,8 @@ def test_restrictions_and_hidden_filters_lose_a_deleted_tag(library: Library) ->
 
 
 def test_unknown_tag_leaves_the_lists_alone(library: Library) -> None:
-    library.access.set_restricted_terms(library.restricted_user.id, ["rating:private"])
+    library.access.set_restricted_terms(library.restricted_user.id, ["general:nobody_has_it"])
 
-    problem_of(lambda: library.delete("rating:private"))  # no image ever had it, so it does not exist
+    problem_of(lambda: library.delete("general:nobody_has_it"))  # it does not exist
 
-    assert library.access.restricted_terms(library.restricted_user.id) == ["rating:private"]
+    assert library.access.restricted_terms(library.restricted_user.id) == ["general:nobody_has_it"]
