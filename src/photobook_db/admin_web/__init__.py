@@ -19,6 +19,7 @@ router.include_router(settings.router)
 router.include_router(users.router)
 router.include_router(namespaces.router)
 router.include_router(tags.router)
+router.include_router(tags.old_urls)
 router.include_router(jobs.router)
 router.include_router(jobs.old_urls)
 router.add_api_route("", overview.overview, response_class=HTMLResponse)  # /admin itself: a router needs a path

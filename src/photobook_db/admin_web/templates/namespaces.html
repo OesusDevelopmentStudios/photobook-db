@@ -1,6 +1,7 @@
 {# SPDX-License-Identifier: GPL-3.0-or-later #}
 {# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
 {% extends "page.html" %}
+{% from "_buttons.html" import pencil_icon %}
 {% block title %}Namespaces{% endblock %}
 {% block heading %}Namespaces{% endblock %}
 {% block content %}
@@ -22,11 +23,14 @@
     <tr><th>Namespace</th><th>Tags per image</th><th>Kind</th><th>Folders</th><th></th></tr>
     {% for namespace in namespaces %}
     <tr>
-        <td><a href="/admin/namespaces/{{ namespace.name }}/tags"><code>{{ namespace.name }}:</code></a></td>
+        <td><code>{{ namespace.name }}:</code></td>
         <td>{% if namespace.single_value %}one{% else %}any number{% endif %}</td>
         <td>{% if namespace.is_builtin %}built-in{% else %}custom{% endif %}</td>
         <td>{% if namespace.in_path_template %}in the path template{% else %}<span class="hint">no</span>{% endif %}</td>
-        <td>
+        <td class="row-actions">
+            <a class="button secondary" href="/admin/namespaces/{{ namespace.name }}/tags">
+                {%- if namespace.user_editable %}{{ pencil_icon() }} Edit{% else %}View{% endif -%}
+            </a>
             {% if namespace.is_builtin or namespace.in_path_template %}
             {% set reason = "Built-in namespaces cannot be removed." if namespace.is_builtin
                             else "The path template uses this namespace. Change the template first." %}
@@ -43,6 +47,6 @@
     </tr>
     {% endfor %}
 </table>
-<p class="hint">Only namespaces without tags can be removed. Tags can be renamed, moved to another namespace or
-deleted on the <a href="/admin/tags">Tags</a> page.</p>
+<p class="hint">Only namespaces without tags can be removed. Edit shows a namespace's tags, where they are added,
+renamed, moved to another namespace or deleted.</p>
 {% endblock %}

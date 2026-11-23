@@ -1,8 +1,7 @@
 {# SPDX-License-Identifier: GPL-3.0-or-later #}
 {# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
 {% extends "page.html" %}
-{% from "_buttons.html" import back_button %}
-{% set path = "/admin/namespaces/" ~ namespace.name ~ "/tags" %}
+{% from "_buttons.html" import back_button, pencil_icon, trash_icon %}
 {% block title %}Namespace {{ namespace.name }}{% endblock %}
 {% block heading %}Namespace <code>{{ namespace.name }}:</code>{% endblock %}
 {% block back %}{{ back_button("/admin/namespaces", "Back to all namespaces") }}{% endblock %}
@@ -13,18 +12,26 @@
     <dt>Folders</dt><dd>{% if namespace.in_path_template %}in the path template{% else %}no{% endif %}</dd>
 </dl>
 
-{% if error %}
-<p class="error" role="alert">{{ error }}</p>
-{% elif added %}
-<p class="success" role="status">The tag <code>{{ namespace.name }}:{{ added }}</code> has been added. Users get it
-as a suggestion.</p>
-{% elif deleted %}
-<p class="success" role="status">The tag has been deleted.</p>
+{% if notes.error %}
+<p class="error" role="alert">{{ notes.error }}</p>
+{% elif notes.added %}
+<p class="success" role="status">The tag <code>{{ namespace.name }}:{{ notes.added }}</code> has been added. Users get
+it as a suggestion.</p>
+{% elif notes.renamed %}
+<p class="success" role="status">The images now have <code>{{ notes.renamed }}</code> instead of the old tag.
+{% if notes.relayout_job is not none %}
+<a href="/admin/import/{{ notes.relayout_job }}">Job {{ notes.relayout_job }}</a> moves the affected files to their
+new folders.{% endif %}</p>
+{% elif notes.deleted %}
+<p class="success" role="status">The tag has been deleted.
+{% if notes.relayout_job is not none %}
+<a href="/admin/import/{{ notes.relayout_job }}">Job {{ notes.relayout_job }}</a> moves the affected files to their
+new folders.{% endif %}</p>
 {% endif %}
 
 {% if namespace.user_editable %}
 <h2>Add a tag</h2>
-<form method="post" action="{{ path }}" class="field-with-button">
+<form method="post" action="{{ tags_path }}" class="field-with-button">
     <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
     <input name="tag_name" required autocomplete="off" spellcheck="false" value="{{ new_tag_name }}"
            aria-label="New tag" placeholder="A tag no image has yet, so that users get it as a suggestion">
@@ -37,7 +44,7 @@ so they cannot be added, renamed or deleted here.</p>
 
 <h2>Tags</h2>
 <div class="toolbar">
-    <form method="get" action="{{ path }}" role="search">
+    <form method="get" action="{{ tags_path }}" role="search">
         <input name="search" type="search" value="{{ search }}" placeholder="Tags starting with…"
                aria-label="Tags starting with" spellcheck="false">
         <button type="submit" class="secondary">Search</button>
@@ -46,11 +53,32 @@ so they cannot be added, renamed or deleted here.</p>
 
 {% if tags %}
 <table>
-    <tr><th>Tag</th><th>Images</th></tr>
+    <tr><th>Tag</th><th>Images</th>{% if namespace.user_editable %}<th></th>{% endif %}</tr>
     {% for match, tag_path in tags %}
+    {% set refused = renaming is not none and renaming.tag_name == match.tag.name %}
     <tr>
-        <td><a href="{{ tag_path }}"><code>{{ match.tag.name }}</code></a></td>
+        <td><code>{{ match.tag.name }}</code></td>
         <td>{{ match.image_count }}</td>
+        {% if namespace.user_editable %}
+        <td class="row-actions">
+            {# Opens a field in the row; clicking the pencil again closes it. #}
+            <details class="rename"{% if refused %} open{% endif %}>
+                <summary class="icon-button" title="Rename {{ match.tag }}" aria-label="Rename {{ match.tag }}">
+                    {{ pencil_icon() }}
+                </summary>
+                <form method="post" action="{{ tag_path }}/rename" class="field-with-button">
+                    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+                    <input type="hidden" name="search" value="{{ search }}">
+                    <input type="hidden" name="cursor" value="{{ cursor or '' }}">
+                    <input name="new_tag" required autocomplete="off" spellcheck="false" aria-label="New tag"
+                           value="{{ renaming.new_tag if refused else match.tag.name }}">
+                    <button type="submit">Rename</button>
+                </form>
+            </details>
+            <a class="icon-button danger" href="{{ tag_path }}/delete" title="Delete {{ match.tag }}"
+               aria-label="Delete {{ match.tag }}">{{ trash_icon() }}</a>
+        </td>
+        {% endif %}
     </tr>
     {% endfor %}
 </table>
@@ -59,11 +87,14 @@ so they cannot be added, renamed or deleted here.</p>
 {% endif %}
 
 <p class="hint">Most used first.
-{% if namespace.user_editable %}A tag's page renames, merges or deletes it.{% endif %}</p>
-{% if next_cursor or not first_page %}
-{% set first_page_path = path ~ "?search=" ~ (search | urlencode) %}
+{% if namespace.user_editable %}Renaming to an existing tag merges the two. Another namespace's prefix, e.g.
+<code>album:</code>, moves the tag there; in a one-tag-per-image namespace it replaces an image's current tag.
+Restricted tags and hidden filters follow.{% endif %}
+</p>
+{% if next_cursor or cursor %}
+{% set first_page_path = tags_path ~ "?search=" ~ (search | urlencode) %}
 <div class="toolbar">
-    {% if not first_page %}
+    {% if cursor %}
     <a class="button secondary" href="{{ first_page_path }}">First page</a>
     {% endif %}
     {% if next_cursor %}

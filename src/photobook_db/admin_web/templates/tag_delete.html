@@ -1,8 +1,10 @@
 {# SPDX-License-Identifier: GPL-3.0-or-later #}
 {# SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios #}
 {% extends "page.html" %}
+{% from "_buttons.html" import back_button %}
 {% block title %}Delete {{ tag }}{% endblock %}
 {% block heading %}Delete tag <code>{{ tag }}</code>?{% endblock %}
+{% block back %}{{ back_button(tags_path, "Back to the namespace") }}{% endblock %}
 {% block content %}
 <p>The tag is taken off {{ image_count }} image{% if image_count != 1 %}s{% endif %} and deleted; this cannot be
 undone. The images stay in the library. Restricted tags and hidden filters lose it too.</p>
@@ -10,6 +12,6 @@ undone. The images stay in the library. Restricted tags and hidden filters lose 
 <form method="post" action="{{ tag_path }}/delete">
     <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
     <button type="submit" class="danger">Delete {{ tag }}</button>
-    <a class="button secondary" href="{{ tag_path }}">Cancel</a>
+    <a class="button secondary" href="{{ tags_path }}">Cancel</a>
 </form>
 {% endblock %}

@@ -127,13 +127,15 @@ def add_tags(admin_browser: TestClient, namespace_name: str, names: list[str]) -
 
 
 def listed_tags(page: str) -> list[str]:
-    return re.findall(r"<td><a href=\"[^\"]+\"><code>([^<]+)</code></a></td>", page)
+    return re.findall(r"<tr>\s*<td><code>([^<]+)</code></td>", page)
 
 
-def test_the_list_links_to_each_namespace(admin_browser: TestClient) -> None:
+def test_each_namespace_has_an_edit_button(admin_browser: TestClient) -> None:
     page = admin_browser.get("/admin/namespaces").text
 
-    assert '<a href="/admin/namespaces/author/tags"><code>author:</code></a>' in page
+    assert re.search(r'<a class="button secondary" href="/admin/namespaces/author/tags">\s*<svg', page)
+    assert "<td><code>author:</code></td>" in page  # the name itself is no link
+    assert '<a class="button secondary" href="/admin/namespaces/meta/tags">View</a>' in page  # nothing to edit
 
 
 def test_shows_the_namespace_and_its_tags(admin_browser: TestClient) -> None:
@@ -144,7 +146,6 @@ def test_shows_the_namespace_and_its_tags(admin_browser: TestClient) -> None:
     assert "Namespace <code>author:</code>" in page
     assert "<dt>Folders</dt><dd>in the path template</dd>" in page
     assert listed_tags(page) == ["anon_one", "sample_artist"]  # the same count: by name
-    assert '<a href="/admin/tags/author/anon_one">' in page  # its page renames or deletes it
 
 
 def test_finds_tags_starting_with_the_search(admin_browser: TestClient) -> None:
