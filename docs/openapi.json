@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "photobook-db",
-    "version": "0.1.0"
+    "version": "0.2.0.dev0"
   },
   "paths": {
     "/api/v1/server/info": {

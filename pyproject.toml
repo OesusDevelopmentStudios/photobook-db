@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "photobook-db"
-version = "0.1.0"
+version = "0.2.0.dev0"  # a development build of 0.2.0; the release step sets 0.2.0
 description = "Image library server for Photobook: stores images, tags and thumbnails"
 readme = "README.md"
 license = "GPL-3.0-or-later"
