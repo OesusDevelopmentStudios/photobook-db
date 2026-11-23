@@ -133,3 +133,13 @@ def test_ratings_are_the_rating_tags(client: TestClient, admin: dict[str, str]) 
     assert user_tags(client.get(f"/api/v1/images/{image_id}", headers=admin).json()["tags"]) == []
     refused = upload(client, admin, ["rating:secret"], colour="red")
     assert (refused.status_code, refused.json()["code"]) == (422, "invalid_tag")
+
+
+def test_categories_are_fixed_values_too(client: TestClient, admin: dict[str, str]) -> None:
+    refused = upload(client, admin, ["category:refs"])
+    assert (refused.status_code, refused.json()["code"]) == (422, "invalid_tag")
+    assert "category is one of: photo, artwork" in refused.json()["detail"]
+
+    client.post("/api/v1/tags", json={"tag": "category:refs"}, headers=admin)
+
+    assert upload(client, admin, ["category:refs"]).status_code == 201

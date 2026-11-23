@@ -46,7 +46,7 @@ def test_every_user_can_list_namespaces(client: TestClient, user_headers: dict[s
         "is_builtin": True,
         "in_path_template": True,
         "user_editable": True,
-        "allowed_values": None,
+        "allowed_values": ["photo", "artwork"],
     }
 
 

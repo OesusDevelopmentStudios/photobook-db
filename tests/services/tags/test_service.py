@@ -45,7 +45,8 @@ def test_lists_the_builtin_namespaces(tags: TagsService) -> None:
     assert [name for name, namespace in namespaces.items() if not namespace.user_editable] == ["meta"]
     assert {name for name, namespace in namespaces.items() if namespace.in_path_template} == {"category", "author"}
     assert {name: namespace.allowed_values for name, namespace in namespaces.items() if namespace.allowed_values} == {
-        "rating": ("public", "private")
+        "category": ("photo", "artwork"),
+        "rating": ("public", "private"),
     }
 
 
@@ -149,7 +150,7 @@ def test_resolve_keeps_every_tag_of_a_multi_value_namespace(tags: TagsService) -
 # --- Ratings
 
 def test_ratings_are_public_and_private_by_default(tags: TagsService) -> None:
-    assert tags.fixed_values() == {"rating": ["public", "private"]}
+    assert tags.fixed_values()["rating"] == ["public", "private"]
     assert tags.resolve_tags(["Rating:PRIVATE"]) == [TagName("rating", "private")]
 
 
@@ -164,7 +165,7 @@ def test_a_new_rating_is_a_value_an_admin_adds(tags: TagsService) -> None:
     [secret] = tags.resolve_tags(["rating:Secret"], new_values_allowed=True)
     tags.create_tag(secret)
 
-    assert tags.fixed_values() == {"rating": ["public", "private", "secret"]}
+    assert tags.fixed_values()["rating"] == ["public", "private", "secret"]
     assert tags.resolve_tags(["rating:secret"]) == [TagName("rating", "secret")]
     assert next(info for info in tags.list_namespaces() if info.name == "rating").allowed_values == (
         "public", "private", "secret"

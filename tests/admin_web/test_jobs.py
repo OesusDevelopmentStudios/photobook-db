@@ -93,7 +93,8 @@ def test_import_page_has_a_tag_field_per_namespace(admin_browser: TestClient) ->
     ]
     assert '<select id="tag_rating" name="tag_rating">' in page and '<option value="private">private</option>' in page
     assert '<textarea id="tag_author" name="tag_author" rows="1"' in page  # several tags: a box that can grow
-    assert re.search(r'<datalist id="tag_category-values">\s*<option value="photo">', page)
+    assert '<select id="tag_category" name="tag_category">' in page  # fixed values, like the ratings
+    assert '<option value="photo">photo</option>' in page
     assert 'list="tag_weather-values"' in page  # every one-tag-per-image namespace gets suggestions
 
 

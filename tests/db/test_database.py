@@ -206,15 +206,23 @@ def test_tag_names_are_unique_within_a_namespace(database: Database) -> None:
 
 # --- 0003: fixed values
 
-def rating_tags(database_path: Path) -> list[str]:
+def tag_names(database_path: Path, namespace: str) -> list[str]:
     engine = create_sqlite_engine(database_path)
     with engine.connect() as connection:
         names = connection.execute(text(
             "SELECT tag.name FROM tag JOIN namespace ON namespace.id = tag.namespace_id "
-            "WHERE namespace.name = 'rating' ORDER BY tag.id"
-        )).scalars().all()
+            "WHERE namespace.name = :namespace ORDER BY tag.id"
+        ), {"namespace": namespace}).scalars().all()
     engine.dispose()
     return list(names)
+
+
+def fixed_namespaces(database_path: Path) -> set[str]:
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        names = connection.execute(text("SELECT name FROM namespace WHERE fixed_values")).scalars().all()
+    engine.dispose()
+    return set(names)
 
 
 def stored_setting(database_path: Path, key: str) -> object:
@@ -233,20 +241,17 @@ def test_upgrade_to_0003_makes_the_stored_ratings_tags(database_path: Path) -> N
                            {"value": '["public", "members_only"]'})
     engine.dispose()
 
-    database = open_database(database_path)
-    with database.session() as session:
-        fixed = {namespace.name for namespace in session.scalars(select(Namespace)) if namespace.fixed_values}
-    database.close()
+    migrate(database_path, "0003")
 
-    assert fixed == {"rating"}
-    assert rating_tags(database_path) == ["public", "members_only"]  # in their order
+    assert fixed_namespaces(database_path) == {"rating"}
+    assert tag_names(database_path, "rating") == ["public", "members_only"]  # in their order
     assert stored_setting(database_path, "rating_values") is None
 
 
 def test_without_stored_ratings_the_defaults_become_tags(database_path: Path) -> None:
     open_database(database_path).close()
 
-    assert rating_tags(database_path) == ["public", "private"]
+    assert tag_names(database_path, "rating") == ["public", "private"]
 
 
 def test_undoing_0003_stores_the_ratings_again_and_drops_unused_tags(database_path: Path) -> None:
@@ -262,4 +267,37 @@ def test_undoing_0003_stores_the_ratings_again_and_drops_unused_tags(database_pa
     migrate(database_path, "0002", downgrade=True)
 
     assert stored_setting(database_path, "rating_values") == '["public", "private"]'
-    assert rating_tags(database_path) == ["public"]  # private was a value only; public is on an image
+    assert tag_names(database_path, "rating") == ["public"]  # private was a value only; public is on an image
+
+
+# --- 0004: category values
+
+def test_upgrade_to_0004_makes_the_categories_values(database_path: Path) -> None:
+    migrate(database_path, "0003")
+    engine = create_sqlite_engine(database_path)
+    with engine.begin() as connection:  # a category in use, from before
+        connection.execute(
+            text("INSERT INTO tag (namespace_id, name) SELECT id, 'refs' FROM namespace WHERE name = 'category'")
+        )
+    engine.dispose()
+
+    migrate(database_path, "0004")
+
+    assert fixed_namespaces(database_path) == {"rating", "category"}
+    assert tag_names(database_path, "category") == ["refs", "photo", "artwork"]
+
+
+def test_undoing_0004_keeps_only_the_categories_images_have(database_path: Path) -> None:
+    database = open_database(database_path)
+    image_id = add_image_with_tag(database)
+    with database.session() as session:
+        photo_tag = select(Tag).join(Namespace).where(Namespace.name == "category", Tag.name == "photo")
+        photo = session.scalars(photo_tag).one()
+        session.execute(image_tag.insert().values(image_id=image_id, tag_id=photo.id))
+        session.commit()
+    database.close()
+
+    migrate(database_path, "0003", downgrade=True)
+
+    assert fixed_namespaces(database_path) == {"rating"}
+    assert tag_names(database_path, "category") == ["photo"]  # artwork was a value only
