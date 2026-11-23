@@ -164,7 +164,8 @@ class ImagesService:
     def replace_tag(self, old_tag: TagName, new_tag: TagName | None) -> list[int]:
         """For admins: every image with old_tag gets new_tag instead (a rename, or a merge if new_tag exists), or
         loses it if new_tag is None; then old_tag is deleted. In one transaction. Files are not moved: returns the
-        ids of the changed images, for a relayout. Raises 404 not_found."""
+        ids of the changed images, for a relayout. The new tag keeps the time the old one was added (an album's
+        order); an image that had both keeps the new one's. Raises 404 not_found."""
         with self._database.session() as session:
             old_tag_id = session.scalar(
                 select(Tag.id)
@@ -175,10 +176,21 @@ class ImagesService:
                 raise Problem(404, "not_found", "Tag not found")
 
             additions = [] if new_tag is None else [new_tag]
-            _tag_ids(session, additions)  # the new tag exists afterwards, even if no image had the old one
+            # The new tag exists afterwards, even if no image had the old one.
+            new_tag_ids = _tag_ids(session, additions)
             tagged_ids = select(image_tag.c.image_id).where(image_tag.c.tag_id == old_tag_id)
             images = session.scalars(select(Image).where(Image.id.in_(tagged_ids))).all()
+            added_times = _added_times(session, old_tag_id)
+            had_new_tag = set(_added_times(session, new_tag_ids[0])) if new_tag_ids else set()
             changed_ids = self._change_tags(session, images, tagged_ids, additions, {old_tag}, _no_check)
+            if new_tag_ids:
+                kept = [
+                    {"link_image_id": image_id, "link_tag_id": new_tag_ids[0], "kept_added_at": added_at}
+                    for image_id, added_at in added_times.items()
+                    if image_id not in had_new_tag
+                ]
+                _set_added_times(session, kept)
+
             session.execute(delete(Tag).where(Tag.id == old_tag_id))
             session.commit()
 
@@ -362,6 +374,20 @@ def _save_tag_changes(session: Session, changes: list[_TagChange]) -> None:
         update(Image.__table__).where(images.id == bindparam("changed_id")).values(updated_at=utc_now()),
         [{"changed_id": change.image_id} for change in changes],
     )
+
+
+def _added_times(session: Session, tag_id: int) -> dict[int, datetime]:
+    """When each image got the tag, by image id."""
+    links = image_tag.c
+    return dict(session.execute(select(links.image_id, links.added_at).where(links.tag_id == tag_id)).all())
+
+
+def _set_added_times(session: Session, times: list[dict[str, object]]) -> None:
+    """Rows of link_image_id, link_tag_id and kept_added_at."""
+    if times:
+        links = image_tag.c
+        is_link = and_(links.image_id == bindparam("link_image_id"), links.tag_id == bindparam("link_tag_id"))
+        session.execute(update(image_tag).where(is_link).values(added_at=bindparam("kept_added_at")), times)
 
 
 def _tag_ids(session: Session, tags: list[TagName]) -> list[int]:

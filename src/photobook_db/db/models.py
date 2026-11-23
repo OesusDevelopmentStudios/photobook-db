@@ -10,6 +10,7 @@ from sqlalchemy import (
     JSON,
     CheckConstraint,
     Column,
+    DateTime,
     ForeignKey,
     Index,
     MetaData,
@@ -21,6 +22,8 @@ from sqlalchemy import (
     true,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from photobook_db.utils.time import utc_now
 
 # Fixed constraint names, so that later migrations can refer to them.
 NAMING_CONVENTION = {
@@ -102,7 +105,9 @@ image_tag = Table(
     Base.metadata,
     Column("image_id", ForeignKey("image.id", ondelete="CASCADE"), primary_key=True),
     Column("tag_id", ForeignKey("tag.id"), primary_key=True),
+    Column("added_at", DateTime, nullable=False, default=utc_now),  # an album's images are in this order
     Index(None, "tag_id", "image_id"),  # finds the images with a tag
+    Index(None, "tag_id", "added_at", "image_id"),  # an album's images, in the order they were added
 )
 
 

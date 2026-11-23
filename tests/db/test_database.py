@@ -301,3 +301,45 @@ def test_undoing_0004_keeps_only_the_categories_images_have(database_path: Path)
 
     assert fixed_namespaces(database_path) == {"rating"}
     assert tag_names(database_path, "category") == ["photo"]  # artwork was a value only
+
+
+# --- 0005: when a tag was added
+
+def test_upgrade_to_0005_dates_the_links_by_their_images_import(database_path: Path) -> None:
+    migrate(database_path, "0004")
+    engine = create_sqlite_engine(database_path)
+    with engine.begin() as connection:
+        connection.execute(text(
+            "INSERT INTO image (sha256, storage_path, original_filename, mime_type, width, height, file_size, "
+            "taken_at, taken_at_source, imported_at, updated_at, revision) VALUES "
+            "(:sha256, 'beach.jpg', 'beach.jpg', 'image/jpeg', 1, 1, 1, :moment, 'exif', :imported, :moment, 0)"
+        ), {"sha256": "ab" * 32, "moment": "2024-05-01 10:00:00", "imported": "2025-03-04 05:06:07"})
+        connection.execute(text(
+            "INSERT INTO image_tag (image_id, tag_id) SELECT 1, id FROM tag WHERE name = 'photo'"
+        ))
+    engine.dispose()
+
+    migrate(database_path, "0005")
+
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        added_at = connection.execute(text("SELECT added_at FROM image_tag")).scalar()
+        indexes = {index["name"] for index in inspect(connection).get_indexes("image_tag")}
+    engine.dispose()
+    assert str(added_at).startswith("2025-03-04 05:06:07")
+    assert "ix_image_tag_tag_id_added_at_image_id" in indexes
+
+
+def test_undoing_0005_drops_the_times(database_path: Path) -> None:
+    database = open_database(database_path)
+    add_image_with_tag(database)
+    database.close()
+
+    migrate(database_path, "0004", downgrade=True)
+
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        columns = {column["name"] for column in inspect(connection).get_columns("image_tag")}
+        links = connection.execute(text("SELECT COUNT(*) FROM image_tag")).scalar()
+    engine.dispose()
+    assert "added_at" not in columns and links == 1

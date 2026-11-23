@@ -4,20 +4,24 @@
 """Changing the tags of images, with real files: a change to a folder-forming tag moves the file."""
 
 import logging
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 from PIL import ExifTags, Image
+from sqlalchemy import select, update
 
 from photobook_db.db import Database
+from photobook_db.db.models import Namespace, Tag, image_tag
 from photobook_db.services.access import Restrictions
 from photobook_db.services.images import ImageRecord, ImagesService
 from photobook_db.services.importer import ImporterService, UploadMetadata
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
-from photobook_db.services.tags import TagsService
+from photobook_db.services.tags import TagName, TagsService
 from photobook_db.services.thumbnails import ThumbnailsService
 from photobook_db.utils.problems import Problem
+from photobook_db.utils.time import utc_now
 
 from ...tag_lists import user_tags
 
@@ -26,6 +30,7 @@ NO_RESTRICTIONS = Restrictions([])
 
 class Library:
     def __init__(self, database: Database, tmp_path: Path) -> None:
+        self.database = database
         self.library_dir = tmp_path / "library"
         settings = SettingsService(database)
         tags = TagsService(database, lambda: self.storage.path_template_namespaces())
@@ -56,6 +61,33 @@ class Library:
 
     def file_exists(self, record: ImageRecord) -> bool:
         return (self.library_dir / record.storage_path).is_file()
+
+    def added_at(self, image_id: int, tag: str) -> datetime | None:
+        """When the image got the tag; None if it does not have it."""
+        return self.added_times(tag).get(image_id)
+
+    def added_times(self, tag: str) -> dict[int, datetime]:
+        namespace, name = tag.split(":")
+        query = (
+            select(image_tag.c.image_id, image_tag.c.added_at)
+            .join(Tag, Tag.id == image_tag.c.tag_id)
+            .join(Namespace, Namespace.id == Tag.namespace_id)
+            .where(Namespace.name == namespace, Tag.name == name)
+        )
+        with self.database.session() as session:
+            return dict(session.execute(query).all())
+
+    def backdate(self, image_id: int, tag: str, when: datetime) -> None:
+        """As if the image had got the tag at `when`."""
+        namespace, name = tag.split(":")
+        tag_id = select(Tag.id).join(Namespace).where(Namespace.name == namespace, Tag.name == name)
+        with self.database.session() as session:
+            session.execute(
+                update(image_tag)
+                .where(image_tag.c.image_id == image_id, image_tag.c.tag_id == tag_id.scalar_subquery())
+                .values(added_at=when)
+            )
+            session.commit()
 
 
 @pytest.fixture
@@ -227,3 +259,41 @@ def test_images_that_already_have_the_tag_are_not_touched(library: Library) -> N
 
     assert library.images.get_image(tagged.id).updated_at == tagged.updated_at
     assert tag_texts(library.images.get_image(untagged.id)) == ["general:summer"]
+
+
+# --- When a tag was added (an album's order)
+
+LONG_AGO = datetime(2025, 1, 1, 12, 0)
+
+
+def test_a_tag_gets_the_time_it_was_added(library: Library) -> None:
+    image = library.add_image("red", ("album:trip",))
+    before = utc_now()
+
+    library.change_tags(image.id, add_tags=["album:summer"], remove_tags=[])
+
+    added = library.added_at(image.id, "album:summer")
+    assert added is not None and added >= before
+
+
+def test_other_changes_keep_the_time_a_tag_was_added(library: Library) -> None:
+    image = library.add_image("red", ("album:trip",))
+    library.backdate(image.id, "album:trip", LONG_AGO)
+
+    library.change_tags(image.id, add_tags=["beach"], remove_tags=[])
+    library.change_tags_of_many([image.id], add_tags=["album:trip", "sunset"], remove_tags=[])  # had it already
+
+    assert library.added_at(image.id, "album:trip") == LONG_AGO
+
+
+def test_a_rename_keeps_the_time_and_a_merge_keeps_the_existing_one(library: Library) -> None:
+    renamed = library.add_image("red", ("album:trip",))
+    merged = library.add_image("green", ("album:trip", "album:journey"))
+    library.backdate(renamed.id, "album:trip", LONG_AGO)
+    library.backdate(merged.id, "album:trip", LONG_AGO)
+    library.backdate(merged.id, "album:journey", LONG_AGO.replace(year=2026))
+
+    library.images.replace_tag(TagName("album", "trip"), TagName("album", "journey"))
+
+    assert library.added_at(renamed.id, "album:journey") == LONG_AGO
+    assert library.added_at(merged.id, "album:journey") == LONG_AGO.replace(year=2026)
