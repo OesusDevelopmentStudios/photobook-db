@@ -3,11 +3,12 @@
 {% extends "page.html" %}
 {% from "_buttons.html" import back_button %}
 {% block title %}Delete {{ tag }}{% endblock %}
-{% block heading %}Delete tag <code>{{ tag }}</code>?{% endblock %}
+{% block heading %}Delete {{ "value" if fixed else "tag" }} <code>{{ tag }}</code>?{% endblock %}
 {% block back %}{{ back_button(tags_path, "Back to the namespace") }}{% endblock %}
 {% block content %}
-<p>The tag is taken off {{ image_count }} image{% if image_count != 1 %}s{% endif %} and deleted; this cannot be
-undone. The images stay in the library. Restricted tags and hidden filters lose it too.</p>
+<p>The {{ "value" if fixed else "tag" }} is taken off {{ image_count }} image{% if image_count != 1 %}s{% endif %}
+and deleted; this cannot be undone.{% if fixed %} Images can no longer be given it.{% endif %} The images stay in the
+library. Restricted tags and hidden filters lose it too.</p>
 
 <form method="post" action="{{ tag_path }}/delete">
     <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">

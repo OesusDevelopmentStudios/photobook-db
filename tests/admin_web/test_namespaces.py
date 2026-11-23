@@ -216,3 +216,29 @@ def test_the_meta_namespace_takes_no_new_tags(admin_browser: TestClient) -> None
 @pytest.mark.parametrize("path", ["/admin/namespaces/nowhere/tags", "/admin/namespaces/general/tags?cursor=broken"])
 def test_unknown_namespace_or_page_is_not_found(admin_browser: TestClient, path: str) -> None:
     assert admin_browser.get(path).status_code == 404
+
+
+# --- Fixed values: the rating page
+
+def test_the_rating_page_lists_its_values(admin_browser: TestClient) -> None:
+    page = admin_browser.get("/admin/namespaces/rating/tags").text
+
+    assert "<dt>Values</dt><dd>fixed: images may have only the values listed here</dd>" in page
+    assert "<h2>Add a value</h2>" in page and "<h2>Values</h2>" in page
+    assert listed_tags(page) == ["private", "public"]  # no image has either: by name
+    assert "deleting one takes it off every image" in page
+
+
+def test_adds_a_rating_value(admin_browser: TestClient, tags: TagsService) -> None:
+    response = post(admin_browser, "/admin/namespaces/rating/tags", tag_name="Secret")
+
+    page = admin_browser.get(response.headers["location"]).text
+    assert "The value <code>rating:secret</code> has been added.\nImages may have it now." in page
+    assert tags.fixed_values()["rating"] == ["public", "private", "secret"]
+
+
+def test_asks_before_deleting_a_value(admin_browser: TestClient) -> None:
+    page = admin_browser.get("/admin/namespaces/rating/tags/private/delete").text
+
+    assert "Delete value <code>rating:private</code>?" in page
+    assert "Images can no longer be given it." in page

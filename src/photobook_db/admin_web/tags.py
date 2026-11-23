@@ -60,6 +60,7 @@ def confirm_deletion(request: Request, session: AdminPage, namespace: str, name:
         "tag_path": tag_path(tag),
         "tags_path": tags_path(namespace),
         "image_count": image_count,
+        "fixed": namespace in request.app.state.tags.fixed_values(),  # a value, e.g. a rating
     }
     return templates.TemplateResponse(request, "tag_delete.html", context)
 
