@@ -8,8 +8,10 @@ from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from itertools import groupby
 
 from sqlalchemy import ColumnElement, Select, Subquery, and_, func, literal, or_, select, tuple_
+from sqlalchemy.orm import Session
 
 from photobook_db.db import Database
 from photobook_db.db.models import Image, Namespace, Tag, image_tag
@@ -53,6 +55,15 @@ class SearchPage:
     image_ids: list[int]
     next_cursor: str | None  # None on the last page
     effective_query: str  # the query with the hidden filters that were added
+
+
+@dataclass(frozen=True)
+class AlbumSummary:
+    name: str  # of its album: tag
+    image_count: int
+    cover_id: int  # the first image in album order
+    cover_revision: int
+    last_changed_at: datetime  # when an image was last added to it
 
 
 @dataclass(frozen=True)
@@ -110,6 +121,50 @@ class SearchService:
             count = session.scalar(statement) or 0
 
         return SearchCount(count, filtered.effective_query)
+
+    def albums(self, visible_images: ColumnElement[bool], hidden_filters: tuple[str, ...]) -> list[AlbumSummary]:
+        """Each album with an image the user may see (`visible_images`): how many, the first in album order as its
+        cover, and when one was last added; most recently changed first. An album with an image that one of
+        `hidden_filters` matches is left out."""
+        links = (
+            select(Tag.name, Image.id, Image.revision, image_tag.c.added_at)
+            .join(image_tag, image_tag.c.image_id == Image.id)
+            .join(Tag, Tag.id == image_tag.c.tag_id)
+            .join(Namespace, Namespace.id == Tag.namespace_id)
+            .where(Namespace.name == ALBUM_NAMESPACE, visible_images)
+            .order_by(Tag.name, image_tag.c.added_at, Image.original_filename, Image.id)
+        )
+        with self._database.session() as session:
+            rows = session.execute(links).all()
+            hidden_ids = self._hidden_album_images(session, hidden_filters, visible_images)
+
+        albums = []
+        for name, album_rows in groupby(rows, key=lambda row: row[0]):
+            images = list(album_rows)
+            if any(image_id in hidden_ids for _name, image_id, _revision, _added_at in images):
+                continue
+
+            _name, cover_id, cover_revision, _added_at = images[0]
+            last_changed_at = max(added_at for _name, _id, _revision, added_at in images)
+            albums.append(AlbumSummary(name, len(images), cover_id, cover_revision, last_changed_at))
+
+        return sorted(albums, key=lambda album: album.last_changed_at, reverse=True)
+
+    def _hidden_album_images(
+        self, session: Session, hidden_filters: tuple[str, ...], visible_images: ColumnElement[bool]
+    ) -> set[int]:
+        if not hidden_filters:
+            return set()
+
+        namespace_names = self._namespace_names()
+        hidden = or_(*(matching_condition(parse_query(term, namespace_names)) for term in hidden_filters))
+        album_images = (
+            select(image_tag.c.image_id)
+            .join(Tag, Tag.id == image_tag.c.tag_id)
+            .join(Namespace, Namespace.id == Tag.namespace_id)
+            .where(Namespace.name == ALBUM_NAMESPACE)
+        )
+        return set(session.scalars(select(Image.id).where(Image.id.in_(album_images), hidden, visible_images)))
 
     def _filtered(self, query: str, hidden_filters: tuple[str, ...]) -> FilteredQuery:
         namespace_names = self._namespace_names()

@@ -1588,6 +1588,66 @@
         }
       }
     },
+    "/api/v1/albums": {
+      "get": {
+        "tags": [
+          "albums"
+        ],
+        "summary": "Albums, most recently changed first",
+        "operationId": "list_albums_api_v1_albums_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "include_hidden",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Also albums with images that your hidden-by-default filters match",
+              "default": false,
+              "title": "Include Hidden"
+            },
+            "description": "Also albums with images that your hidden-by-default filters match"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlbumList"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        }
+      }
+    },
     "/api/v1/namespaces": {
       "get": {
         "tags": [
@@ -2536,6 +2596,75 @@
   },
   "components": {
     "schemas": {
+      "Album": {
+        "properties": {
+          "tag": {
+            "type": "string",
+            "title": "Tag",
+            "examples": [
+              "album:vacation_2015"
+            ]
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "description": "The images you may see"
+          },
+          "cover": {
+            "$ref": "#/components/schemas/AlbumCover"
+          },
+          "last_changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Changed At",
+            "description": "When an image was last added to it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tag",
+          "image_count",
+          "cover",
+          "last_changed_at"
+        ],
+        "title": "Album"
+      },
+      "AlbumCover": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "The album's first image, in the order images were added to it"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "For the thumbnail's URL (rev=), as in the image object"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "revision"
+        ],
+        "title": "AlbumCover"
+      },
+      "AlbumList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Album"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "AlbumList"
+      },
       "BulkTagChanges": {
         "properties": {
           "add_tags": {

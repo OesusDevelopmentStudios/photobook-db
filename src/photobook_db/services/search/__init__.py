@@ -25,6 +25,7 @@ from photobook_db.services.search._terms import MAX_TERMS, TERM_MAX_LENGTH, chec
 from photobook_db.services.search._service import (
     DEFAULT_LIMIT,
     MAX_LIMIT,
+    AlbumSummary,
     Order,
     SearchCount,
     SearchPage,
@@ -34,6 +35,7 @@ from photobook_db.services.search._service import (
 )
 
 __all__ = [
+    "AlbumSummary",
     "DATE_FIELDS",
     "DEFAULT_LIMIT",
     "MAX_LIMIT",

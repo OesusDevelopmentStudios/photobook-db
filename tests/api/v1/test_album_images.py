@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""An album's images: GET /images and /images/count with album=, and album order (sort=album)."""
+"""Albums: the list (GET /albums), and an album's images: GET /images and /images/count with album=, and album
+order (sort=album)."""
 
 import io
 import json
@@ -125,3 +126,41 @@ def test_a_restricted_image_stays_out_of_its_album(
     restricted = {"Authorization": f"Bearer {client.post('/api/v1/auth/tokens', json=login).json()['token']}"}
 
     assert found(client, restricted, album="trip", sort="album") == [trip["hills"]]
+
+
+# --- The list of albums
+
+def albums(client: TestClient, headers: dict[str, str], **params: object) -> list[tuple[str, int, int, str]]:
+    items = client.get("/api/v1/albums", params=params, headers=headers).json()["items"]
+    return [(item["tag"], item["image_count"], item["cover"]["id"], item["last_changed_at"]) for item in items]
+
+
+def test_needs_a_login(client: TestClient) -> None:
+    assert client.get("/api/v1/albums").status_code == 401
+
+
+def test_lists_the_albums_most_recently_changed_first(
+    client: TestClient, headers: dict[str, str], trip: dict[str, int]
+) -> None:
+    holiday, trip_album = albums(client, headers)
+
+    assert holiday[:3] == ("album:holiday", 1, trip["city"])  # added just now
+    assert trip_album == ("album:trip", 3, trip["hills"], "2025-02-01T00:00:00Z")  # its first image is the cover
+
+
+def test_leaves_out_albums_with_hidden_images_unless_asked(
+    client: TestClient, headers: dict[str, str], trip: dict[str, int]
+) -> None:
+    client.put("/api/v1/preferences", json={"hidden_filters": ["album:holiday"]}, headers=headers)
+
+    assert [album[0] for album in albums(client, headers)] == ["album:trip"]
+    assert [album[0] for album in albums(client, headers, include_hidden=True)] == ["album:holiday", "album:trip"]
+
+
+def test_an_album_with_one_hidden_image_is_left_out_whole(
+    client: TestClient, headers: dict[str, str], trip: dict[str, int]
+) -> None:
+    client.put("/api/v1/preferences", json={"hidden_filters": ["general:summer"]}, headers=headers)
+
+    assert albums(client, headers) == []  # lake and beach in trip, city in holiday
+    assert [album[1] for album in albums(client, headers, include_hidden=True)] == [1, 3]  # all of them counted

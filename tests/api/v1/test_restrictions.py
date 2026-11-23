@@ -206,6 +206,16 @@ def expect_admins_only(method: str) -> Callable[[TestClient, Setup], None]:
     return check
 
 
+def check_albums_leave_it_out(client: TestClient, setup: Setup) -> None:
+    for image_id in (setup.private_id, setup.safe_id):  # the private one first: for an admin, the cover
+        client.patch(f"/api/v1/images/{image_id}", json={"add_tags": ["album:trip"]}, headers=setup.admin)
+
+    response = client.get("/api/v1/albums", params={"include_hidden": True}, headers=setup.restricted_user)
+
+    albums = [(album["tag"], album["image_count"], album["cover"]["id"]) for album in response.json()["items"]]
+    assert albums == [("album:trip", 1, setup.safe_id)]
+
+
 def check_creating_is_for_admins(client: TestClient, setup: Setup) -> None:
     response = client.post("/api/v1/tags", json={"tag": "rating:public"}, headers=setup.restricted_user)
     assert response.status_code == 403
@@ -225,6 +235,7 @@ ACCESS_RULES = {
     ("POST", "/api/v1/images/{image_id}/rotation"): expect_not_found("POST", "/api/v1/images/{image_id}/rotation"),
     ("GET", "/api/v1/tags"): check_autocomplete_hides,
     ("POST", "/api/v1/tags"): check_creating_is_for_admins,
+    ("GET", "/api/v1/albums"): check_albums_leave_it_out,
     ("PATCH", "/api/v1/tags/{namespace}/{name}"): expect_admins_only("PATCH"),
     ("DELETE", "/api/v1/tags/{namespace}/{name}"): expect_admins_only("DELETE"),
 }
@@ -242,7 +253,7 @@ def test_every_image_route_is_checked(client: TestClient) -> None:
     image_routes = {
         (method.upper(), path)
         for path, operations in client.app.openapi()["paths"].items()
-        if path.startswith(("/api/v1/images", "/api/v1/tags"))
+        if path.startswith(("/api/v1/images", "/api/v1/tags", "/api/v1/albums"))
         for method in operations
     }
 
