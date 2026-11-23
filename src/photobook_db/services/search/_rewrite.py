@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Changing stored terms (restrictions, hidden filters) after an admin renamed or deleted a tag. A term that
-does not name the tag keeps its text as written. Wildcards are patterns, not tags, so they are left alone."""
+"""Changing stored terms (restrictions, hidden filters) after an admin renamed or deleted a tag, or removed a
+namespace. A term that does not name the tag keeps its text as written. Wildcards are patterns, not tags, so a
+renamed or deleted tag leaves them alone; a removed namespace takes its patterns too."""
 
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 
 from photobook_db.services.search._parser import All, AnyOf, DateMatch, Node, Not, TagMatch, parse_query
 from photobook_db.services.tags import TagName
@@ -13,7 +14,7 @@ from photobook_db.services.tags import TagName
 def renamed_in_term(term: str, old_tag: TagName, new_tag: TagName, namespace_names: Collection[str]) -> str:
     """The term naming new_tag wherever it named old_tag."""
     tree = _parse_term(term, namespace_names)
-    if not _names_tag(tree, old_tag):
+    if not _names(tree, lambda node: _is_tag(node, old_tag)):
         return term
 
     return term_text(_renamed(tree, old_tag, new_tag))
@@ -22,11 +23,23 @@ def renamed_in_term(term: str, old_tag: TagName, new_tag: TagName, namespace_nam
 def without_tag_in_term(term: str, tag: TagName, namespace_names: Collection[str]) -> str | None:
     """None if the term goes. In an OR only the tag goes (rating:private|restricted → rating:restricted); a term
     that names the tag in any other way can no longer match as written, so it goes whole."""
+    return _without_in_term(term, lambda node: _is_tag(node, tag), namespace_names)
+
+
+def without_namespace_in_term(term: str, namespace: str, namespace_names: Collection[str]) -> str | None:
+    """As without_tag_in_term(), for every tag and pattern of a namespace that is removed: afterwards the term
+    would read them as general tags. Call it while the namespace still exists."""
+    return _without_in_term(
+        term, lambda node: isinstance(node, TagMatch) and node.namespace == namespace, namespace_names
+    )
+
+
+def _without_in_term(term: str, goes: Callable[[Node], bool], namespace_names: Collection[str]) -> str | None:
     tree = _parse_term(term, namespace_names)
-    if not _names_tag(tree, tag):
+    if not _names(tree, goes):
         return term
 
-    remaining = _without(tree, tag)
+    remaining = _without(tree, goes)
     return None if remaining is None else term_text(remaining)
 
 
@@ -70,14 +83,14 @@ def _is_tag(node: Node, tag: TagName) -> bool:
     return isinstance(node, TagMatch) and not node.any_name_starting and TagName(node.namespace, node.name) == tag
 
 
-def _names_tag(node: Node, tag: TagName) -> bool:
+def _names(node: Node, matches: Callable[[Node], bool]) -> bool:
     if isinstance(node, Not):
-        return _names_tag(node.operand, tag)
+        return _names(node.operand, matches)
 
     if isinstance(node, (All, AnyOf)):
-        return any(_names_tag(operand, tag) for operand in node.operands)
+        return any(_names(operand, matches) for operand in node.operands)
 
-    return _is_tag(node, tag)
+    return matches(node)
 
 
 def _renamed(node: Node, old_tag: TagName, new_tag: TagName) -> Node:
@@ -94,21 +107,21 @@ def _renamed(node: Node, old_tag: TagName, new_tag: TagName) -> Node:
     return node
 
 
-def _without(node: Node, tag: TagName) -> Node | None:
+def _without(node: Node, goes: Callable[[Node], bool]) -> Node | None:
     """None: the node goes."""
-    if _is_tag(node, tag):
+    if goes(node):
         return None
 
     if isinstance(node, Not):
-        operand = _without(node.operand, tag)
+        operand = _without(node.operand, goes)
         return None if operand is None else Not(operand)
 
     if isinstance(node, All):
-        operands = [_without(operand, tag) for operand in node.operands]
+        operands = [_without(operand, goes) for operand in node.operands]
         return None if None in operands else All(tuple(operands))  # type: ignore[arg-type]
 
     if isinstance(node, AnyOf):
-        operands = [kept for kept in (_without(operand, tag) for operand in node.operands) if kept is not None]
+        operands = [kept for kept in (_without(operand, goes) for operand in node.operands) if kept is not None]
         if not operands:
             return None
 

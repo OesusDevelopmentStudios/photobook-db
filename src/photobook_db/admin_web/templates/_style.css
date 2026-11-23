@@ -122,7 +122,7 @@ button.secondary, a.button.secondary { background: var(--button); color: var(--t
 button.secondary:hover, a.button.secondary:hover {
     filter: none; border-color: var(--accent); background: var(--hover);
 }
-button.danger { background: var(--negative); color: var(--text); border-color: var(--negative); }
+button.danger, a.button.danger { background: var(--negative); color: var(--text); border-color: var(--negative); }
 button + a.button { margin-left: 0.5rem; }  /* e.g. Cancel beside the button that confirms */
 button:disabled {
     background: var(--button); color: var(--muted-text); border-color: var(--border); filter: none; cursor: default;

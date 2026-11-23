@@ -15,7 +15,12 @@ from photobook_db.services.search._parser import (
 )
 from photobook_db.services.search._conditions import matching_condition
 from photobook_db.services.search._hidden_filters import FilteredQuery, apply_hidden_filters, mentioned_tags
-from photobook_db.services.search._rewrite import renamed_in_term, term_text, without_tag_in_term
+from photobook_db.services.search._rewrite import (
+    renamed_in_term,
+    term_text,
+    without_namespace_in_term,
+    without_tag_in_term,
+)
 from photobook_db.services.search._terms import MAX_TERMS, TERM_MAX_LENGTH, checked_terms, tree_matches
 from photobook_db.services.search._service import (
     DEFAULT_LIMIT,
@@ -55,5 +60,6 @@ __all__ = [
     "renamed_in_term",
     "term_text",
     "tree_matches",
+    "without_namespace_in_term",
     "without_tag_in_term",
 ]

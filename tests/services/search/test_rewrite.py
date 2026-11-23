@@ -3,7 +3,13 @@
 
 import pytest
 
-from photobook_db.services.search import parse_query, renamed_in_term, term_text, without_tag_in_term
+from photobook_db.services.search import (
+    parse_query,
+    renamed_in_term,
+    term_text,
+    without_namespace_in_term,
+    without_tag_in_term,
+)
 from photobook_db.services.tags import TagName
 
 NAMESPACES = {"general", "category", "author", "rating", "character"}
@@ -69,3 +75,17 @@ def test_rename_can_change_the_namespace() -> None:
 )
 def test_delete_drops_the_tag_from_an_or_and_otherwise_the_term(term: str, remaining: str | None) -> None:
     assert without_tag_in_term(term, PRIVATE, NAMESPACES) == remaining
+
+
+@pytest.mark.parametrize(
+    "term, remaining",
+    [
+        ("character:*", None),  # patterns go with the namespace, unlike with a deleted tag
+        ("character:hero", None),
+        ("character:hero|rating:private", "rating:private"),
+        ("category:photo,character:hero*", None),
+        ("rating:private|public", "rating:private|public"),  # not named: kept as written
+    ],
+)
+def test_a_removed_namespace_takes_its_tags_and_patterns_out_of_terms(term: str, remaining: str | None) -> None:
+    assert without_namespace_in_term(term, "character", NAMESPACES) == remaining

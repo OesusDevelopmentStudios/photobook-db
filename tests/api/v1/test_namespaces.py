@@ -1,8 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
+import io
+import json
+
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from photobook_db.services.auth import AuthService, Role
 
@@ -91,6 +95,25 @@ def test_admin_deletes_an_unused_namespace(client: TestClient, admin_headers: di
     assert response.status_code == 204
     names = [item["name"] for item in client.get("/api/v1/namespaces", headers=admin_headers).json()["items"]]
     assert "weather" not in names
+
+
+def test_deleting_a_namespace_takes_its_tags_off_the_images(
+    client: TestClient, admin_headers: dict[str, str]
+) -> None:
+    client.post("/api/v1/namespaces", json={"name": "weather"}, headers=admin_headers)
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), "teal").save(buffer, format="JPEG")
+    metadata = json.dumps({"original_filename": "beach.jpg", "tags": ["weather:sunny", "summer"]})
+    image = client.post(
+        "/api/v1/images", headers=admin_headers, files={"file": ("beach.jpg", buffer.getvalue())},
+        data={"metadata": metadata},
+    ).json()
+
+    response = client.delete("/api/v1/namespaces/weather", headers=admin_headers)
+
+    assert response.status_code == 204
+    tags = client.get(f"/api/v1/images/{image['id']}", headers=admin_headers).json()["tags"]
+    assert "general:summer" in tags and not [tag for tag in tags if tag.startswith("weather:")]
 
 
 def test_builtin_namespace_is_in_use(client: TestClient, admin_headers: dict[str, str]) -> None:

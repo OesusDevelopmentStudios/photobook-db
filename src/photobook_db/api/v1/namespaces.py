@@ -6,7 +6,12 @@
 from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 
-from photobook_db.api.v1.dependencies import CurrentAdmin, CurrentAuthentication, TagsServiceDependency
+from photobook_db.api.v1.dependencies import (
+    CurrentAdmin,
+    CurrentAuthentication,
+    TagAdminDependency,
+    TagsServiceDependency,
+)
 from photobook_db.services.tags import NamespaceInfo
 from photobook_db.utils.problems import problem_responses
 
@@ -54,11 +59,13 @@ def create_namespace(
 @router.delete(
     "/{name}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete an unused custom namespace",
+    summary="Delete a custom namespace and its tags",
+    description="Its tags come off every image and are deleted; restricted tags and hidden filters lose the terms "
+    "that name them. Built-in namespaces and those in the path template cannot be deleted (409 namespace_in_use).",
     responses=problem_responses(401, 403, 404, 409),
 )
-def delete_namespace(name: str, _admin: CurrentAdmin, tags: TagsServiceDependency) -> None:
-    tags.delete_namespace(name)
+def delete_namespace(name: str, _admin: CurrentAdmin, tag_admin: TagAdminDependency) -> None:
+    tag_admin.delete_namespace(name)
 
 
 def _namespace_details(namespace: NamespaceInfo) -> NamespaceDetails:

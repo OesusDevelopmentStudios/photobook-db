@@ -90,13 +90,22 @@ def test_namespace_in_the_path_template_cannot_be_deleted(database: Database) ->
     assert problem.detail == "The library's path template uses this namespace."
 
 
-def test_namespace_with_tags_cannot_be_deleted(tags: TagsService, database: Database) -> None:
+def test_namespace_with_tags_is_not_deleted_on_its_own(tags: TagsService, database: Database) -> None:
+    """The tag admin takes the tags first, so that images, restrictions and hidden filters follow."""
     tags.create_namespace("weather", single_value=False)
     add_tag(database, "weather", "sunny")
 
     problem = raised_problem(lambda: tags.delete_namespace("weather"))
 
-    assert problem.detail == "Tags in this namespace exist; rename or delete them first."
+    assert (problem.code, problem.detail) == ("namespace_in_use", "It still has tags.")
+
+
+def test_tells_how_much_a_namespace_is_used(tags: TagsService, database: Database) -> None:
+    tags.create_namespace("weather", single_value=False)
+    add_tag(database, "weather", "sunny")
+    add_tag(database, "weather", "rainy")
+
+    assert tags.namespace_usage("weather") == (2, 0)  # no image has them
 
 
 def test_unknown_namespace_is_not_found(tags: TagsService) -> None:

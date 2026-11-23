@@ -1663,7 +1663,8 @@
         "tags": [
           "namespaces"
         ],
-        "summary": "Delete an unused custom namespace",
+        "summary": "Delete a custom namespace and its tags",
+        "description": "Its tags come off every image and are deleted; restricted tags and hidden filters lose the terms that name them. Built-in namespaces and those in the path template cannot be deleted (409 namespace_in_use).",
         "operationId": "delete_namespace_api_v1_namespaces__name__delete",
         "security": [
           {

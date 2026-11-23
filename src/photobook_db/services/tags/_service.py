@@ -297,30 +297,42 @@ class TagsService:
 
             return _namespace_info(namespace, self._path_template_namespaces(), self.rating_values())
 
-    def delete_namespace(self, name: str) -> None:
-        """Only custom namespaces that no tag and no path template uses."""
+    def check_namespace_removable(self, name: str) -> None:
+        """Custom namespaces that the path template does not use. Raises 404 not_found or 409 namespace_in_use."""
         with self._database.session() as session:
             namespace = session.scalars(select(Namespace).where(Namespace.name == name)).one_or_none()
             if namespace is None:
                 raise Problem(404, "not_found", "Namespace not found")
 
-            has_tags = bool(session.scalar(select(exists().where(Tag.namespace_id == namespace.id))))
-            reason = self._reason_namespace_is_in_use(namespace, has_tags)
+            reason = self._reason_namespace_is_in_use(namespace)
             if reason is not None:
                 raise Problem(409, "namespace_in_use", "Namespace is in use", reason)
+
+    def namespace_usage(self, name: str) -> tuple[int, int]:
+        """How many tags the namespace has, and how many images have one of them."""
+        tag_ids = select(Tag.id).join(Namespace, Tag.namespace_id == Namespace.id).where(Namespace.name == name)
+        image_count = select(func.count(image_tag.c.image_id.distinct())).where(image_tag.c.tag_id.in_(tag_ids))
+        with self._database.session() as session:
+            tag_count = session.scalar(select(func.count()).select_from(tag_ids.subquery())) or 0
+            return tag_count, session.scalar(image_count) or 0
+
+    def delete_namespace(self, name: str) -> None:
+        """A removable namespace (check_namespace_removable()) without tags; the tag admin takes its tags first."""
+        self.check_namespace_removable(name)
+        with self._database.session() as session:
+            namespace = session.scalars(select(Namespace).where(Namespace.name == name)).one()
+            if session.scalar(select(exists().where(Tag.namespace_id == namespace.id))):
+                raise Problem(409, "namespace_in_use", "Namespace is in use", "It still has tags.")
 
             session.delete(namespace)
             session.commit()
 
-    def _reason_namespace_is_in_use(self, namespace: Namespace, has_tags: bool) -> str | None:
+    def _reason_namespace_is_in_use(self, namespace: Namespace) -> str | None:
         if namespace.is_builtin:
             return "Built-in namespaces cannot be deleted."
 
         if namespace.name in self._path_template_namespaces():
             return "The library's path template uses this namespace."
-
-        if has_tags:
-            return "Tags in this namespace exist; rename or delete them first."
 
         return None
 

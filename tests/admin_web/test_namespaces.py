@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from photobook_db.db.models import Namespace, Tag
 from photobook_db.services.server_settings import SettingsChanges
-from photobook_db.services.tags import NamespaceInfo, TagsService
+from photobook_db.services.tags import NamespaceInfo, TagName, TagsService
 
 from .conftest import csrf_token_in
 
@@ -30,7 +30,7 @@ def namespace(tags: TagsService, name: str) -> NamespaceInfo | None:
 
 def removable(page: str) -> list[str]:
     """The namespaces whose Remove button works."""
-    return re.findall(r'action="/admin/namespaces/(\w+)/delete"', page)
+    return re.findall(r'href="/admin/namespaces/(\w+)/delete"', page)
 
 
 def test_needs_a_login(client: TestClient) -> None:
@@ -102,18 +102,29 @@ def test_removes_an_unused_namespace(admin_browser: TestClient, tags: TagsServic
     assert namespace(tags, "weather") is None
 
 
-def test_namespace_with_tags_is_not_removed(admin_browser: TestClient, tags: TagsService) -> None:
+def test_asks_before_removing_a_namespace_and_its_tags(admin_browser: TestClient, tags: TagsService) -> None:
     tags.create_namespace("weather", single_value=True)
     with admin_browser.app.state.database.session() as session:
         weather = session.scalars(select(Namespace).where(Namespace.name == "weather")).one()
-        session.add(Tag(namespace_id=weather.id, name="sunny"))
+        session.add_all([Tag(namespace_id=weather.id, name="sunny"), Tag(namespace_id=weather.id, name="rainy")])
         session.commit()
+
+    question = admin_browser.get("/admin/namespaces/weather/delete").text
+
+    assert "This will remove 2 tags and affect\n0 images." in question
 
     response = post(admin_browser, "/admin/namespaces/weather/delete")
 
+    assert (response.status_code, response.headers["location"]) == (303, "/admin/namespaces?deleted=true")
+    assert namespace(tags, "weather") is None
+    assert not tags.tag_exists(TagName("weather", "sunny"))
+
+
+def test_a_builtin_namespace_is_not_offered_for_removal(admin_browser: TestClient) -> None:
+    response = admin_browser.get("/admin/namespaces/album/delete")
+
     assert response.status_code == 409
-    assert "Tags in this namespace exist; rename or delete them first." in response.text
-    assert namespace(tags, "weather") is not None
+    assert "Built-in namespaces cannot be deleted." in response.text
 
 
 # --- One namespace's page with its tags

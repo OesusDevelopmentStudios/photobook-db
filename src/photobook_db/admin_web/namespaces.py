@@ -50,11 +50,23 @@ def create_namespace(
     return RedirectResponse("/admin/namespaces?created=true", status_code=303)
 
 
+@router.get("/{name}/delete", response_class=HTMLResponse)
+def confirm_deletion(request: Request, session: AdminPage, name: str) -> HTMLResponse:
+    """A page of its own: the namespace's tags go with it, and this cannot be undone."""
+    try:
+        _tags(request).check_namespace_removable(name)
+    except Problem as problem:
+        return _list_page(request, session, error=problem_message(problem), status_code=problem.status)
+
+    tag_count, image_count = _tags(request).namespace_usage(name)
+    context = {"session": session, "name": name, "tag_count": tag_count, "image_count": image_count}
+    return templates.TemplateResponse(request, "namespace_delete.html", context)
+
+
 @router.post("/{name}/delete", response_class=HTMLResponse)
 def delete_namespace(request: Request, session: AdminForm, name: str) -> Response:
-    """Only unused custom namespaces can go, so nothing is lost and no confirmation is needed."""
     try:
-        _tags(request).delete_namespace(name)
+        _tag_admin(request).delete_namespace(name)
     except Problem as problem:
         return _list_page(request, session, error=problem_message(problem), status_code=problem.status)
 

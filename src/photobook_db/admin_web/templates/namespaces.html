@@ -38,15 +38,12 @@
                 <button type="button" class="danger" disabled>Remove</button>
             </span>
             {% else %}
-            <form method="post" action="/admin/namespaces/{{ namespace.name }}/delete">
-                <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
-                <button type="submit" class="danger">Remove</button>
-            </form>
+            <a class="button danger" href="/admin/namespaces/{{ namespace.name }}/delete">Remove</a>
             {% endif %}
         </td>
     </tr>
     {% endfor %}
 </table>
-<p class="hint">Only namespaces without tags can be removed. Edit shows a namespace's tags, where they are added,
-renamed, moved to another namespace or deleted.</p>
+<p class="hint">Removing a namespace removes its tags too, after asking. Edit shows a namespace's tags, where they are
+added, renamed, moved to another namespace or deleted.</p>
 {% endblock %}

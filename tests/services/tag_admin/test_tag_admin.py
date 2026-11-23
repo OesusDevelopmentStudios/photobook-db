@@ -229,6 +229,31 @@ def test_restrictions_and_hidden_filters_follow_a_rename(library: Library) -> No
     )  # still hidden from the restricted_user
 
 
+def test_removing_a_namespace_takes_its_tags_and_their_terms(library: Library) -> None:
+    library.tags.create_namespace("weather", single_value=False)
+    image = library.add_image("red", ("weather:sunny", "beach"))
+    library.access.set_restricted_terms(library.restricted_user.id, ["weather:*", "rating:private"])
+    # "weather:sunny|beach" would mean weather:beach too: a prefix at a term's start applies to all of it
+    library.preferences.set_hidden_filters(library.restricted_user.id, ["weather:sunny|general:beach", "weather:*"])
+
+    library.tag_admin.delete_namespace("weather")
+
+    assert "weather" not in library.tags.namespace_names()
+    assert library.tags_of(image) == ["general:beach"]
+    assert library.access.restricted_terms(library.restricted_user.id) == ["rating:private"]
+    assert library.preferences.hidden_filters(library.restricted_user.id) == ["general:beach"]
+
+
+@pytest.mark.parametrize("name", ["album", "author"])  # built in; in the path template
+def test_namespaces_that_cannot_go_change_nothing(library: Library, name: str) -> None:
+    library.access.set_restricted_terms(library.restricted_user.id, [f"{name}:*"])
+
+    problem = problem_of(lambda: library.tag_admin.delete_namespace(name))
+
+    assert (problem.status, problem.code) == (409, "namespace_in_use")
+    assert library.access.restricted_terms(library.restricted_user.id) == [f"{name}:*"]
+
+
 def test_restrictions_and_hidden_filters_lose_a_deleted_tag(library: Library) -> None:
     library.access.set_restricted_terms(
         library.restricted_user.id, ["rating:private", "category:photo,rating:private", "character:*"]

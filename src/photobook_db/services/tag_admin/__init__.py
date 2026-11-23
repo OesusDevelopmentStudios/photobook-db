@@ -10,7 +10,7 @@ from photobook_db.services.access import AccessService
 from photobook_db.services.images import ImagesService
 from photobook_db.services.jobs import JobInfo, Relayout
 from photobook_db.services.preferences import PreferencesService
-from photobook_db.services.search import renamed_in_term, without_tag_in_term
+from photobook_db.services.search import renamed_in_term, without_namespace_in_term, without_tag_in_term
 from photobook_db.services.storage import StorageService
 from photobook_db.services.tags import TagName, TagsService
 from photobook_db.utils.problems import Problem
@@ -67,6 +67,16 @@ class TagAdmin:
         self._rewrite_terms(lambda term: without_tag_in_term(term, tag, namespace_names))
         changed_ids = self._images.replace_tag(tag, None)
         return self._relayout_if_needed(changed_ids, {tag.namespace}, user_id)
+
+    def delete_namespace(self, name: str) -> None:
+        """A custom namespace and its tags: they come off every image and are deleted, and restrictions and hidden
+        filters lose the terms that name them. Raises 404 not_found, or 409 namespace_in_use for a built-in
+        namespace or one the path template uses (so no file moves)."""
+        self._tags.check_namespace_removable(name)
+        namespace_names = self._tags.namespace_names()
+        self._rewrite_terms(lambda term: without_namespace_in_term(term, name, namespace_names))
+        self._images.delete_namespace_tags(name)
+        self._tags.delete_namespace(name)
 
     def _check_admin_may_change(self, namespace: str) -> None:
         if namespace in self._tags.read_only_namespace_names():

@@ -184,6 +184,26 @@ class ImagesService:
 
         return changed_ids
 
+    def delete_namespace_tags(self, namespace: str) -> list[int]:
+        """For admins removing a namespace: its tags come off every image and are deleted, in one transaction.
+        Returns the ids of the changed images."""
+        with self._database.session() as session:
+            namespace_tags = (
+                select(Tag.id, Tag.name)
+                .join(Namespace, Tag.namespace_id == Namespace.id)
+                .where(Namespace.name == namespace)
+            )
+            rows = session.execute(namespace_tags).all()
+            tag_ids = [tag_id for tag_id, _name in rows]
+            tagged_ids = select(image_tag.c.image_id).where(image_tag.c.tag_id.in_(tag_ids)).distinct()
+            images = session.scalars(select(Image).where(Image.id.in_(tagged_ids))).all()
+            removals = {TagName(namespace, name) for _tag_id, name in rows}
+            changed_ids = self._change_tags(session, images, tagged_ids, [], removals, _no_check)
+            session.execute(delete(Tag).where(Tag.id.in_(tag_ids)))
+            session.commit()
+
+        return changed_ids
+
     def image_count(self) -> int:
         with self._database.session() as session:
             return session.scalar(select(func.count()).select_from(Image)) or 0
