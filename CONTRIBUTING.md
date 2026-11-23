@@ -44,7 +44,7 @@ The interactive API documentation is at <http://127.0.0.1:PHOTOBOOK_PORT/api/doc
 - **Tests come with the code.** New logic comes with a test in `tests/`.
 - Before committing:
   ```sh
-  pytest
+  pytest                          # runs in parallel; pytest -n0 path/to/test.py::name runs one test alone
   flake8
   shellcheck deploy/install.sh    # after changing it
   ```

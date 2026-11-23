@@ -32,6 +32,7 @@ photobook-db = "photobook_db.cli:main"
 [project.optional-dependencies]
 dev = [
     "pytest==9.2.0",  # tests
+    "pytest-xdist==3.8.0",  # runs the tests in parallel
     "httpx2==2.16.0",  # required by FastAPI's TestClient
     "flake8==7.5.0",  # style check
 ]
@@ -46,4 +47,5 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Test files mirror the source files, so names repeat (tests/api/v1/test_auth.py, tests/services/auth/test_auth.py).
-addopts = ["--import-mode=importlib"]
+# -n: runs the tests in parallel worker processes; pass -n0 to run one test alone or to debug.
+addopts = ["--import-mode=importlib", "-n", "8"]

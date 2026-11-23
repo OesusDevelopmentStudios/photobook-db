@@ -7,11 +7,20 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 
 from photobook_db.app import create_app
 from photobook_db.config import DEFAULT_HOST, DEFAULT_PORT, Config
 from photobook_db.db import DATABASE_FILE_NAME, Database, open_database
+from photobook_db.services.auth import _passwords
+
+
+@pytest.fixture(autouse=True, scope="session")
+def cheap_password_hashing() -> None:
+    """Production-strength argon2 takes ~33 ms and 64 MiB per hash; tests only need it to work."""
+    _passwords._hasher = PasswordHasher(time_cost=1, memory_cost=8, parallelism=1)
+    _passwords._UNKNOWN_USER_HASH = _passwords._hasher.hash("password of a user that does not exist")
 
 
 @pytest.fixture
