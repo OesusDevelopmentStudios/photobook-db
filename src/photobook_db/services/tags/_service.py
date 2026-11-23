@@ -141,6 +141,30 @@ class TagsService:
         with self._database.session() as session:
             return session.scalar(query)
 
+    def image_counts(self, tags: list[TagName]) -> list[TagCount]:
+        """How many images have each tag, counting all of them, in the order given. In one query: the viewer asks
+        for every tag of the image on screen."""
+        names_by_namespace: dict[str, list[str]] = {}
+        for tag in tags:
+            names_by_namespace.setdefault(tag.namespace, []).append(tag.name)
+
+        if not names_by_namespace:
+            return []
+
+        wanted = or_(*(and_(Namespace.name == ns, Tag.name.in_(names)) for ns, names in names_by_namespace.items()))
+        query = (
+            select(Namespace.name, Tag.name, func.count(image_tag.c.image_id))
+            .select_from(Tag)
+            .join(Namespace, Tag.namespace_id == Namespace.id)
+            .outerjoin(image_tag, image_tag.c.tag_id == Tag.id)
+            .where(wanted)
+            .group_by(Tag.id)
+        )
+        with self._database.session() as session:
+            counts = {TagName(namespace, name): count for namespace, name, count in session.execute(query)}
+
+        return [TagCount(tag, counts.get(tag, 0)) for tag in tags]
+
     def autocomplete(
         self,
         prefix: str = "",

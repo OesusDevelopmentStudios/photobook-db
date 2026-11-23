@@ -170,3 +170,16 @@ def test_a_new_rating_is_a_value_an_admin_adds(tags: TagsService) -> None:
     assert next(info for info in tags.list_namespaces() if info.name == "rating").allowed_values == (
         "public", "private", "secret"
     )
+
+
+# --- Image counts of given tags
+
+def test_counts_images_of_given_tags_in_their_order(tags: TagsService, database: Database) -> None:
+    add_tag(database, "general", "beach")
+
+    counts = tags.image_counts([TagName("rating", "public"), TagName("general", "beach"), TagName("general", "none")])
+
+    assert [(str(count.tag), count.image_count) for count in counts] == [
+        ("rating:public", 0), ("general:beach", 0), ("general:none", 0)  # one that does not exist counts 0
+    ]
+    assert tags.image_counts([]) == []

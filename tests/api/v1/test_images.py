@@ -496,6 +496,22 @@ def test_invalid_search_parameters(client: TestClient, headers: dict[str, str], 
     assert client.get("/api/v1/images", params=params, headers=headers).status_code == 422
 
 
+# --- Tag counts, for the viewer's tag pane
+
+def test_counts_the_images_of_each_of_its_tags(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
+    upload(client, headers, jpeg_bytes(colour="red"), {"original_filename": "dusk.jpg", "tags": ["summer"]})
+
+    response = client.get(f"/api/v1/images/{uploaded['id']}/tag-counts", headers=headers)
+
+    counts = {item["tag"]: item["image_count"] for item in response.json()["items"]}
+    assert [item["tag"] for item in response.json()["items"]] == uploaded["tags"]  # every tag, in the same order
+    assert (counts["general:summer"], counts["category:photo"], counts["meta:jpeg"]) == (2, 1, 2)
+
+
+def test_tag_counts_of_an_unknown_image_are_not_found(client: TestClient, headers: dict[str, str]) -> None:
+    assert client.get("/api/v1/images/999/tag-counts", headers=headers).status_code == 404
+
+
 # --- Changing tags
 
 def test_changing_tags_needs_a_login(client: TestClient) -> None:

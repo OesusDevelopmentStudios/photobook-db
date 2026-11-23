@@ -21,6 +21,7 @@ from photobook_db.api.v1.dependencies import (
     RotationServiceDependency,
     SearchServiceDependency,
     StorageServiceDependency,
+    TagsServiceDependency,
     ThumbnailsServiceDependency,
 )
 from photobook_db.services.images import ImageRecord
@@ -75,6 +76,15 @@ class ImageList(BaseModel):
     items: list[ImageObject]
     next_cursor: str | None = Field(description="Pass as `cursor` for the next page; null on the last page")
     effective_query: str = Field(description="The query with the hidden-by-default filters that were added")
+
+
+class TagCountItem(BaseModel):
+    tag: str = Field(examples=["general:beach"])
+    image_count: int
+
+
+class TagCountList(BaseModel):
+    items: list[TagCountItem] = Field(description="Every tag of the image, in the image object's order")
 
 
 class ImageCount(BaseModel):
@@ -256,6 +266,21 @@ async def rotate_image(
 @router.get("/{image_id}", summary="One image", responses=problem_responses(401, 404, 422))
 def get_image(image_id: int, restrictions: CurrentRestrictions, images: ImagesServiceDependency) -> ImageObject:
     return _image_object(images.get_visible_image(image_id, restrictions))
+
+
+@router.get(
+    "/{image_id}/tag-counts",
+    summary="How many images have each of the image's tags",
+    description="For the viewer's tag pane. The counts are over all images, also ones you cannot see, as in "
+    "autocomplete.",
+    responses=problem_responses(401, 404, 422),
+)
+def get_tag_counts(
+    image_id: int, restrictions: CurrentRestrictions, images: ImagesServiceDependency, tags: TagsServiceDependency
+) -> TagCountList:
+    image = images.get_visible_image(image_id, restrictions)
+    counts = tags.image_counts(list(image.tags))
+    return TagCountList(items=[TagCountItem(tag=str(count.tag), image_count=count.image_count) for count in counts])
 
 
 @router.get(

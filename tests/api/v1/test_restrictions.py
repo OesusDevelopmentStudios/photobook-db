@@ -229,6 +229,7 @@ ACCESS_RULES = {
     ("POST", "/api/v1/images"): check_upload_refuses,
     ("POST", "/api/v1/images/bulk-tags"): check_bulk_refuses,
     ("GET", "/api/v1/images/{image_id}"): expect_not_found("GET", "/api/v1/images/{image_id}"),
+    ("GET", "/api/v1/images/{image_id}/tag-counts"): expect_not_found("GET", "/api/v1/images/{image_id}/tag-counts"),
     ("PATCH", "/api/v1/images/{image_id}"): expect_not_found("PATCH", "/api/v1/images/{image_id}"),
     ("GET", "/api/v1/images/{image_id}/file"): expect_not_found("GET", "/api/v1/images/{image_id}/file"),
     ("GET", "/api/v1/images/{image_id}/thumbnail"): expect_not_found("GET", "/api/v1/images/{image_id}/thumbnail"),

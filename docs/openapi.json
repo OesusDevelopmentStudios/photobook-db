@@ -1059,6 +1059,74 @@
         }
       }
     },
+    "/api/v1/images/{image_id}/tag-counts": {
+      "get": {
+        "tags": [
+          "images"
+        ],
+        "summary": "How many images have each of the image's tags",
+        "description": "For the viewer's tag pane. The counts are over all images, also ones you cannot see, as in autocomplete.",
+        "operationId": "get_tag_counts_api_v1_images__image_id__tag_counts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Image Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagCountList"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        }
+      }
+    },
     "/api/v1/images/{image_id}/file": {
       "get": {
         "tags": [
@@ -3821,6 +3889,44 @@
         },
         "type": "object",
         "title": "TagChanges"
+      },
+      "TagCountItem": {
+        "properties": {
+          "tag": {
+            "type": "string",
+            "title": "Tag",
+            "examples": [
+              "general:beach"
+            ]
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tag",
+          "image_count"
+        ],
+        "title": "TagCountItem"
+      },
+      "TagCountList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TagCountItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Every tag of the image, in the image object's order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "TagCountList"
       },
       "TagList": {
         "properties": {
