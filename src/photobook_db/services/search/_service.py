@@ -9,23 +9,26 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import ColumnElement, and_, func, or_, select
+from sqlalchemy import ColumnElement, Select, Subquery, and_, func, literal, or_, select, tuple_
 
 from photobook_db.db import Database
-from photobook_db.db.models import Image
+from photobook_db.db.models import Image, Namespace, Tag, image_tag
 from photobook_db.services.search._conditions import matching_condition
 from photobook_db.services.search._hidden_filters import FilteredQuery, apply_hidden_filters
 from photobook_db.services.search._parser import parse_query
+from photobook_db.services.tags import normalized_tag_name
 from photobook_db.utils.problems import Problem
 
 DEFAULT_LIMIT = 100
 MAX_LIMIT = 500
+ALBUM_NAMESPACE = "album"
 
 
 class Sort(StrEnum):
     TAKEN_AT = "taken_at"
     IMPORTED_AT = "imported_at"
     RANDOM = "random"
+    ALBUM = "album"  # when the album tag was added, then by file name; only with an album
 
 
 class Order(StrEnum):
@@ -42,6 +45,7 @@ class SearchRequest:
     limit: int = DEFAULT_LIMIT
     cursor: str | None = None  # next_cursor of the previous page
     hidden_filters: tuple[str, ...] = ()
+    album: str | None = None  # only this album's images, e.g. "vacation_2015"
 
 
 @dataclass(frozen=True)
@@ -67,31 +71,41 @@ class SearchService:
 
     def search(self, request: SearchRequest, visible_images: ColumnElement[bool]) -> SearchPage:
         """Only images matching `visible_images` (the user's restrictions; not shown in effective_query).
-        Raises 400 invalid_query, or 422 validation_error for a missing seed or a damaged cursor."""
+        Raises 400 invalid_query, 422 validation_error for a missing seed, a damaged cursor or sort=album without
+        an album, or 422 invalid_tag for an album name the tag rules refuse."""
         filtered = self._filtered(request.query, request.hidden_filters)
-
-        sort_value = _sort_value(request.sort, request.seed)
-        descending = request.sort != Sort.RANDOM and request.order == Order.DESC
-        statement = select(Image.id, sort_value).where(matching_condition(filtered.tree), visible_images)
+        links = None if request.album is None else _album_links(request.album)
+        sort_keys = _sort_keys(request.sort, request.seed, links)
+        descending = request.sort not in (Sort.RANDOM, Sort.ALBUM) and request.order == Order.DESC
+        statement = _in_album(select(Image.id, *sort_keys), links)
+        statement = statement.where(matching_condition(filtered.tree), visible_images)
         if request.cursor is not None:
-            last_value, last_id = _decode_cursor(request.cursor, request.sort)
-            statement = statement.where(_after(sort_value, last_value, last_id, descending))
+            last_values, last_id = _decode_cursor(request.cursor, request.sort)
+            statement = statement.where(_after(sort_keys, last_values, last_id, descending))
 
-        sort_order = (sort_value.desc(), Image.id.desc()) if descending else (sort_value.asc(), Image.id.asc())
-        statement = statement.order_by(*sort_order).limit(request.limit + 1)  # one more: is there a next page?
+        directed = [key.desc() if descending else key.asc() for key in [*sort_keys, Image.id]]
+        statement = statement.order_by(*directed).limit(request.limit + 1)  # one more: is there a next page?
 
         with self._database.session() as session:
             rows = session.execute(statement).all()
 
         page_rows = rows[: request.limit]
         has_next_page = len(rows) > request.limit
-        next_cursor = _encode_cursor(page_rows[-1][1], page_rows[-1][0]) if has_next_page else None
-        return SearchPage([image_id for image_id, _value in page_rows], next_cursor, filtered.effective_query)
+        next_cursor = _encode_cursor(list(page_rows[-1][1:]), page_rows[-1][0]) if has_next_page else None
+        return SearchPage([row[0] for row in page_rows], next_cursor, filtered.effective_query)
 
-    def count(self, query: str, hidden_filters: tuple[str, ...], visible_images: ColumnElement[bool]) -> SearchCount:
-        """How many images search() finds over all its pages. Raises 400 invalid_query."""
+    def count(
+        self,
+        query: str,
+        hidden_filters: tuple[str, ...],
+        visible_images: ColumnElement[bool],
+        album: str | None = None,
+    ) -> SearchCount:
+        """How many images search() finds over all its pages. Raises 400 invalid_query or 422 invalid_tag."""
         filtered = self._filtered(query, hidden_filters)
-        statement = select(func.count(Image.id)).where(matching_condition(filtered.tree), visible_images)
+        links = None if album is None else _album_links(album)
+        statement = _in_album(select(func.count(Image.id)), links)
+        statement = statement.where(matching_condition(filtered.tree), visible_images)
         with self._database.session() as session:
             count = session.scalar(statement) or 0
 
@@ -103,31 +117,58 @@ class SearchService:
         return apply_hidden_filters(query, tree, list(hidden_filters), namespace_names)
 
 
-def _sort_value(sort: Sort, seed: int | None) -> ColumnElement:
+def _album_links(album: str) -> Subquery:
+    """The images of an album and when the album tag was put on each."""
+    return (
+        select(image_tag.c.image_id, image_tag.c.added_at)
+        .join(Tag, Tag.id == image_tag.c.tag_id)
+        .join(Namespace, Namespace.id == Tag.namespace_id)
+        .where(Namespace.name == ALBUM_NAMESPACE, Tag.name == normalized_tag_name(album))
+        .subquery()
+    )
+
+
+def _in_album(statement: Select, links: Subquery | None) -> Select:
+    return statement if links is None else statement.join(links, links.c.image_id == Image.id)
+
+
+def _sort_keys(sort: Sort, seed: int | None, links: Subquery | None) -> list[ColumnElement]:
+    """What the images are ordered by, before their id."""
+    if sort == Sort.ALBUM:
+        if links is None:
+            raise _invalid("query.sort", "sort=album needs an album: the order is when images were added to it.")
+
+        return [links.c.added_at, Image.original_filename]
+
     if sort == Sort.RANDOM:
         if seed is None:
             raise _invalid("query.seed", "Required for sort=random; the same seed gives the same order.")
 
-        return func.shuffled_position(seed, Image.id)  # registered on every database connection
+        return [func.shuffled_position(seed, Image.id)]  # registered on every database connection
 
-    return Image.taken_at if sort == Sort.TAKEN_AT else Image.imported_at
+    return [Image.taken_at if sort == Sort.TAKEN_AT else Image.imported_at]
 
 
-def _after(sort_value: ColumnElement, last_value: object, last_id: int, descending: bool) -> ColumnElement[bool]:
+def _after(keys: list[ColumnElement], last: list[object], last_id: int, descending: bool) -> ColumnElement[bool]:
+    if len(keys) > 1:  # compared as one row value; only ascending (album order)
+        return tuple_(*keys, Image.id) > tuple_(*[literal(value) for value in last], literal(last_id))
+
+    [key], [last_value] = keys, last
     if descending:
-        return or_(sort_value < last_value, and_(sort_value == last_value, Image.id < last_id))
+        return or_(key < last_value, and_(key == last_value, Image.id < last_id))
 
-    return or_(sort_value > last_value, and_(sort_value == last_value, Image.id > last_id))
+    return or_(key > last_value, and_(key == last_value, Image.id > last_id))
 
 
-def _encode_cursor(sort_value: object, image_id: int) -> str:
-    """base64url JSON {"v": <last sort value>, "id": <last id>}, as the API documents it."""
-    value = sort_value.isoformat() if isinstance(sort_value, datetime) else sort_value
-    text = json.dumps({"v": value, "id": image_id}, separators=(",", ":"))
+def _encode_cursor(sort_values: list[object], image_id: int) -> str:
+    """base64url JSON {"v": <last sort value>, "id": <last id>}, as the API documents it; for album order "v" is
+    [<when it was added>, <file name>]."""
+    values = [value.isoformat() if isinstance(value, datetime) else value for value in sort_values]
+    text = json.dumps({"v": values[0] if len(values) == 1 else values, "id": image_id}, separators=(",", ":"))
     return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
 
 
-def _decode_cursor(cursor: str, sort: Sort) -> tuple[object, int]:
+def _decode_cursor(cursor: str, sort: Sort) -> tuple[list[object], int]:
     try:
         content = json.loads(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
         image_id = content["id"]
@@ -139,9 +180,16 @@ def _decode_cursor(cursor: str, sort: Sort) -> tuple[object, int]:
             if not isinstance(value, int):
                 raise ValueError
 
-            return value, image_id
+            return [value], image_id
 
-        return datetime.fromisoformat(value), image_id
+        if sort == Sort.ALBUM:
+            added_at, file_name = value
+            if not isinstance(file_name, str):
+                raise ValueError
+
+            return [datetime.fromisoformat(added_at), file_name], image_id
+
+        return [datetime.fromisoformat(value)], image_id
     except (binascii.Error, ValueError, TypeError, KeyError, UnicodeDecodeError):
         raise _invalid("query.cursor", "Use next_cursor of the previous page, with the same sort.") from None
 

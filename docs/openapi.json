@@ -400,8 +400,10 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/Sort",
+              "description": "album: the order images were added to `album`; needs it",
               "default": "taken_at"
-            }
+            },
+            "description": "album: the order images were added to `album`; needs it"
           },
           {
             "name": "order",
@@ -409,10 +411,10 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/Order",
-              "description": "Ignored for sort=random",
+              "description": "Ignored for sort=random and sort=album",
               "default": "desc"
             },
-            "description": "Ignored for sort=random"
+            "description": "Ignored for sort=random and sort=album"
           },
           {
             "name": "seed",
@@ -474,6 +476,25 @@
               "title": "Apply Hidden Filters"
             },
             "description": "false skips your hidden-by-default filters"
+          },
+          {
+            "name": "album",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this album's images: the name of an album: tag, e.g. trip",
+              "title": "Album"
+            },
+            "description": "Only this album's images: the name of an album: tag, e.g. trip"
           }
         ],
         "responses": {
@@ -667,6 +688,25 @@
               "title": "Apply Hidden Filters"
             },
             "description": "false skips your hidden-by-default filters"
+          },
+          {
+            "name": "album",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this album's images: the name of an album: tag, e.g. trip",
+              "title": "Album"
+            },
+            "description": "Only this album's images: the name of an album: tag, e.g. trip"
           }
         ],
         "responses": {
@@ -3600,7 +3640,8 @@
         "enum": [
           "taken_at",
           "imported_at",
-          "random"
+          "random",
+          "album"
         ],
         "title": "Sort"
       },

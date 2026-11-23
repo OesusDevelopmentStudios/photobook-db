@@ -38,6 +38,9 @@ THUMBNAIL_CACHE_CONTROL = "private, max-age=31536000, immutable"
 # The parameters that choose which images a search finds, shared by the search and its count
 SearchText = Annotated[str, Query(max_length=2000, description="Search query, e.g. category:artwork -rating:private")]
 ApplyHiddenFilters = Annotated[bool, Query(description="false skips your hidden-by-default filters")]
+AlbumName = Annotated[
+    str | None, Query(max_length=200, description="Only this album's images: the name of an album: tag, e.g. trip")
+]
 
 
 class ImageLinks(BaseModel):
@@ -132,16 +135,24 @@ def search_images(
     images: ImagesServiceDependency,
     preferences: PreferencesServiceDependency,
     q: SearchText = "",
-    sort: Sort = Sort.TAKEN_AT,
-    order: Annotated[Order, Query(description="Ignored for sort=random")] = Order.DESC,
+    sort: Annotated[Sort, Query(description="album: the order images were added to `album`; needs it")] = Sort.TAKEN_AT,
+    order: Annotated[Order, Query(description="Ignored for sort=random and sort=album")] = Order.DESC,
     seed: Annotated[int | None, Query(description="Required for sort=random: same seed, same order")] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
     cursor: Annotated[str | None, Query(max_length=500, description="next_cursor of the previous page")] = None,
     apply_hidden_filters: ApplyHiddenFilters = True,
+    album: AlbumName = None,
 ) -> ImageList:
     hidden_filters = preferences.hidden_filters(authentication.user.id) if apply_hidden_filters else []
     request = SearchRequest(
-        query=q, sort=sort, order=order, seed=seed, limit=limit, cursor=cursor, hidden_filters=tuple(hidden_filters)
+        query=q,
+        sort=sort,
+        order=order,
+        seed=seed,
+        limit=limit,
+        cursor=cursor,
+        hidden_filters=tuple(hidden_filters),
+        album=album,
     )
     page = search.search(request, restrictions.visible_images_filter())
     return ImageList(
@@ -160,9 +171,10 @@ def count_images(
     preferences: PreferencesServiceDependency,
     q: SearchText = "",
     apply_hidden_filters: ApplyHiddenFilters = True,
+    album: AlbumName = None,
 ) -> ImageCount:
     hidden_filters = preferences.hidden_filters(authentication.user.id) if apply_hidden_filters else []
-    found = search.count(q, tuple(hidden_filters), restrictions.visible_images_filter())
+    found = search.count(q, tuple(hidden_filters), restrictions.visible_images_filter(), album)
     return ImageCount(count=found.count, effective_query=found.effective_query)
 
 
