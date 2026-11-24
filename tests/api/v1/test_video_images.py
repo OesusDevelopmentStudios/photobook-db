@@ -2,10 +2,14 @@
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
 """Videos are rows of the image table, found only when a client asks for them: a client from before videos never
-receives a file it cannot show. Until videos are imported (step I3), the tests make one in the database."""
+receives a file it cannot show. The search tests make a video in the database; the upload tests send a real one,
+made by FFmpeg (skipped without it)."""
 
 import io
 import json
+import shutil
+import subprocess
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,6 +18,7 @@ from sqlalchemy import update
 
 from photobook_db.db.models import Image as ImageModel
 from photobook_db.services.auth import Role
+from photobook_db.services.media_probe import MediaProbe
 
 PASSWORD = "correct horse battery"
 
@@ -111,3 +116,61 @@ def test_an_image_has_no_video_fields(client: TestClient, headers: dict[str, str
     assert photo["media_kind"] == "image"
     assert "duration_ms" not in photo
     assert "video" not in photo
+
+
+# --- Uploading videos
+
+needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="FFmpeg is not installed")
+
+
+def video_bytes(tmp_path: Path) -> bytes:
+    path = tmp_path / "waves.mp4"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=10:duration=1",
+         "-c:v", "mpeg4", str(path)],
+        check=True,
+    )
+    return path.read_bytes()
+
+
+def upload_video(client: TestClient, headers: dict[str, str], content: bytes):  # -> httpx Response
+    return client.post(
+        "/api/v1/images",
+        headers=headers,
+        files={"file": ("waves.mp4", content, "video/mp4")},
+        data={"metadata": json.dumps({"original_filename": "waves.mp4", "tags": ["general:coast"]})},
+    )
+
+
+@needs_ffmpeg
+def test_uploads_a_video(client: TestClient, headers: dict[str, str], tmp_path: Path) -> None:
+    response = upload_video(client, headers, video_bytes(tmp_path))
+
+    assert response.status_code == 201, response.text
+    video = response.json()
+    assert (video["media_kind"], video["mime_type"]) == ("video", "video/mp4")
+    assert video["video"]["video_codec"] == "mpeg4"
+    assert "meta:video" in video["tags"]
+    assert found(client, headers, media="video") == [video["id"]]
+
+
+# A cleared thumbnail folder: the poster frame is made again on request.
+@needs_ffmpeg
+def test_makes_a_videos_thumbnail_again(client: TestClient, headers: dict[str, str], tmp_path: Path) -> None:
+    video = upload_video(client, headers, video_bytes(tmp_path)).json()
+    client.app.state.thumbnails.delete_thumbnails(video["sha256"])
+
+    response = client.get(f"/api/v1/images/{video['id']}/thumbnail", headers=headers)
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/webp"
+
+
+@needs_ffmpeg
+def test_a_server_without_ffmpeg_says_why(client: TestClient, headers: dict[str, str], tmp_path: Path) -> None:
+    client.app.state.importer._media_probe = MediaProbe(ffprobe="no-such-ffprobe", ffmpeg="no-such-ffmpeg")
+
+    response = upload_video(client, headers, video_bytes(tmp_path))
+
+    assert response.status_code == 415
+    assert response.json()["detected_type"] == "video/mp4"

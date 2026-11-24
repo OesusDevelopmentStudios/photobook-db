@@ -9,17 +9,26 @@ from pathlib import Path, PurePosixPath
 
 from photobook_db.services.access import Restrictions
 from photobook_db.services.images import ImageRecord, ImagesService, NewImage, duplicate_image
-from photobook_db.services.importer._inspection import ImageFacts, file_sha256, inspect_image
-from photobook_db.services.meta_tags import meta_tags_for
+from photobook_db.services.importer._inspection import (
+    ImageFacts,
+    file_sha256,
+    inspect_image,
+    sniffed_video_type,
+    video_facts,
+    videos_not_supported,
+)
+from photobook_db.services.media_probe import MediaProbe
+from photobook_db.services.meta_tags import meta_tags_for, video_meta_tags
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService, file_name
 from photobook_db.services.tags import TagName, TagsService
-from photobook_db.services.thumbnails import ThumbnailsService
+from photobook_db.services.thumbnails import THUMBNAIL_SIZES, ThumbnailsService
 from photobook_db.utils.problems import Problem
 
 MAX_UPLOAD_BYTES_SETTING = "max_upload_bytes"
 DEFAULT_MAX_UPLOAD_BYTES = 200 * 1024 * 1024
 UPLOAD_LIMIT_RANGE = (1024 * 1024, 10 * 1024 * 1024 * 1024)  # what an admin may set: 1 MiB to 10 GiB
+POSTER_LATEST_MS = 10_000  # a video's poster frame is at most this far in
 
 
 @dataclass(frozen=True)
@@ -33,7 +42,7 @@ class UploadMetadata:
 @dataclass(frozen=True)
 class TakenAt:
     time: datetime  # local wall-clock time
-    source: str  # "exif", "file_mtime" or "import_time"
+    source: str  # "exif", "container", "file_mtime" or "import_time"
     utc_offset_minutes: int | None
 
 
@@ -50,6 +59,7 @@ class ImporterService:
         storage: StorageService,
         thumbnails: ThumbnailsService,
         settings: SettingsService,
+        media_probe: MediaProbe,
         now: Callable[[], datetime] = local_now,
     ) -> None:
         self._images = images
@@ -57,6 +67,7 @@ class ImporterService:
         self._storage = storage
         self._thumbnails = thumbnails
         self._settings = settings
+        self._media_probe = media_probe
         self._now = now
 
     def max_upload_bytes(self) -> int:
@@ -108,6 +119,48 @@ class ImporterService:
         # The checksum finds a source that changed while it was copied.
         return self.import_image(incoming, replace(metadata, client_sha256=sha256), user_id, restrictions)
 
+    def make_thumbnails(self, path: Path, sha256: str, revision: int = 0, video_duration_ms: int | None = None) -> None:
+        """The grid's thumbnails: of the image, or of a video's poster frame (video_duration_ms is a video's duration;
+        None for an image). Raises 415 if the picture cannot be decoded."""
+        if video_duration_ms is None:
+            self._thumbnails.create_thumbnails(path, sha256, revision)
+            return
+
+        frame = self._poster_frame(path, video_duration_ms)
+        if frame is None:
+            raise Problem(
+                415,
+                "unsupported_media_type",
+                "The video cannot be decoded",
+                "FFmpeg reads the file but cannot decode its pictures.",
+            )
+
+        self._thumbnails.create_thumbnails_from_frame(frame, sha256, revision)
+
+    def _poster_frame(self, path: Path, duration_ms: int) -> bytes | None:
+        """At a tenth of the video, at most 10 s in, past a black start or a fade; else its first picture."""
+        largest = max(THUMBNAIL_SIZES)
+        frame = self._media_probe.frame(path, min(duration_ms // 10, POSTER_LATEST_MS), largest)
+        return frame if frame is not None else self._media_probe.frame(path, 0, largest)
+
+    def _inspect(self, path: Path) -> ImageFacts:
+        """An image, as Pillow reads it; else a video, as FFmpeg does. Raises 415 unsupported_media_type."""
+        try:
+            return inspect_image(path)
+        except Problem as not_an_image:
+            if not_an_image.code != "unsupported_media_type":
+                raise
+
+            video = self._media_probe.probe(path)
+            if video is not None:
+                return video_facts(video)
+
+            detected = None if self._media_probe.available() else sniffed_video_type(path)
+            if detected is not None:
+                raise videos_not_supported(detected) from None
+
+            raise
+
     def _checked_upload(
         self, incoming: Path, metadata: UploadMetadata, restrictions: Restrictions
     ) -> tuple[str, list[TagName], ImageFacts, TakenAt]:
@@ -116,17 +169,17 @@ class ImporterService:
             sha256 = file_sha256(incoming)
             _check_client_sha256(metadata.client_sha256, sha256)
             self._check_not_duplicate(sha256, restrictions)
-            facts = inspect_image(incoming)
+            facts = self._inspect(incoming)
             tags = self._tags.resolve_tags(list(metadata.tags))
-            tags += meta_tags_for(facts.type.mime_type, facts.width, facts.height, facts.animated)
+            tags += _meta_tags(facts)
             taken_at = self._taken_at(metadata, facts)
             restrictions.check_tags_allowed(tags, taken_at.time)
         except Exception:
             incoming.unlink(missing_ok=True)
             raise
 
-        try:
-            self._thumbnails.create_thumbnails(incoming, sha256)  # decodes the whole image: finds damaged data
+        try:  # decodes the whole image, or a video's frame: finds damaged data
+            self.make_thumbnails(incoming, sha256, video_duration_ms=facts.video.duration_ms if facts.video else None)
         except Exception:
             incoming.unlink(missing_ok=True)
             self._thumbnails.delete_thumbnails(sha256)
@@ -162,17 +215,43 @@ class ImporterService:
             taken_at_source=taken_at.source,
             taken_at_utc_offset_minutes=taken_at.utc_offset_minutes,
             imported_by_user_id=user_id,
+            **_video_fields(facts),
         )
 
     def _taken_at(self, metadata: UploadMetadata, facts: ImageFacts) -> TakenAt:
-        """From EXIF; else the original file's modification time; else now. The source is recorded too."""
+        """From EXIF or the video itself; else the original file's modification time; else now. The source is
+        recorded too."""
         if facts.taken_at is not None:
-            return TakenAt(facts.taken_at, "exif", facts.taken_at_utc_offset_minutes)
+            source = "container" if facts.video is not None else "exif"
+            return TakenAt(facts.taken_at, source, facts.taken_at_utc_offset_minutes)
 
         if metadata.file_mtime is not None:
             return TakenAt(metadata.file_mtime.replace(tzinfo=None), "file_mtime", None)
 
         return TakenAt(self._now(), "import_time", None)
+
+
+def _meta_tags(facts: ImageFacts) -> list[TagName]:
+    video = facts.video
+    if video is None:
+        return meta_tags_for(facts.type.mime_type, facts.width, facts.height, facts.animated)
+
+    return video_meta_tags(video.container, video.width, video.height, video.audio_codec is not None, video.duration_ms)
+
+
+def _video_fields(facts: ImageFacts) -> dict[str, object]:
+    video = facts.video
+    if video is None:
+        return {}
+
+    return {
+        "media_kind": "video",
+        "duration_ms": video.duration_ms,
+        "video_codec": video.video_codec,
+        "audio_codec": video.audio_codec,
+        "bitrate": video.bitrate,
+        "frame_rate": video.frame_rate,
+    }
 
 
 def check_upload_limit(limit: int) -> None:

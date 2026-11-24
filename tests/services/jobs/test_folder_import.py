@@ -4,6 +4,8 @@
 """Folder import jobs with the real services and worker, on temporary import and library folders."""
 
 import io
+import shutil
+import subprocess
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -15,6 +17,7 @@ from photobook_db.db import Database
 from photobook_db.services.auth import AuthService, Role
 from photobook_db.services.images import ImagesService
 from photobook_db.services.importer import ImporterService
+from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.jobs import FolderImport, JobInfo, JobKind, JobsService, JobStatus
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
@@ -34,7 +37,7 @@ class Server:
         self.storage = StorageService(database, settings, self.library_dir, tags.namespace_names)
         self.images = ImagesService(database, tags, self.storage)
         thumbnails = ThumbnailsService(tmp_path / "thumbnails")
-        importer = ImporterService(self.images, tags, self.storage, thumbnails, settings)
+        importer = ImporterService(self.images, tags, self.storage, thumbnails, settings, MediaProbe())
         self.jobs = JobsService(database)
         self.folder_import = FolderImport(self.jobs, importer, tags, import_dir)
         self.jobs.register(JobKind.FOLDER_IMPORT, self.folder_import.run)
@@ -261,3 +264,41 @@ def test_lists_the_folders_three_levels_deep(server: Server, import_dir: Path, t
 
 def test_without_an_import_folder_there_are_no_folders(database: Database, tmp_path: Path) -> None:
     assert Server(database, tmp_path, import_dir=None).folder_import.source_folders() == []
+
+
+# --- Videos
+
+needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="FFmpeg is not installed")
+
+
+def write_video(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=10:duration=1",
+         "-c:v", "mpeg4", str(path)],
+        check=True,
+    )
+    return path
+
+
+@needs_ffmpeg
+def test_imports_videos_with_the_images(server: Server, import_dir: Path) -> None:
+    write_video(import_dir / "holiday" / "waves.mp4")
+    write_jpeg(import_dir / "holiday" / "beach.jpg", "teal")
+
+    job = server.import_folder("holiday")
+
+    assert job.result == {"imported": 2, "duplicates": 0, "unsupported": 0, "failed": []}
+    assert any(path.suffix == ".mp4" for path in server.library_dir.rglob("*.mp4"))
+
+
+# As in 0.1.0: a server without FFmpeg counts videos as files it does not take, and leaves them.
+@needs_ffmpeg
+def test_without_ffmpeg_videos_are_unsupported(server: Server, import_dir: Path) -> None:
+    video = write_video(import_dir / "holiday" / "waves.mp4")
+    server.folder_import._importer._media_probe = MediaProbe(ffprobe="no-such-ffprobe", ffmpeg="no-such-ffmpeg")
+
+    job = server.import_folder("holiday")
+
+    assert job.result == {"imported": 0, "duplicates": 0, "unsupported": 1, "failed": []}
+    assert video.exists()

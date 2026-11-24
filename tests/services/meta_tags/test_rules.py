@@ -3,7 +3,7 @@
 
 import pytest
 
-from photobook_db.services.meta_tags import meta_tags_for
+from photobook_db.services.meta_tags import meta_tags_for, video_meta_tags
 
 
 def names(mime_type: str = "image/png", size: tuple[int, int] = (1000, 800), animated: bool = False) -> list[str]:
@@ -38,3 +38,26 @@ def test_an_unknown_type_gets_no_file_type_tag() -> None:
 def test_size_class(size: tuple[int, int], size_class: str | None) -> None:
     expected = ["meta:still_image", "meta:png"] + ([f"meta:{size_class}"] if size_class else [])
     assert names(size=size) == expected
+
+
+def video_names(container: str = "mp4", size: tuple[int, int] = (2560, 1440), has_sound: bool = True,
+                duration_ms: int = 60_000) -> list[str]:
+    return [str(tag) for tag in video_meta_tags(container, *size, has_sound, duration_ms)]
+
+
+def test_a_video_has_its_kind_container_size_and_sound() -> None:
+    assert video_names() == ["meta:video", "meta:mp4", "meta:hi_res", "meta:sound"]
+
+
+def test_a_silent_small_video() -> None:
+    expected = ["meta:video", "meta:webm", "meta:low_res", "meta:no_sound"]
+    assert video_names("webm", (320, 240), has_sound=False) == expected
+
+
+@pytest.mark.parametrize(("duration_ms", "long"), [(300_000, False), (300_001, True)])
+def test_a_video_over_five_minutes_is_long(duration_ms: int, long: bool) -> None:
+    assert ("meta:long_video" in video_names(duration_ms=duration_ms)) is long
+
+
+def test_an_unknown_container_gets_no_file_type_tag() -> None:
+    assert video_names("ogg", (1000, 800)) == ["meta:video", "meta:sound"]

@@ -15,6 +15,7 @@ from photobook_db.services.access import AccessService, Restrictions
 from photobook_db.services.auth import AuthService, Role
 from photobook_db.services.images import ImageRecord, ImagesService
 from photobook_db.services.importer import ImporterService, UploadMetadata
+from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.jobs import JobInfo, JobKind, JobsService, JobStatus, Relayout
 from photobook_db.services.preferences import PreferencesService
 from photobook_db.services.settings import SettingsService
@@ -35,7 +36,7 @@ class Library:
         self.storage = StorageService(database, settings, self.library_dir, self.tags.namespace_names)
         self.images = ImagesService(database, self.tags, self.storage)
         thumbnails = ThumbnailsService(tmp_path / "thumbnails")
-        self.importer = ImporterService(self.images, self.tags, self.storage, thumbnails, settings)
+        self.importer = ImporterService(self.images, self.tags, self.storage, thumbnails, settings, MediaProbe())
         self.access = AccessService(database, self.tags.namespace_names)
         self.preferences = PreferencesService(database, self.tags.namespace_names)
         self.jobs = JobsService(database)

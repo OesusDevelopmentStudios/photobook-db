@@ -30,9 +30,15 @@ class NewImage:
     height: int
     file_size: int
     taken_at: datetime  # local wall-clock time
-    taken_at_source: str  # "exif", "file_mtime" or "import_time"
+    taken_at_source: str  # "exif", "container" (a video's own), "file_mtime" or "import_time"
     taken_at_utc_offset_minutes: int | None
     imported_by_user_id: int | None
+    media_kind: str = "image"  # or "video"; the rest only for videos
+    duration_ms: int | None = None
+    video_codec: str | None = None
+    audio_codec: str | None = None
+    bitrate: int | None = None
+    frame_rate: float | None = None
 
 
 @dataclass(frozen=True)

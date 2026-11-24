@@ -9,6 +9,8 @@ from photobook_db.services.importer._inspection import (
     ImageType,
     file_sha256,
     inspect_image,
+    sniffed_video_type,
+    video_facts,
 )
 from photobook_db.services.importer._service import (
     DEFAULT_MAX_UPLOAD_BYTES,
@@ -31,4 +33,6 @@ __all__ = [
     "check_upload_limit",
     "file_sha256",
     "inspect_image",
+    "sniffed_video_type",
+    "video_facts",
 ]

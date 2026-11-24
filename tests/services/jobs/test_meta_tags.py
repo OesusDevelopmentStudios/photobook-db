@@ -17,6 +17,7 @@ from photobook_db.services.access import Restrictions
 from photobook_db.services.auth import AuthService, Role
 from photobook_db.services.images import ImageRecord, ImagesService
 from photobook_db.services.importer import ImporterService, UploadMetadata
+from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.jobs import JobInfo, JobKind, JobsService, JobStatus, MetaTagging
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
@@ -31,7 +32,9 @@ class Library:
         tags = TagsService(database, lambda: self.storage.path_template_namespaces())
         self.storage = StorageService(database, settings, tmp_path / "library", tags.folder_namespace_names)
         self.images = ImagesService(database, tags, self.storage)
-        self.importer = ImporterService(self.images, tags, self.storage, ThumbnailsService(tmp_path / "t"), settings)
+        self.importer = ImporterService(
+            self.images, tags, self.storage, ThumbnailsService(tmp_path / "t"), settings, MediaProbe()
+        )
         self.jobs = JobsService(database)
         self.meta_tagging = MetaTagging(self.jobs, self.images, self.storage)
         self.jobs.register(JobKind.META_TAGS, self.meta_tagging.run)

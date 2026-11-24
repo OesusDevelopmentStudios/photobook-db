@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
 """What an uploaded file is: its type from the content (never the name), its size as shown, when it was
-taken, and its SHA-256."""
+taken, and its SHA-256. Images are read by Pillow; videos by FFmpeg, through the media_probe service."""
 
 import hashlib
 from dataclasses import dataclass
@@ -11,6 +11,7 @@ from pathlib import Path
 
 from PIL import ExifTags, Image, UnidentifiedImageError
 
+from photobook_db.services.media_probe import VideoInfo
 from photobook_db.utils.image_limits import max_pixels
 from photobook_db.utils.problems import Problem
 
@@ -34,6 +35,18 @@ SUPPORTED_TYPES = {
     "AVIF": ImageType("image/avif", "avif"),
 }
 
+# The video containers the server takes, by the name media_probe gives them
+VIDEO_TYPES = {
+    "mp4": ImageType("video/mp4", "mp4"),
+    "mov": ImageType("video/quicktime", "mov"),
+    "webm": ImageType("video/webm", "webm"),
+    "mkv": ImageType("video/x-matroska", "mkv"),
+    "avi": ImageType("video/x-msvideo", "avi"),
+}
+
+# ISO media brands of still pictures, which share MP4's file layout
+_PICTURE_BRANDS = {b"avif", b"avis", b"heic", b"heix", b"heim", b"heis", b"mif1", b"msf1"}
+
 # EXIF orientations that turn the picture by 90° or 270°, so width and height swap when it is shown
 _SIDEWAYS_ORIENTATIONS = {5, 6, 7, 8}
 _EXIF_DATE_FORMAT = "%Y:%m:%d %H:%M:%S"
@@ -46,8 +59,9 @@ class ImageFacts:
     width: int  # as the image is shown, i.e. after the EXIF orientation
     height: int
     animated: bool  # more than one frame, e.g. an animated GIF
-    taken_at: datetime | None  # local wall-clock time from EXIF; None if the file does not say
+    taken_at: datetime | None  # local wall-clock time from EXIF or the video; None if the file does not say
     taken_at_utc_offset_minutes: int | None
+    video: VideoInfo | None = None  # a video's details; None for an image
 
 
 def inspect_image(path: Path) -> ImageFacts:
@@ -73,6 +87,48 @@ def inspect_image(path: Path) -> ImageFacts:
 
     taken_at, utc_offset_minutes = _capture_time(exif)
     return ImageFacts(image_type, width, height, animated, taken_at, utc_offset_minutes)
+
+
+def video_facts(video: VideoInfo) -> ImageFacts:
+    return ImageFacts(
+        VIDEO_TYPES[video.container],
+        video.width,
+        video.height,
+        False,
+        video.recorded_at,
+        video.recorded_utc_offset_minutes,
+        video,
+    )
+
+
+def sniffed_video_type(path: Path) -> str | None:
+    """A video's MIME type by its first bytes, for a server without FFmpeg to say why it refuses the file."""
+    try:
+        with path.open("rb") as file:
+            start = file.read(16)
+    except OSError:
+        return None
+
+    if start[4:8] == b"ftyp" and start[8:12] not in _PICTURE_BRANDS:
+        return "video/quicktime" if start[8:12] == b"qt  " else "video/mp4"
+
+    if start.startswith(b"\x1a\x45\xdf\xa3"):  # EBML: Matroska or WebM
+        return "video/x-matroska"
+
+    if start.startswith(b"RIFF") and start[8:12] == b"AVI ":
+        return "video/x-msvideo"
+
+    return None
+
+
+def videos_not_supported(detected_type: str) -> Problem:
+    return Problem(
+        415,
+        "unsupported_media_type",
+        "Videos are not supported here",
+        "This server cannot read videos: FFmpeg is not installed with it.",
+        detected_type=detected_type,
+    )
 
 
 def file_sha256(path: Path) -> str:

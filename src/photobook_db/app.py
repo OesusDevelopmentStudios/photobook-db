@@ -74,7 +74,7 @@ def _lifespan(config: Config) -> Callable[[FastAPI], AbstractAsyncContextManager
         app.state.preferences = PreferencesService(database, app.state.tags.namespace_names)
         app.state.access = AccessService(database, app.state.tags.namespace_names)
         app.state.importer = ImporterService(
-            app.state.images, app.state.tags, app.state.storage, app.state.thumbnails, settings
+            app.state.images, app.state.tags, app.state.storage, app.state.thumbnails, settings, app.state.media_probe
         )
         app.state.jobs = JobsService(database)
         app.state.folder_import = FolderImport(app.state.jobs, app.state.importer, app.state.tags, config.import_dir)

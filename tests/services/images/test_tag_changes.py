@@ -16,6 +16,7 @@ from photobook_db.db.models import Namespace, Tag, image_tag
 from photobook_db.services.access import Restrictions
 from photobook_db.services.images import ImageRecord, ImagesService
 from photobook_db.services.importer import ImporterService, UploadMetadata
+from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
 from photobook_db.services.tags import TagName, TagsService
@@ -37,7 +38,7 @@ class Library:
         self.storage = StorageService(database, settings, self.library_dir, tags.namespace_names)
         self.images = ImagesService(database, tags, self.storage)
         thumbnails = ThumbnailsService(tmp_path / "thumbnails")
-        self.importer = ImporterService(self.images, tags, self.storage, thumbnails, settings)
+        self.importer = ImporterService(self.images, tags, self.storage, thumbnails, settings, MediaProbe())
 
     def add_image(self, colour: str, tags: tuple[str, ...]) -> ImageRecord:
         """Taken in 2024, so its folder is <category>/<author>/2024."""

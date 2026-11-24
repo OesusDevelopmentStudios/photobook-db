@@ -346,6 +346,7 @@ def get_image_thumbnail(
     images: ImagesServiceDependency,
     storage: StorageServiceDependency,
     thumbnails: ThumbnailsServiceDependency,
+    importer: ImporterServiceDependency,
     size: Annotated[int, Query(json_schema_extra={"enum": list(THUMBNAIL_SIZES)})] = 256,
     rev: Annotated[
         int | None,
@@ -369,7 +370,12 @@ def get_image_thumbnail(
 
     thumbnail = thumbnails.thumbnail_path(record.sha256, size, record.revision)
     if not thumbnail.exists():  # e.g. the thumbnail folder was cleared: make them again
-        thumbnails.create_thumbnails(storage.absolute_path(record.storage_path), record.sha256, record.revision)
+        importer.make_thumbnails(
+            storage.absolute_path(record.storage_path),
+            record.sha256,
+            record.revision,
+            record.duration_ms if record.media_kind == "video" else None,
+        )
 
     return FileResponse(thumbnail, media_type="image/webp", headers=headers)
 

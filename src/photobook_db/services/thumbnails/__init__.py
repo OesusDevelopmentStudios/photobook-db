@@ -3,8 +3,10 @@
 
 """Thumbnails for the desktop app's grid and image view: WebP, upright, by SHA-256 and the image's revision."""
 
+import io
 import os
 from pathlib import Path
+from typing import BinaryIO
 
 from PIL import Image, ImageOps
 
@@ -33,7 +35,13 @@ class ThumbnailsService:
 
     def create_thumbnails(self, image_path: Path, sha256: str, revision: int = 0) -> None:
         """Decodes the whole image, so damaged image data is found here: raises 415."""
-        largest = _upright_image_fitting(image_path, max(THUMBNAIL_SIZES))
+        self._save_sizes(_upright_image_fitting(image_path, max(THUMBNAIL_SIZES)), sha256, revision)
+
+    def create_thumbnails_from_frame(self, frame: bytes, sha256: str, revision: int = 0) -> None:
+        """From a picture in memory, e.g. a video's frame as PNG. Raises 415 for data that is no picture."""
+        self._save_sizes(_upright_image_fitting(io.BytesIO(frame), max(THUMBNAIL_SIZES)), sha256, revision)
+
+    def _save_sizes(self, largest: Image.Image, sha256: str, revision: int) -> None:
         for size in sorted(THUMBNAIL_SIZES, reverse=True):
             largest.thumbnail((size, size))  # each smaller size from the previous one, not the original
             _save_atomically(largest, self.thumbnail_path(sha256, size, revision))
@@ -43,9 +51,9 @@ class ThumbnailsService:
             self.thumbnail_path(sha256, size, revision).unlink(missing_ok=True)
 
 
-def _upright_image_fitting(image_path: Path, size: int) -> Image.Image:
+def _upright_image_fitting(source: Path | BinaryIO, size: int) -> Image.Image:
     try:
-        with Image.open(image_path) as image:
+        with Image.open(source) as image:
             image.draft("RGB", (size, size))  # JPEG decodes straight at a reduced size: much faster
             upright = ImageOps.exif_transpose(image)  # also reads the whole image (first frame if animated)
             upright.thumbnail((size, size))

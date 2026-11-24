@@ -15,6 +15,10 @@ _FILE_TYPES = {
     "image/avif": "avif",
 }
 
+# A video's file type tag is its container's name.
+VIDEO_CONTAINERS = ("mp4", "mov", "webm", "mkv", "avi")
+_LONG_VIDEO_MS = 5 * 60 * 1000  # over five minutes
+
 # Sizes as boorus name them: either side may be the long one.
 _LOW_RES_MAX_SIDE = 500
 _HI_RES_SIZE = (1600, 1200)
@@ -32,6 +36,24 @@ def meta_tags_for(mime_type: str, width: int, height: int, animated: bool) -> li
     size_class = _size_class(width, height)
     if size_class is not None:
         names.append(size_class)
+
+    return [TagName(META_NAMESPACE, name) for name in names]
+
+
+def video_meta_tags(container: str, width: int, height: int, has_sound: bool, duration_ms: int) -> list[TagName]:
+    """A video's kind, container, size class (as for images, by the size it is shown at), whether it has sound,
+    and whether it is long."""
+    names = ["video"]
+    if container in VIDEO_CONTAINERS:
+        names.append(container)
+
+    size_class = _size_class(width, height)
+    if size_class is not None:
+        names.append(size_class)
+
+    names.append("sound" if has_sound else "no_sound")
+    if duration_ms > _LONG_VIDEO_MS:
+        names.append("long_video")
 
     return [TagName(META_NAMESPACE, name) for name in names]
 

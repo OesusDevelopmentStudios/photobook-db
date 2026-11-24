@@ -17,6 +17,7 @@ from photobook_db.db.models import User
 from photobook_db.services.access import Restrictions
 from photobook_db.services.images import ImageRecord, ImagesService
 from photobook_db.services.importer import DEFAULT_MAX_UPLOAD_BYTES, ImporterService, UploadMetadata
+from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
 from photobook_db.services.tags import TagsService
@@ -41,8 +42,15 @@ class Library:
         self.storage = StorageService(database, self.settings, self.library_dir, self.tags.namespace_names)
         self.thumbnails = ThumbnailsService(self.thumbnails_dir)
         self.images = ImagesService(database, self.tags, self.storage)
+        self.media_probe = MediaProbe()
         self.importer = ImporterService(
-            self.images, self.tags, self.storage, self.thumbnails, self.settings, now=lambda: IMPORT_TIME
+            self.images,
+            self.tags,
+            self.storage,
+            self.thumbnails,
+            self.settings,
+            self.media_probe,
+            now=lambda: IMPORT_TIME,
         )
 
     def import_image(self, incoming: Path, metadata: UploadMetadata, user_id: int | None) -> ImageRecord:
