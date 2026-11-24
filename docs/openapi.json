@@ -3725,6 +3725,11 @@
           "setup_required": {
             "type": "boolean",
             "title": "Setup Required"
+          },
+          "video_support": {
+            "type": "boolean",
+            "title": "Video Support",
+            "description": "FFmpeg is installed: the server takes videos"
           }
         },
         "type": "object",
@@ -3732,7 +3737,8 @@
           "name",
           "version",
           "api_version",
-          "setup_required"
+          "setup_required",
+          "video_support"
         ],
         "title": "ServerInfo"
       },

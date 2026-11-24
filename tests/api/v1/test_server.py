@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from fastapi.testclient import TestClient
 import photobook_db
 from photobook_db.config import Config
 from photobook_db.services.auth import Role
+from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.same_machine import app_specific_id
 
 MACHINE_ID = "0123456789abcdef0123456789abcdef"
@@ -40,7 +42,19 @@ def test_server_info_is_public_and_names_the_server(client: TestClient) -> None:
         "version": photobook_db.__version__,
         "api_version": 1,
         "setup_required": True,
+        "video_support": client.app.state.media_probe.available(),
     }
+
+
+# Without FFmpeg the server knows no videos, and says so.
+def test_says_whether_it_takes_videos(client: TestClient) -> None:
+    client.app.state.media_probe = MediaProbe(ffprobe="no-such-ffprobe", ffmpeg="no-such-ffmpeg")
+
+    assert client.get("/api/v1/server/info").json()["video_support"] is False
+
+    client.app.state.media_probe = MediaProbe(ffprobe=sys.executable, ffmpeg=sys.executable)  # both found
+
+    assert client.get("/api/v1/server/info").json()["video_support"] is True
 
 
 def test_setup_is_no_longer_required_once_an_admin_exists(client: TestClient) -> None:

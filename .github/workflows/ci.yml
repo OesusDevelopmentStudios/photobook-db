@@ -27,6 +27,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+      - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends ffmpeg  # the video tests
       - run: pip install -e '.[dev]'
       - run: pytest
       - run: flake8

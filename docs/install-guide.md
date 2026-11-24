@@ -20,7 +20,7 @@ hand instead, follow the steps below.
 ## What you need
 
 - **Podman 4.4 or newer**, with systemd. Fedora, Ubuntu 24.04 and Debian 13 have it.
-- About 200 MB for the container image, and room for your images.
+- About 230 MB for the container image (with FFmpeg, for videos), and room for your images.
 
 ## 1. Install Podman
 

@@ -10,7 +10,12 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 import photobook_db
-from photobook_db.api.v1.dependencies import AuthServiceDependency, CurrentAuthentication, SameMachineDependency
+from photobook_db.api.v1.dependencies import (
+    AuthServiceDependency,
+    CurrentAuthentication,
+    MediaProbeDependency,
+    SameMachineDependency,
+)
 from photobook_db.utils.problems import problem_responses
 
 SERVER_NAME = "photobook-db"
@@ -24,15 +29,17 @@ class ServerInfo(BaseModel):
     version: str
     api_version: int
     setup_required: bool  # no admin account exists yet; the client sends the user to /admin/setup
+    video_support: bool = Field(description="FFmpeg is installed: the server takes videos")
 
 
 @router.get("/info", summary="Server name and versions (public)")
-def server_info(auth: AuthServiceDependency) -> ServerInfo:
+def server_info(auth: AuthServiceDependency, media_probe: MediaProbeDependency) -> ServerInfo:
     return ServerInfo(
         name=SERVER_NAME,
         version=photobook_db.__version__,
         api_version=API_VERSION,
         setup_required=auth.is_setup_required(),
+        video_support=media_probe.available(),
     )
 
 

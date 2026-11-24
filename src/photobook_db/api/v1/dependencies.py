@@ -15,6 +15,7 @@ from photobook_db.services.importer import ImporterService
 from photobook_db.services.jobs import FolderImport, JobsService
 from photobook_db.services.preferences import PreferencesService
 from photobook_db.services.rotation import RotationService
+from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.same_machine import SameMachine
 from photobook_db.services.search import SearchService
 from photobook_db.services.server_settings import ServerSettings
@@ -62,6 +63,10 @@ def jobs_service(request: Request) -> JobsService:
 
 def preferences_service(request: Request) -> PreferencesService:
     return request.app.state.preferences
+
+
+def media_probe(request: Request) -> MediaProbe:
+    return request.app.state.media_probe
 
 
 def rotation_service(request: Request) -> RotationService:
@@ -125,6 +130,7 @@ JobsServiceDependency = Annotated[JobsService, Depends(jobs_service)]
 FolderImportDependency = Annotated[FolderImport, Depends(folder_import)]
 PreferencesServiceDependency = Annotated[PreferencesService, Depends(preferences_service)]
 RotationServiceDependency = Annotated[RotationService, Depends(rotation_service)]
+MediaProbeDependency = Annotated[MediaProbe, Depends(media_probe)]
 SameMachineDependency = Annotated[SameMachine, Depends(same_machine)]
 SearchServiceDependency = Annotated[SearchService, Depends(search_service)]
 ServerSettingsDependency = Annotated[ServerSettings, Depends(server_settings)]

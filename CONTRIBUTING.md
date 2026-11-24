@@ -12,6 +12,10 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
 ```
+
+FFmpeg (`ffmpeg` and `ffprobe` on `PATH`) is optional: with it the server takes videos, and the video tests run;
+without it they are skipped.
+
 Run the server (in the virtual environment):
 
 ```sh

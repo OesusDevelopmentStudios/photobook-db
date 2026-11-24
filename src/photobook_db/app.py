@@ -23,6 +23,7 @@ from photobook_db.services.server_settings import ServerSettings
 from photobook_db.services.images import ImagesService
 from photobook_db.services.jobs import FolderImport, JobKind, JobsService, MetaTagging, Relayout
 from photobook_db.services.importer import ImporterService
+from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
 from photobook_db.services.tag_admin import TagAdmin
@@ -58,6 +59,7 @@ def _lifespan(config: Config) -> Callable[[FastAPI], AbstractAsyncContextManager
         database = open_database(config.data_dir / DATABASE_FILE_NAME)
         app.state.database = database
         app.state.auth = AuthService(database)
+        app.state.media_probe = MediaProbe()  # looks for FFmpeg once, at start
         settings = app.state.settings = SettingsService(database)
         # Tags and storage ask each other: which namespaces exist, which ones form folder names.
         app.state.tags = TagsService(database, lambda: app.state.storage.path_template_namespaces())
