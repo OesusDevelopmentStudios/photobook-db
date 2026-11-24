@@ -26,7 +26,7 @@ from photobook_db.api.v1.dependencies import (
 )
 from photobook_db.services.images import ImageRecord
 from photobook_db.services.importer import UploadMetadata
-from photobook_db.services.search import DEFAULT_LIMIT, MAX_LIMIT, Order, SearchRequest, Sort
+from photobook_db.services.search import DEFAULT_LIMIT, MAX_LIMIT, Media, Order, SearchRequest, Sort
 from photobook_db.services.thumbnails import THUMBNAIL_SIZES
 from photobook_db.utils.problems import Problem, problem_responses
 from photobook_db.utils.time import as_utc
@@ -42,12 +42,22 @@ ApplyHiddenFilters = Annotated[bool, Query(description="false skips your hidden-
 AlbumName = Annotated[
     str | None, Query(max_length=200, description="Only this album's images: the name of an album: tag, e.g. trip")
 ]
+MediaChoice = Annotated[
+    Media, Query(description="image (the default, as clients from before videos expect), video, or all")
+]
 
 
 class ImageLinks(BaseModel):
     self: str
     file: str
     thumbnail: str
+
+
+class VideoDetails(BaseModel):
+    video_codec: str = Field(examples=["h264"])
+    audio_codec: str | None = Field(description="null: no sound", examples=["aac"])
+    bitrate: int | None = Field(description="Bits per second, of the whole file")
+    frame_rate: float | None
 
 
 class ImageObject(BaseModel):
@@ -60,7 +70,9 @@ class ImageObject(BaseModel):
     height: int
     file_size: int
     taken_at: datetime = Field(description="Local wall-clock time, without a time zone")
-    taken_at_source: Literal["exif", "file_mtime", "import_time"]
+    taken_at_source: Literal["exif", "file_mtime", "import_time", "container"] = Field(
+        description="container: a video's own recording time"
+    )
     imported_at: datetime
     updated_at: datetime
     revision: int = Field(
@@ -70,6 +82,10 @@ class ImageObject(BaseModel):
         description="Sorted by namespace, then name", examples=[["category:photo", "general:summer"]]
     )
     links: ImageLinks
+    media_kind: Literal["image", "video"]
+    # Only for videos: an image's object has neither, so clients from before videos see nothing new.
+    duration_ms: int | None = Field(default=None, exclude_if=lambda value: value is None)
+    video: VideoDetails | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class ImageList(BaseModel):
@@ -152,6 +168,7 @@ def search_images(
     cursor: Annotated[str | None, Query(max_length=500, description="next_cursor of the previous page")] = None,
     apply_hidden_filters: ApplyHiddenFilters = True,
     album: AlbumName = None,
+    media: MediaChoice = Media.IMAGE,
 ) -> ImageList:
     hidden_filters = preferences.hidden_filters(authentication.user.id) if apply_hidden_filters else []
     request = SearchRequest(
@@ -163,6 +180,7 @@ def search_images(
         cursor=cursor,
         hidden_filters=tuple(hidden_filters),
         album=album,
+        media=media,
     )
     page = search.search(request, restrictions.visible_images_filter())
     return ImageList(
@@ -182,9 +200,10 @@ def count_images(
     q: SearchText = "",
     apply_hidden_filters: ApplyHiddenFilters = True,
     album: AlbumName = None,
+    media: MediaChoice = Media.IMAGE,
 ) -> ImageCount:
     hidden_filters = preferences.hidden_filters(authentication.user.id) if apply_hidden_filters else []
-    found = search.count(q, tuple(hidden_filters), restrictions.visible_images_filter(), album)
+    found = search.count(q, tuple(hidden_filters), restrictions.visible_images_filter(), album, media)
     return ImageCount(count=found.count, effective_query=found.effective_query)
 
 
@@ -402,4 +421,19 @@ def _image_object(record: ImageRecord) -> ImageObject:
         revision=record.revision,
         tags=[str(tag) for tag in record.tags],
         links=ImageLinks(self=base, file=f"{base}/file", thumbnail=f"{base}/thumbnail"),
+        media_kind=record.media_kind,  # type: ignore[arg-type]
+        duration_ms=record.duration_ms,
+        video=_video_details(record),
+    )
+
+
+def _video_details(record: ImageRecord) -> VideoDetails | None:
+    if record.media_kind != "video":
+        return None
+
+    return VideoDetails(
+        video_codec=record.video_codec or "",
+        audio_codec=record.audio_codec,
+        bitrate=record.bitrate,
+        frame_rate=record.frame_rate,
     )

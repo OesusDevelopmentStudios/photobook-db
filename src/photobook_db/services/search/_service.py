@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import StrEnum
 from itertools import groupby
 
-from sqlalchemy import ColumnElement, Select, Subquery, and_, func, literal, or_, select, tuple_
+from sqlalchemy import ColumnElement, Select, Subquery, and_, func, literal, or_, select, true, tuple_
 from sqlalchemy.orm import Session
 
 from photobook_db.db import Database
@@ -33,6 +33,12 @@ class Sort(StrEnum):
     ALBUM = "album"  # when the album tag was added, then by file name; only with an album
 
 
+class Media(StrEnum):
+    IMAGE = "image"  # images only: what clients from before videos expect, so it is the default
+    VIDEO = "video"
+    ALL = "all"
+
+
 class Order(StrEnum):
     DESC = "desc"
     ASC = "asc"
@@ -48,6 +54,7 @@ class SearchRequest:
     cursor: str | None = None  # next_cursor of the previous page
     hidden_filters: tuple[str, ...] = ()
     album: str | None = None  # only this album's images, e.g. "vacation_2015"
+    media: Media = Media.IMAGE
 
 
 @dataclass(frozen=True)
@@ -89,7 +96,7 @@ class SearchService:
         sort_keys = _sort_keys(request.sort, request.seed, links)
         descending = request.sort not in (Sort.RANDOM, Sort.ALBUM) and request.order == Order.DESC
         statement = _in_album(select(Image.id, *sort_keys), links)
-        statement = statement.where(matching_condition(filtered.tree), visible_images)
+        statement = statement.where(matching_condition(filtered.tree), visible_images, _of_media(request.media))
         if request.cursor is not None:
             last_values, last_id = _decode_cursor(request.cursor, request.sort)
             statement = statement.where(_after(sort_keys, last_values, last_id, descending))
@@ -111,12 +118,13 @@ class SearchService:
         hidden_filters: tuple[str, ...],
         visible_images: ColumnElement[bool],
         album: str | None = None,
+        media: Media = Media.IMAGE,
     ) -> SearchCount:
         """How many images search() finds over all its pages. Raises 400 invalid_query or 422 invalid_tag."""
         filtered = self._filtered(query, hidden_filters)
         links = None if album is None else _album_links(album)
         statement = _in_album(select(func.count(Image.id)), links)
-        statement = statement.where(matching_condition(filtered.tree), visible_images)
+        statement = statement.where(matching_condition(filtered.tree), visible_images, _of_media(media))
         with self._database.session() as session:
             count = session.scalar(statement) or 0
 
@@ -170,6 +178,10 @@ class SearchService:
         namespace_names = self._namespace_names()
         tree = parse_query(query, namespace_names)
         return apply_hidden_filters(query, tree, list(hidden_filters), namespace_names)
+
+
+def _of_media(media: Media) -> ColumnElement[bool]:
+    return true() if media == Media.ALL else Image.media_kind == media.value
 
 
 def _album_links(album: str) -> Subquery:

@@ -53,6 +53,12 @@ class ImageRecord:
     imported_by_user_id: int | None
     tags: list[TagName]  # sorted by namespace, then name
     revision: int = 0  # how often the file was changed since it came in
+    media_kind: str = "image"  # or "video"; the rest only for videos
+    duration_ms: int | None = None
+    video_codec: str | None = None
+    audio_codec: str | None = None  # None: no sound
+    bitrate: int | None = None
+    frame_rate: float | None = None
 
 
 # Checks one image's tags before and after a change, and its date; raises a Problem to cancel the whole change.
@@ -446,4 +452,10 @@ def _record_with_tags(image: Image, tags: list[TagName]) -> ImageRecord:
         imported_by_user_id=image.imported_by_user_id,
         tags=tags,
         revision=image.revision,
+        media_kind=image.media_kind,
+        duration_ms=image.duration_ms,
+        video_codec=image.video_codec,
+        audio_codec=image.audio_codec,
+        bitrate=image.bitrate,
+        frame_rate=image.frame_rate,
     )

@@ -11,6 +11,7 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     MetaData,
@@ -39,8 +40,11 @@ USERNAME_MAX_LENGTH = 32
 ROLES = ("admin", "user")
 JOB_STATUSES = ("queued", "running", "done", "failed")
 TAG_NAME_MAX_LENGTH = 100
-TAKEN_AT_SOURCES = ("exif", "file_mtime", "import_time")
+# container: a video's own recording time
+TAKEN_AT_SOURCES = ("exif", "file_mtime", "import_time", "container")
 _TAKEN_AT_SOURCES_SQL = ", ".join(f"'{source}'" for source in TAKEN_AT_SOURCES)
+MEDIA_KINDS = ("image", "video")
+_MEDIA_KINDS_SQL = ", ".join(f"'{kind}'" for kind in MEDIA_KINDS)
 _ROLES_SQL = ", ".join(f"'{role}'" for role in ROLES)
 _JOB_STATUSES_SQL = ", ".join(f"'{status}'" for status in JOB_STATUSES)
 
@@ -77,6 +81,7 @@ class Image(Base):
     __tablename__ = "image"
     __table_args__ = (
         CheckConstraint(f"taken_at_source IN ({_TAKEN_AT_SOURCES_SQL})", name="taken_at_source"),
+        CheckConstraint(f"media_kind IN ({_MEDIA_KINDS_SQL})", name="media_kind"),
         # Keyset pagination sorts by these columns, with the id as tie-breaker.
         Index(None, "taken_at", "id"),
         Index(None, "imported_at", "id"),
@@ -98,6 +103,13 @@ class Image(Base):
     imported_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id", ondelete="SET NULL"))
     # Counts changes to the file, e.g. a saved rotation; the sha256 stays the uploaded file's.
     revision: Mapped[int] = mapped_column(default=0, server_default="0")
+    # A video is an image row too; these are NULL for images.
+    media_kind: Mapped[str] = mapped_column(default="image", server_default="image")  # one of MEDIA_KINDS
+    duration_ms: Mapped[int | None]
+    video_codec: Mapped[str | None]  # e.g. "h264", "hevc", "vp9", "av1"
+    audio_codec: Mapped[str | None]  # NULL: no sound
+    bitrate: Mapped[int | None]  # bits per second, of the whole file
+    frame_rate: Mapped[float | None] = mapped_column(Float)
 
 
 image_tag = Table(

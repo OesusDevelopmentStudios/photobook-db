@@ -495,6 +495,17 @@
               "title": "Album"
             },
             "description": "Only this album's images: the name of an album: tag, e.g. trip"
+          },
+          {
+            "name": "media",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Media",
+              "description": "image (the default, as clients from before videos expect), video, or all",
+              "default": "image"
+            },
+            "description": "image (the default, as clients from before videos expect), video, or all"
           }
         ],
         "responses": {
@@ -707,6 +718,17 @@
               "title": "Album"
             },
             "description": "Only this album's images: the name of an album: tag, e.g. trip"
+          },
+          {
+            "name": "media",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Media",
+              "description": "image (the default, as clients from before videos expect), video, or all",
+              "default": "image"
+            },
+            "description": "image (the default, as clients from before videos expect), video, or all"
           }
         ],
         "responses": {
@@ -3136,9 +3158,11 @@
             "enum": [
               "exif",
               "file_mtime",
-              "import_time"
+              "import_time",
+              "container"
             ],
-            "title": "Taken At Source"
+            "title": "Taken At Source",
+            "description": "container: a video's own recording time"
           },
           "imported_at": {
             "type": "string",
@@ -3171,6 +3195,35 @@
           },
           "links": {
             "$ref": "#/components/schemas/ImageLinks"
+          },
+          "media_kind": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video"
+            ],
+            "title": "Media Kind"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "video": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VideoDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3189,7 +3242,8 @@
           "updated_at",
           "revision",
           "tags",
-          "links"
+          "links",
+          "media_kind"
         ],
         "title": "ImageObject"
       },
@@ -3397,6 +3451,15 @@
           "device_name"
         ],
         "title": "LoginRequest"
+      },
+      "Media": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video",
+          "all"
+        ],
+        "title": "Media"
       },
       "NamespaceDetails": {
         "properties": {
@@ -4203,6 +4266,63 @@
           "errors"
         ],
         "title": "ValidationProblemModel"
+      },
+      "VideoDetails": {
+        "properties": {
+          "video_codec": {
+            "type": "string",
+            "title": "Video Codec",
+            "examples": [
+              "h264"
+            ]
+          },
+          "audio_codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Codec",
+            "description": "null: no sound",
+            "examples": [
+              "aac"
+            ]
+          },
+          "bitrate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate",
+            "description": "Bits per second, of the whole file"
+          },
+          "frame_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frame Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "video_codec",
+          "audio_codec",
+          "bitrate",
+          "frame_rate"
+        ],
+        "title": "VideoDetails"
       }
     },
     "securitySchemes": {

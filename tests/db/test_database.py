@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import delete, inspect, select, text
@@ -14,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 
 from photobook_db.db import DATABASE_FILE_NAME, Database, open_database
 from photobook_db.db._connection import create_sqlite_engine
-from photobook_db.db._migrations import _alembic_config
+from photobook_db.db._migrations import migrate as migrate_database
 from photobook_db.db.models import Base, Image, Namespace, Tag, image_tag
 
 
@@ -104,20 +103,17 @@ def test_models_match_migrations(database: Database) -> None:
 
 
 def test_migrations_can_be_undone_and_redone(database: Database) -> None:
-    with database.engine.begin() as connection:
-        command.downgrade(_alembic_config(connection), "base")
+    migrate_database(database.engine, "base", downgrade=True)
     assert "image" not in inspect(database.engine).get_table_names()
 
-    with database.engine.begin() as connection:
-        command.upgrade(_alembic_config(connection), "head")
+    migrate_database(database.engine, "head")
     assert "image" in inspect(database.engine).get_table_names()
 
 
 def migrate(database_path: Path, revision: str, downgrade: bool = False) -> None:
-    """To a revision before the latest, with foreign keys on, as the server opens the file."""
+    """To a revision before the latest, as the server migrates: on its connection, foreign keys off meanwhile."""
     engine = create_sqlite_engine(database_path)
-    with engine.begin() as connection:
-        (command.downgrade if downgrade else command.upgrade)(_alembic_config(connection), revision)
+    migrate_database(engine, revision, downgrade)
     engine.dispose()
 
 
@@ -343,3 +339,109 @@ def test_undoing_0005_drops_the_times(database_path: Path) -> None:
         links = connection.execute(text("SELECT COUNT(*) FROM image_tag")).scalar()
     engine.dispose()
     assert "added_at" not in columns and links == 1
+
+
+# --- 0006: videos in the image table
+
+def count_rows(database_path: Path, table: str) -> int:
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        count = connection.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() or 0
+    engine.dispose()
+    return count
+
+
+def add_file_move(database_path: Path, image_id: int) -> None:
+    engine = create_sqlite_engine(database_path)
+    with engine.begin() as connection:
+        connection.execute(text(
+            "INSERT INTO file_move (image_id, from_path, to_path, created_at) "
+            "VALUES (:image_id, 'a.jpg', 'b.jpg', '2025-01-01 00:00:00')"
+        ), {"image_id": image_id})
+    engine.dispose()
+
+
+# The image table is copied to change it; the rows that refer to its images must all stay.
+def test_upgrade_to_0006_keeps_every_image_and_what_refers_to_it(database_path: Path) -> None:
+    migrate(database_path, "0005")  # not open_database(): it would migrate to the latest first
+    engine = create_sqlite_engine(database_path)
+    with engine.begin() as connection:
+        connection.execute(text(
+            "INSERT INTO image (sha256, storage_path, original_filename, mime_type, width, height, file_size, "
+            "taken_at, taken_at_source, imported_at, updated_at, revision) VALUES "
+            "(:sha256, 'beach.jpg', 'beach.jpg', 'image/jpeg', 1, 1, 1, :moment, 'exif', :moment, :moment, 0)"
+        ), {"sha256": "ab" * 32, "moment": "2024-05-01 10:00:00"})
+        connection.execute(text(
+            "INSERT INTO image_tag (image_id, tag_id, added_at) "
+            "SELECT 1, id, '2024-05-01 10:00:00' FROM tag WHERE name = 'photo'"
+        ))
+    engine.dispose()
+    add_file_move(database_path, 1)
+    assert (count_rows(database_path, "image_tag"), count_rows(database_path, "file_move")) == (1, 1)
+
+    migrate(database_path, "0006")
+
+    assert count_rows(database_path, "image") == 1
+    assert count_rows(database_path, "image_tag") == 1
+    assert count_rows(database_path, "file_move") == 1
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        kind = connection.execute(text("SELECT media_kind FROM image")).scalar()
+        indexes = {index["name"] for index in inspect(connection).get_indexes("image")}
+    engine.dispose()
+    assert kind == "image"
+    assert {"ix_image_taken_at_id", "ix_image_imported_at_id"} <= indexes
+
+
+def test_0006_takes_videos_with_their_own_date(database: Database) -> None:
+    image_id = add_image_with_tag(database)
+    with database.session() as session:
+        video = session.get(Image, image_id)
+        video.media_kind = "video"
+        video.taken_at_source = "container"
+        video.duration_ms = 222400
+        video.frame_rate = 29.97
+        session.commit()
+
+    with database.session() as session:
+        stored = session.get(Image, image_id)
+        assert (stored.media_kind, stored.taken_at_source, stored.frame_rate) == ("video", "container", 29.97)
+
+
+def test_0006_refuses_an_unknown_kind(database: Database) -> None:
+    image_id = add_image_with_tag(database)
+    with database.session() as session, pytest.raises(IntegrityError):
+        session.get(Image, image_id).media_kind = "sound"
+        session.commit()
+
+
+def test_undoing_0006_keeps_the_images_and_their_links(database_path: Path) -> None:
+    database = open_database(database_path)
+    image_id = add_image_with_tag(database)
+    database.close()
+    add_file_move(database_path, image_id)
+
+    migrate(database_path, "0005", downgrade=True)
+
+    assert (count_rows(database_path, "image"), count_rows(database_path, "image_tag")) == (1, 1)
+    assert count_rows(database_path, "file_move") == 1
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        columns = {column["name"] for column in inspect(connection).get_columns("image")}
+    engine.dispose()
+    assert "media_kind" not in columns
+
+
+# The schema before 0006 cannot hold a video; going back must not lose one quietly.
+def test_undoing_0006_refuses_while_videos_are_stored(database_path: Path) -> None:
+    database = open_database(database_path)
+    image_id = add_image_with_tag(database)
+    with database.session() as session:
+        session.get(Image, image_id).media_kind = "video"
+        session.commit()
+    database.close()
+
+    with pytest.raises(RuntimeError, match="videos are stored"):
+        migrate(database_path, "0005", downgrade=True)
+
+    assert count_rows(database_path, "image") == 1
