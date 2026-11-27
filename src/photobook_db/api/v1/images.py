@@ -21,12 +21,16 @@ from photobook_db.api.v1.dependencies import (
     RotationServiceDependency,
     SearchServiceDependency,
     StorageServiceDependency,
+    StoryboardServiceDependency,
     TagsServiceDependency,
     ThumbnailsServiceDependency,
 )
-from photobook_db.services.images import ImageRecord
+from photobook_db.services.access import Restrictions
+from photobook_db.services.images import ImageRecord, ImagesService
 from photobook_db.services.importer import UploadMetadata
 from photobook_db.services.search import DEFAULT_LIMIT, MAX_LIMIT, Media, Order, SearchRequest, Sort
+from photobook_db.services.storage import StorageService
+from photobook_db.services.storyboard import StoryboardLayout, StoryboardService
 from photobook_db.services.thumbnails import THUMBNAIL_SIZES
 from photobook_db.utils.problems import Problem, problem_responses
 from photobook_db.utils.time import as_utc
@@ -51,6 +55,7 @@ class ImageLinks(BaseModel):
     self: str
     file: str
     thumbnail: str
+    storyboard: str | None = Field(default=None, exclude_if=lambda value: value is None, description="Videos only")
 
 
 class VideoDetails(BaseModel):
@@ -92,6 +97,19 @@ class ImageList(BaseModel):
     items: list[ImageObject]
     next_cursor: str | None = Field(description="Pass as `cursor` for the next page; null on the last page")
     effective_query: str = Field(description="The query with the hidden-by-default filters that were added")
+
+
+class Storyboard(BaseModel):
+    """Frames of a video at a fixed interval, in one sprite image filled row by row."""
+
+    interval_ms: int = Field(description="Frame i shows the video at i × interval_ms", examples=[2224])
+    frame_count: int = Field(examples=[100])
+    frame_width: int = Field(examples=[160])
+    frame_height: int = Field(examples=[90])
+    columns: int = Field(description="Frames per row of the sprite", examples=[10])
+    sprite: str = Field(
+        description="The sprite's URL: a WebP image", examples=["/api/v1/images/1234/storyboard/sprite"]
+    )
 
 
 class TagCountItem(BaseModel):
@@ -381,6 +399,65 @@ def get_image_thumbnail(
     return FileResponse(thumbnail, media_type="image/webp", headers=headers)
 
 
+@router.get(
+    "/{image_id}/storyboard",
+    summary="A video's frames for previews while scrubbing; the first request makes them and may take seconds",
+    responses=problem_responses(401, 404, 503),
+)
+def get_storyboard(
+    image_id: int,
+    restrictions: CurrentRestrictions,
+    images: ImagesServiceDependency,
+    storage: StorageServiceDependency,
+    storyboards: StoryboardServiceDependency,
+) -> Storyboard:
+    record = _visible_video(image_id, restrictions, images)
+    layout = _storyboard_of(record, storage, storyboards)
+    return Storyboard(**layout.to_json(), sprite=f"/api/v1/images/{record.id}/storyboard/sprite")
+
+
+@router.get(
+    "/{image_id}/storyboard/sprite",
+    summary="The storyboard's frames as one WebP image",
+    response_class=FileResponse,
+    responses={
+        200: {"content": {"image/webp": {}}},
+        304: {"description": "Not modified"},
+        **problem_responses(401, 404, 503),
+    },
+)
+def get_storyboard_sprite(
+    image_id: int,
+    request: Request,
+    restrictions: CurrentRestrictions,
+    images: ImagesServiceDependency,
+    storage: StorageServiceDependency,
+    storyboards: StoryboardServiceDependency,
+) -> Response:
+    record = _visible_video(image_id, restrictions, images)
+    etag = f'"{record.sha256}-storyboard"'
+    headers = {"ETag": etag, "Cache-Control": THUMBNAIL_CACHE_CONTROL}  # a video's file never changes
+    if _client_has(request, etag):
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+
+    _storyboard_of(record, storage, storyboards)  # e.g. the thumbnail folder was cleared: made again
+    return FileResponse(storyboards.sprite_path(record.sha256), media_type="image/webp", headers=headers)
+
+
+def _visible_video(image_id: int, restrictions: Restrictions, images: ImagesService) -> ImageRecord:
+    record = images.get_visible_image(image_id, restrictions)
+    if record.media_kind != "video":
+        raise Problem(404, "not_found", "Not a video", "Only videos have a storyboard.")
+
+    return record
+
+
+def _storyboard_of(record: ImageRecord, storage: StorageService, storyboards: StoryboardService) -> StoryboardLayout:
+    return storyboards.storyboard(
+        storage.absolute_path(record.storage_path), record.sha256, record.duration_ms or 0, record.width, record.height
+    )
+
+
 def _parse_metadata(metadata_json: bytes) -> UploadMetadata:
     try:
         model = UploadMetadataModel.model_validate_json(metadata_json)
@@ -427,7 +504,12 @@ def _image_object(record: ImageRecord) -> ImageObject:
         updated_at=as_utc(record.updated_at),
         revision=record.revision,
         tags=[str(tag) for tag in record.tags],
-        links=ImageLinks(self=base, file=f"{base}/file", thumbnail=f"{base}/thumbnail"),
+        links=ImageLinks(
+            self=base,
+            file=f"{base}/file",
+            thumbnail=f"{base}/thumbnail",
+            storyboard=f"{base}/storyboard" if record.media_kind == "video" else None,
+        ),
         media_kind=record.media_kind,  # type: ignore[arg-type]
         duration_ms=record.duration_ms,
         video=_video_details(record),

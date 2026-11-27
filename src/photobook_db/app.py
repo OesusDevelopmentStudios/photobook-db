@@ -26,6 +26,7 @@ from photobook_db.services.importer import ImporterService
 from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
+from photobook_db.services.storyboard import StoryboardService
 from photobook_db.services.tag_admin import TagAdmin
 from photobook_db.services.tags import TagsService
 from photobook_db.services.thumbnails import ThumbnailsService
@@ -68,6 +69,7 @@ def _lifespan(config: Config) -> Callable[[FastAPI], AbstractAsyncContextManager
         app.state.storage.finish_interrupted_moves()  # before any request can touch the files
         app.state.storage.clean_incoming()  # uploads a restart interrupted
         app.state.thumbnails = ThumbnailsService(config.data_dir / "thumbnails")
+        app.state.storyboards = StoryboardService(config.data_dir / "thumbnails" / "storyboard", app.state.media_probe)
         app.state.images = ImagesService(database, app.state.tags, app.state.storage)
         app.state.rotation = RotationService(app.state.images, app.state.storage, app.state.thumbnails)
         app.state.search = SearchService(database, app.state.tags.namespace_names)

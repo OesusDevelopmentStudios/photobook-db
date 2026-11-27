@@ -20,6 +20,7 @@ from photobook_db.services.same_machine import SameMachine
 from photobook_db.services.search import SearchService
 from photobook_db.services.server_settings import ServerSettings
 from photobook_db.services.storage import StorageService
+from photobook_db.services.storyboard import StoryboardService
 from photobook_db.services.tag_admin import TagAdmin
 from photobook_db.services.tags import TagsService
 from photobook_db.services.thumbnails import ThumbnailsService
@@ -93,6 +94,10 @@ def thumbnails_service(request: Request) -> ThumbnailsService:
     return request.app.state.thumbnails
 
 
+def storyboard_service(request: Request) -> StoryboardService:
+    return request.app.state.storyboards
+
+
 def current_authentication(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_token)],
     auth: Annotated[AuthService, Depends(auth_service)],
@@ -135,6 +140,7 @@ SameMachineDependency = Annotated[SameMachine, Depends(same_machine)]
 SearchServiceDependency = Annotated[SearchService, Depends(search_service)]
 ServerSettingsDependency = Annotated[ServerSettings, Depends(server_settings)]
 StorageServiceDependency = Annotated[StorageService, Depends(storage_service)]
+StoryboardServiceDependency = Annotated[StoryboardService, Depends(storyboard_service)]
 ThumbnailsServiceDependency = Annotated[ThumbnailsService, Depends(thumbnails_service)]
 CurrentAuthentication = Annotated[Authentication, Depends(current_authentication)]
 CurrentAdmin = Annotated[Authentication, Depends(current_admin)]

@@ -110,6 +110,36 @@ def test_a_video_has_its_details(client: TestClient, headers: dict[str, str], co
 
 
 # An image's object only gains its kind: a client from before videos sees nothing else new.
+def test_only_a_video_links_to_a_storyboard(
+    client: TestClient, headers: dict[str, str], coast: dict[str, int]
+) -> None:
+    video = client.get(f"/api/v1/images/{coast['video']}", headers=headers).json()
+    photo = client.get(f"/api/v1/images/{coast['photo']}", headers=headers).json()
+
+    assert video["links"]["storyboard"] == f"/api/v1/images/{coast['video']}/storyboard"
+    assert "storyboard" not in photo["links"]
+
+
+@pytest.mark.parametrize("path", ["storyboard", "storyboard/sprite"])
+def test_an_image_has_no_storyboard(
+    client: TestClient, headers: dict[str, str], coast: dict[str, int], path: str
+) -> None:
+    response = client.get(f"/api/v1/images/{coast['photo']}/{path}", headers=headers)
+
+    assert (response.status_code, response.json()["code"]) == (404, "not_found")
+
+
+@pytest.mark.parametrize("path", ["storyboard", "storyboard/sprite"])
+def test_a_server_without_ffmpeg_has_no_storyboards(
+    client: TestClient, headers: dict[str, str], coast: dict[str, int], path: str
+) -> None:
+    client.app.state.storyboards._media_probe = MediaProbe(ffprobe="no-such-ffprobe", ffmpeg="no-such-ffmpeg")
+
+    response = client.get(f"/api/v1/images/{coast['video']}/{path}", headers=headers)
+
+    assert (response.status_code, response.json()["code"]) == (503, "storyboard_unavailable")
+
+
 def test_an_image_has_no_video_fields(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
     photo = client.get(f"/api/v1/images/{coast['photo']}", headers=headers).json()
 
@@ -164,6 +194,36 @@ def test_makes_a_videos_thumbnail_again(client: TestClient, headers: dict[str, s
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/webp"
+
+
+@needs_ffmpeg
+def test_a_videos_storyboard(client: TestClient, headers: dict[str, str], tmp_path: Path) -> None:
+    video = upload_video(client, headers, video_bytes(tmp_path)).json()  # 1 s, 160x120
+
+    response = client.get(video["links"]["storyboard"], headers=headers)
+
+    assert response.status_code == 200
+    sprite_url = f"/api/v1/images/{video['id']}/storyboard/sprite"
+    assert response.json() == {
+        "interval_ms": 1000, "frame_count": 1, "frame_width": 160, "frame_height": 120, "columns": 1,
+        "sprite": sprite_url,
+    }
+    sprite = client.get(sprite_url, headers=headers)
+    assert (sprite.status_code, sprite.headers["content-type"]) == (200, "image/webp")
+    assert sprite.headers["cache-control"] == "private, max-age=31536000, immutable"
+    with Image.open(io.BytesIO(sprite.content)) as picture:
+        assert picture.size == (160, 120)
+    again = client.get(sprite_url, headers=headers | {"If-None-Match": sprite.headers["etag"]})
+    assert again.status_code == 304
+
+
+@needs_ffmpeg
+def test_asking_for_the_sprite_first_makes_it(client: TestClient, headers: dict[str, str], tmp_path: Path) -> None:
+    video = upload_video(client, headers, video_bytes(tmp_path)).json()
+
+    sprite = client.get(f"/api/v1/images/{video['id']}/storyboard/sprite", headers=headers)
+
+    assert (sprite.status_code, sprite.headers["content-type"]) == (200, "image/webp")
 
 
 @needs_ffmpeg

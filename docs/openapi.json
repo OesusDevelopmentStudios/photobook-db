@@ -1313,6 +1313,159 @@
         }
       }
     },
+    "/api/v1/images/{image_id}/storyboard": {
+      "get": {
+        "tags": [
+          "images"
+        ],
+        "summary": "A video's frames for previews while scrubbing; the first request makes them and may take seconds",
+        "operationId": "get_storyboard_api_v1_images__image_id__storyboard_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Image Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Storyboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/images/{image_id}/storyboard/sprite": {
+      "get": {
+        "tags": [
+          "images"
+        ],
+        "summary": "The storyboard's frames as one WebP image",
+        "operationId": "get_storyboard_sprite_api_v1_images__image_id__storyboard_sprite_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Image Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "image/webp": {}
+            }
+          },
+          "304": {
+            "description": "Not modified"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tags": {
       "get": {
         "tags": [
@@ -3073,6 +3226,18 @@
           "thumbnail": {
             "type": "string",
             "title": "Thumbnail"
+          },
+          "storyboard": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storyboard",
+            "description": "Videos only"
           }
         },
         "type": "object",
@@ -3951,6 +4116,66 @@
           "job_id"
         ],
         "title": "StartedJob"
+      },
+      "Storyboard": {
+        "properties": {
+          "interval_ms": {
+            "type": "integer",
+            "title": "Interval Ms",
+            "description": "Frame i shows the video at i \u00d7 interval_ms",
+            "examples": [
+              2224
+            ]
+          },
+          "frame_count": {
+            "type": "integer",
+            "title": "Frame Count",
+            "examples": [
+              100
+            ]
+          },
+          "frame_width": {
+            "type": "integer",
+            "title": "Frame Width",
+            "examples": [
+              160
+            ]
+          },
+          "frame_height": {
+            "type": "integer",
+            "title": "Frame Height",
+            "examples": [
+              90
+            ]
+          },
+          "columns": {
+            "type": "integer",
+            "title": "Columns",
+            "description": "Frames per row of the sprite",
+            "examples": [
+              10
+            ]
+          },
+          "sprite": {
+            "type": "string",
+            "title": "Sprite",
+            "description": "The sprite's URL: a WebP image",
+            "examples": [
+              "/api/v1/images/1234/storyboard/sprite"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "interval_ms",
+          "frame_count",
+          "frame_width",
+          "frame_height",
+          "columns",
+          "sprite"
+        ],
+        "title": "Storyboard",
+        "description": "Frames of a video at a fixed interval, in one sprite image filled row by row."
       },
       "TagChanges": {
         "properties": {

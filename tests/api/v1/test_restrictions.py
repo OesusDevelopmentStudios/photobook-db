@@ -13,8 +13,10 @@ from dataclasses import dataclass
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
+from sqlalchemy import update
 
 from photobook_db.config import Config
+from photobook_db.db.models import Image as ImageModel
 from photobook_db.services.auth import Role
 
 PASSWORD = "correct horse battery"
@@ -216,6 +218,23 @@ def check_albums_leave_it_out(client: TestClient, setup: Setup) -> None:
     assert albums == [("album:trip", 1, setup.safe_id)]
 
 
+def expect_video_not_found(path: str) -> Callable[[TestClient, Setup], None]:
+    """For a route only videos have: the private image is made a video first, so a 404 means it is hidden."""
+
+    def check(client: TestClient, setup: Setup) -> None:
+        with client.app.state.database.session() as session:
+            session.execute(
+                update(ImageModel).where(ImageModel.id == setup.private_id).values(media_kind="video", duration_ms=2000)
+            )
+            session.commit()
+
+        url = path.format(image_id=setup.private_id)
+        assert client.get(url, headers=setup.admin).status_code != 404  # 200, or 503 without FFmpeg
+        assert client.get(url, headers=setup.restricted_user).status_code == 404
+
+    return check
+
+
 def check_creating_is_for_admins(client: TestClient, setup: Setup) -> None:
     response = client.post("/api/v1/tags", json={"tag": "rating:public"}, headers=setup.restricted_user)
     assert response.status_code == 403
@@ -233,6 +252,10 @@ ACCESS_RULES = {
     ("PATCH", "/api/v1/images/{image_id}"): expect_not_found("PATCH", "/api/v1/images/{image_id}"),
     ("GET", "/api/v1/images/{image_id}/file"): expect_not_found("GET", "/api/v1/images/{image_id}/file"),
     ("GET", "/api/v1/images/{image_id}/thumbnail"): expect_not_found("GET", "/api/v1/images/{image_id}/thumbnail"),
+    ("GET", "/api/v1/images/{image_id}/storyboard"): expect_video_not_found("/api/v1/images/{image_id}/storyboard"),
+    ("GET", "/api/v1/images/{image_id}/storyboard/sprite"): expect_video_not_found(
+        "/api/v1/images/{image_id}/storyboard/sprite"
+    ),
     ("POST", "/api/v1/images/{image_id}/rotation"): expect_not_found("POST", "/api/v1/images/{image_id}/rotation"),
     ("GET", "/api/v1/tags"): check_autocomplete_hides,
     ("POST", "/api/v1/tags"): check_creating_is_for_admins,
