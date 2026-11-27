@@ -17,31 +17,31 @@ from photobook_db.utils.problems import Problem
 
 
 @dataclass(frozen=True)
-class ImageType:
+class FileType:
     mime_type: str
     extension: str  # used for the file name in the library
 
 
 # Pillow's format name → type. MPO is how Pillow reports many camera JPEGs (JPEG with extra pictures).
 SUPPORTED_TYPES = {
-    "JPEG": ImageType("image/jpeg", "jpg"),
-    "MPO": ImageType("image/jpeg", "jpg"),
-    "PNG": ImageType("image/png", "png"),
-    "WEBP": ImageType("image/webp", "webp"),
-    "GIF": ImageType("image/gif", "gif"),
-    "TIFF": ImageType("image/tiff", "tiff"),
-    "BMP": ImageType("image/bmp", "bmp"),
-    "JPEG2000": ImageType("image/jp2", "jp2"),
-    "AVIF": ImageType("image/avif", "avif"),
+    "JPEG": FileType("image/jpeg", "jpg"),
+    "MPO": FileType("image/jpeg", "jpg"),
+    "PNG": FileType("image/png", "png"),
+    "WEBP": FileType("image/webp", "webp"),
+    "GIF": FileType("image/gif", "gif"),
+    "TIFF": FileType("image/tiff", "tiff"),
+    "BMP": FileType("image/bmp", "bmp"),
+    "JPEG2000": FileType("image/jp2", "jp2"),
+    "AVIF": FileType("image/avif", "avif"),
 }
 
 # The video containers the server takes, by the name media_probe gives them
 VIDEO_TYPES = {
-    "mp4": ImageType("video/mp4", "mp4"),
-    "mov": ImageType("video/quicktime", "mov"),
-    "webm": ImageType("video/webm", "webm"),
-    "mkv": ImageType("video/x-matroska", "mkv"),
-    "avi": ImageType("video/x-msvideo", "avi"),
+    "mp4": FileType("video/mp4", "mp4"),
+    "mov": FileType("video/quicktime", "mov"),
+    "webm": FileType("video/webm", "webm"),
+    "mkv": FileType("video/x-matroska", "mkv"),
+    "avi": FileType("video/x-msvideo", "avi"),
 }
 
 # ISO media brands of still pictures, which share MP4's file layout
@@ -54,8 +54,8 @@ _HASH_CHUNK_BYTES = 1024 * 1024
 
 
 @dataclass(frozen=True)
-class ImageFacts:
-    type: ImageType
+class MediaFacts:
+    type: FileType
     width: int  # as the image is shown, i.e. after the EXIF orientation
     height: int
     animated: bool  # more than one frame, e.g. an animated GIF
@@ -64,7 +64,7 @@ class ImageFacts:
     video: VideoInfo | None = None  # a video's details; None for an image
 
 
-def inspect_image(path: Path) -> ImageFacts:
+def inspect_image(path: Path) -> MediaFacts:
     """Raises 415 unsupported_media_type for files that are not a supported image."""
     try:
         with Image.open(path) as image:
@@ -86,11 +86,11 @@ def inspect_image(path: Path) -> ImageFacts:
         width, height = height, width
 
     taken_at, utc_offset_minutes = _capture_time(exif)
-    return ImageFacts(image_type, width, height, animated, taken_at, utc_offset_minutes)
+    return MediaFacts(image_type, width, height, animated, taken_at, utc_offset_minutes)
 
 
-def video_facts(video: VideoInfo) -> ImageFacts:
-    return ImageFacts(
+def video_facts(video: VideoInfo) -> MediaFacts:
+    return MediaFacts(
         VIDEO_TYPES[video.container],
         video.width,
         video.height,

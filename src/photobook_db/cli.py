@@ -13,7 +13,7 @@ from photobook_db.config import Config, ConfigError, config_from_environment
 
 
 def main(arguments: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="photobook-db", description="Image library server for Photobook")
+    parser = argparse.ArgumentParser(prog="photobook-db", description="Photo and video library server for Photobook")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("serve", help="run the server (settings: PHOTOBOOK_* environment variables)")
     commands.add_parser("openapi", help="print the API schema, e.g. to update docs/openapi.json")

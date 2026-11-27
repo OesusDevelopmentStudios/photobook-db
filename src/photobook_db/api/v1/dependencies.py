@@ -10,7 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from photobook_db.services.access import AccessService, Restrictions
 from photobook_db.services.auth import Authentication, AuthService, Role, not_authenticated
-from photobook_db.services.images import ImagesService
+from photobook_db.services.media import MediaService
 from photobook_db.services.importer import ImporterService
 from photobook_db.services.jobs import FolderImport, JobsService
 from photobook_db.services.preferences import PreferencesService
@@ -47,8 +47,8 @@ def tags_service(request: Request) -> TagsService:
     return request.app.state.tags
 
 
-def images_service(request: Request) -> ImagesService:
-    return request.app.state.images
+def media_service(request: Request) -> MediaService:
+    return request.app.state.media
 
 
 def importer_service(request: Request) -> ImporterService:
@@ -157,7 +157,7 @@ AccessServiceDependency = Annotated[AccessService, Depends(access_service)]
 AuthServiceDependency = Annotated[AuthService, Depends(auth_service)]
 TagsServiceDependency = Annotated[TagsService, Depends(tags_service)]
 TagAdminDependency = Annotated[TagAdmin, Depends(tag_admin)]
-ImagesServiceDependency = Annotated[ImagesService, Depends(images_service)]
+MediaServiceDependency = Annotated[MediaService, Depends(media_service)]
 ImporterServiceDependency = Annotated[ImporterService, Depends(importer_service)]
 JobsServiceDependency = Annotated[JobsService, Depends(jobs_service)]
 FolderImportDependency = Annotated[FolderImport, Depends(folder_import)]

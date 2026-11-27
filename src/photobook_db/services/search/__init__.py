@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Searching images with the query language: parsing queries and turning them into database queries."""
+"""Searching media with the query language: parsing queries and turning them into database queries."""
 
 from photobook_db.services.search._parser import (
     DATE_FIELDS,

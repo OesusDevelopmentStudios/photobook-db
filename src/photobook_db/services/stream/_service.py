@@ -40,24 +40,24 @@ class StreamService:
         self._now = now
         self._key_lock = threading.Lock()
 
-    def grant(self, image_id: int, token_id: int) -> StreamGrant:
+    def grant(self, media_id: int, token_id: int) -> StreamGrant:
         """Lets the holder of the URL read that one file, for the user of that login, until it expires."""
         expires = int(self._unix_now() + LIFETIME.total_seconds())
-        return StreamGrant(token_id, expires, self._signature(image_id, token_id, expires))
+        return StreamGrant(token_id, expires, self._signature(media_id, token_id, expires))
 
-    def check(self, image_id: int, token_id: int, expires: int, signature: str) -> None:
+    def check(self, media_id: int, token_id: int, expires: int, signature: str) -> None:
         """Raises 401 not_authenticated for a signature that does not match or has expired. Whether the login still
         exists and may see the file is for the caller to check."""
         if expires <= self._unix_now() or not hmac.compare_digest(
-            signature.encode(), self._signature(image_id, token_id, expires).encode()
+            signature.encode(), self._signature(media_id, token_id, expires).encode()
         ):
             raise Problem(401, "not_authenticated", "Not logged in", "The stream URL is not valid, or has expired.")
 
     def _unix_now(self) -> float:
         return as_utc(self._now()).timestamp()  # the stored times are UTC without a time zone
 
-    def _signature(self, image_id: int, token_id: int, expires: int) -> str:
-        message = f"stream:{image_id}:{token_id}:{expires}".encode()
+    def _signature(self, media_id: int, token_id: int, expires: int) -> str:
+        message = f"stream:{media_id}:{token_id}:{expires}".encode()
         digest = hmac.new(self._key(), message, hashlib.sha256).digest()
         return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 

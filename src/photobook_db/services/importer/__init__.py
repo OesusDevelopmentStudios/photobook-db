@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Bringing images into the library: what a file is, whether it is new, and storing it with its tags."""
+"""Bringing photos and videos into the library: what a file is, whether it is new, and storing it with its tags."""
 
 from photobook_db.services.importer._inspection import (
     SUPPORTED_TYPES,
-    ImageFacts,
-    ImageType,
+    FileType,
+    MediaFacts,
     file_sha256,
     inspect_image,
     sniffed_video_type,
@@ -34,9 +34,9 @@ __all__ = [
     "SUPPORTED_TYPES",
     "UPLOAD_LIMIT_RANGE",
     "VIDEO_UPLOAD_LIMIT_RANGE",
-    "ImageFacts",
-    "ImageType",
+    "FileType",
     "ImporterService",
+    "MediaFacts",
     "UploadMetadata",
     "check_upload_limit",
     "check_video_upload_limit",

@@ -392,7 +392,7 @@ def test_a_turn_waits_while_files_change(client: TestClient, uploaded: dict) -> 
         turner.start()
         turner.join(timeout=0.3)
         assert turner.is_alive()
-        storage.move_image_file(uploaded["id"], moved_to)
+        storage.move_media_file(uploaded["id"], moved_to)
 
     turner.join(timeout=5)
     assert revisions == [1]

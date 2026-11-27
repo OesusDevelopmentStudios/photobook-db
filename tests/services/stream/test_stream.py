@@ -45,7 +45,7 @@ def refused(action: object) -> Problem:
 
 
 def test_a_grant_lasts_twelve_hours(streams: StreamService) -> None:
-    grant = streams.grant(image_id=7, token_id=3)
+    grant = streams.grant(media_id=7, token_id=3)
 
     assert grant.expires_at == datetime(2026, 11, 28, 0, 0, tzinfo=UTC)
     assert grant.query() == f"t=3&exp={grant.expires}&sig={grant.signature}"

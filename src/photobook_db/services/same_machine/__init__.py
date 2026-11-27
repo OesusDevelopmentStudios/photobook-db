@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
 """Whether a client runs on the server's own computer, and then where the library folder is there, so the
-desktop app can show an image's file in the file manager.
+desktop app can show a media item's file in the file manager.
 
 Both sides know the computer's machine ID (/etc/machine-id). The client sends an ID derived from it,
 HMAC-SHA256 with the machine ID as written in the file as the key and "photobook-db" as the message, in hex,

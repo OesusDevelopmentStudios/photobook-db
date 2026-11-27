@@ -58,8 +58,8 @@ def confirm_deletion(request: Request, session: AdminPage, name: str) -> HTMLRes
     except Problem as problem:
         return _list_page(request, session, error=problem_message(problem), status_code=problem.status)
 
-    tag_count, image_count = _tags(request).namespace_usage(name)
-    context = {"session": session, "name": name, "tag_count": tag_count, "image_count": image_count}
+    tag_count, media_count = _tags(request).namespace_usage(name)
+    context = {"session": session, "name": name, "tag_count": tag_count, "image_count": media_count}
     return templates.TemplateResponse(request, "namespace_delete.html", context)
 
 
@@ -113,7 +113,7 @@ def namespace_tags_page(
 
 @router.post("/{name}/tags", response_class=HTMLResponse)
 def add_tag(request: Request, session: AdminForm, name: str, tag_name: Annotated[str, Form()]) -> Response:
-    """A tag no image has yet, so that it is suggested to users."""
+    """A tag no media item has yet, so that it is suggested to users."""
     try:
         tag = _tag_admin(request).create_tag(f"{_namespace(request, name).name}:{tag_name}")
     except Problem as problem:

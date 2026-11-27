@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Changing one tag on every image, from its namespace's page: renaming it (which also merges it into another tag
+"""Changing one tag on every media item, from its namespace's page: renaming it (which also merges it into another tag
 or moves it to another namespace) and deleting it. Restricted tags and hidden filters follow; files move in a job
 if their folders change. The Tags page's addresses from before 0.2.0 lead to the namespace pages."""
 
@@ -48,10 +48,10 @@ def rename_tag(
 
 @router.get("/delete", response_class=HTMLResponse)
 def confirm_deletion(request: Request, session: AdminPage, namespace: str, name: str) -> HTMLResponse:
-    """A page of its own: deleting takes the tag off every image, and cannot be undone."""
+    """A page of its own: deleting takes the tag off every media item, and cannot be undone."""
     tag = TagName(namespace, name)
-    image_count = request.app.state.tags.image_count(tag)
-    if image_count is None:
+    media_count = request.app.state.tags.media_count(tag)
+    if media_count is None:
         raise PageError(404, "This tag does not exist (any more).")
 
     context = {
@@ -59,7 +59,7 @@ def confirm_deletion(request: Request, session: AdminPage, namespace: str, name:
         "tag": tag,
         "tag_path": tag_path(tag),
         "tags_path": tags_path(namespace),
-        "image_count": image_count,
+        "image_count": media_count,
         "fixed": namespace in request.app.state.tags.fixed_values(),  # a value, e.g. a rating
     }
     return templates.TemplateResponse(request, "tag_delete.html", context)

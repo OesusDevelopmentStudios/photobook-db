@@ -51,7 +51,7 @@ class StorageService:
         self._file_lock = threading.RLock()
 
     def changing_files(self) -> AbstractContextManager[bool]:
-        """Held while an image's file is moved or its content replaced, also by callers that read it first (a
+        """Held while a media item's file is moved or its content replaced, also by callers that read it first (a
         rotation): one change at a time, so a move never takes a file that is being rewritten, and a rewrite
         never lands where a file was before it moved."""
         return self._file_lock
@@ -77,10 +77,10 @@ class StorageService:
         self._settings.set(PATH_TEMPLATE_SETTING, template.text)
         return template
 
-    # --- Where images belong
+    # --- Where media belong
 
     def path_for(self, tags: list[TagName], taken_at: datetime, file_name: str) -> PurePosixPath:
-        """The place in the library that the path template gives an image with these tags."""
+        """The place in the library that the path template gives a media item with these tags."""
         tags_by_namespace: defaultdict[str, list[str]] = defaultdict(list)
         for tag in tags:
             tags_by_namespace[tag.namespace].append(tag.name)
@@ -88,16 +88,16 @@ class StorageService:
         return folder_path(self.path_template(), tags_by_namespace, taken_at) / file_name
 
     def move_to_layout(
-        self, image_id: int, current_path: PurePosixPath, tags: list[TagName], taken_at: datetime
+        self, media_id: int, current_path: PurePosixPath, tags: list[TagName], taken_at: datetime
     ) -> PurePosixPath:
-        """Moves an image's file to where its tags now place it, keeping the file name, and returns the place.
+        """Moves a media item's file to where its tags now place it, keeping the file name, and returns the place.
         Raises OSError if moving fails; the file then stays where the database says it is."""
         wanted_path = self.path_for(tags, taken_at, current_path.name)
         if wanted_path.parent == current_path.parent:
             return current_path
 
         new_path = self._free_library_path(wanted_path)
-        self.move_image_file(image_id, new_path)
+        self.move_media_file(media_id, new_path)
         return new_path
 
     # --- New files
@@ -150,18 +150,18 @@ class StorageService:
 
     # --- Moving files
 
-    def move_image_file(self, image_id: int, to_path: PurePosixPath) -> None:
-        """Moves an image's file within the library, e.g. after a tag change. `to_path` is relative to the
+    def move_media_file(self, media_id: int, to_path: PurePosixPath) -> None:
+        """Moves a media item's file within the library, e.g. after a tag change. `to_path` is relative to the
         library. Raises FileExistsError if a file is in the way, or another OSError if moving fails."""
         with self._file_lock:
-            self._move_image_file(image_id, to_path)
+            self._move_media_file(media_id, to_path)
 
-    def _move_image_file(self, image_id: int, to_path: PurePosixPath) -> None:
+    def _move_media_file(self, media_id: int, to_path: PurePosixPath) -> None:
         target = self.absolute_path(to_path)
         if target.exists():
             raise FileExistsError(errno.EEXIST, "The target file exists already", str(target))
 
-        move_id, from_path = self._record_move(image_id, to_path)
+        move_id, from_path = self._record_move(media_id, to_path)
         try:
             move_file(self.absolute_path(from_path), target)
         except OSError:
@@ -171,7 +171,7 @@ class StorageService:
 
             raise  # otherwise the complete copy is there; the next start finishes the move
 
-        self._finish_move(move_id, image_id, to_path)
+        self._finish_move(move_id, media_id, to_path)
         remove_empty_folders(self.absolute_path(from_path).parent, self.library_dir)
 
     def finish_interrupted_moves(self) -> int:
@@ -190,19 +190,19 @@ class StorageService:
 
     # The steps of a move. A crash can happen between any two of them.
 
-    def _record_move(self, image_id: int, to_path: PurePosixPath) -> tuple[int, PurePosixPath]:
+    def _record_move(self, media_id: int, to_path: PurePosixPath) -> tuple[int, PurePosixPath]:
         with self._database.session() as session:
-            from_path = session.get_one(Media, image_id).storage_path
-            move = FileMove(media_id=image_id, from_path=from_path, to_path=str(to_path), created_at=utc_now())
+            from_path = session.get_one(Media, media_id).storage_path
+            move = FileMove(media_id=media_id, from_path=from_path, to_path=str(to_path), created_at=utc_now())
             session.add(move)
             session.commit()
             return move.id, PurePosixPath(from_path)
 
-    def _finish_move(self, move_id: int, image_id: int, to_path: PurePosixPath | str) -> None:
+    def _finish_move(self, move_id: int, media_id: int, to_path: PurePosixPath | str) -> None:
         """The new path and the end of the move are recorded in one transaction."""
         with self._database.session() as session:
             session.execute(
-                update(Media).where(Media.id == image_id).values(storage_path=str(to_path), updated_at=utc_now())
+                update(Media).where(Media.id == media_id).values(storage_path=str(to_path), updated_at=utc_now())
             )
             session.execute(delete(FileMove).where(FileMove.id == move_id))
             session.commit()
@@ -221,17 +221,17 @@ class StorageService:
 
             self._finish_move(move.id, move.media_id, move.to_path)
             remove_empty_folders(source.parent, self.library_dir)
-            _logger.info("Finished an interrupted move of image %s to %s", move.media_id, move.to_path)
+            _logger.info("Finished an interrupted move of media %s to %s", move.media_id, move.to_path)
             return True
 
         if source.exists():
             partial_path(target).unlink(missing_ok=True)  # the copy had not finished; the original is intact
             self._forget_move(move.id)
-            _logger.info("Undid an interrupted move of image %s; it stays at %s", move.media_id, move.from_path)
+            _logger.info("Undid an interrupted move of media %s; it stays at %s", move.media_id, move.from_path)
             return True
 
         _logger.error(
-            "The file of image %s is neither at %s nor at %s; the move is kept for an admin to look at",
+            "The file of media %s is neither at %s nor at %s; the move is kept for an admin to look at",
             move.media_id,
             move.from_path,
             move.to_path,

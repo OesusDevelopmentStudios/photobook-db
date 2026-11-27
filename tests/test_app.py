@@ -102,12 +102,12 @@ def test_gives_older_images_their_meta_tags_when_it_starts(config: Config) -> No
     database.close()
 
     with TestClient(create_app(config)) as client:
-        images = client.app.state.images
+        images = client.app.state.media
         deadline = time.monotonic() + 10
-        while not images.get_image(1).tags and time.monotonic() < deadline:
+        while not images.get_media(1).tags and time.monotonic() < deadline:
             time.sleep(0.01)
 
-        tags = [str(tag) for tag in images.get_image(1).tags]
+        tags = [str(tag) for tag in images.get_media(1).tags]
 
     assert tags == ["meta:low_res", "meta:png", "meta:still_image"]
 

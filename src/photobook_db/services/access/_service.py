@@ -23,7 +23,7 @@ from photobook_db.utils.problems import Problem
 
 class Restrictions:
     """One user's restrictions, parsed once per request. The only place that decides whether a user may see
-    an image or use a tag. Admins have none."""
+    a media item or use a tag. Admins have none."""
 
     def __init__(self, terms: list[All]) -> None:
         self._terms = terms
@@ -32,16 +32,16 @@ class Restrictions:
     def active(self) -> bool:
         return bool(self._terms)
 
-    def visible_images_filter(self) -> ColumnElement[bool]:
-        """Added to every query that reads images: search, lookup by id, file, thumbnail, bulk changes."""
+    def visible_media_filter(self) -> ColumnElement[bool]:
+        """Added to every query that reads media: search, lookup by id, file, thumbnail, bulk changes."""
         return and_(true(), *(not_(matching_condition(term)) for term in self._terms))
 
     def is_visible(self, tags: Collection[TagName], taken_at: datetime | None) -> bool:
         return not any(tree_matches(term, tags, taken_at) for term in self._terms)
 
     def check_tags_allowed(self, tags_after: Collection[TagName], taken_at: datetime | None) -> None:
-        """For uploads and tag changes: an image with these tags must stay visible to the user. Raises
-        403 tag_restricted naming the image's tags that the applying restrictions mention."""
+        """For uploads and tag changes: a media item with these tags must stay visible to the user. Raises
+        403 tag_restricted naming the media item's tags that the applying restrictions mention."""
         applying = [term for term in self._terms if tree_matches(term, tags_after, taken_at)]
         if not applying:
             return
@@ -61,7 +61,7 @@ class Restrictions:
         )
 
     def is_tag_hidden(self, tag: TagName) -> bool:
-        """For autocomplete: hidden if an image with only this tag would be restricted."""
+        """For autocomplete: hidden if a media item with only this tag would be restricted."""
         return not self.is_visible([tag], None)
 
 

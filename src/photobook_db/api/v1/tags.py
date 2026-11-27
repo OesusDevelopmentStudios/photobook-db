@@ -45,7 +45,7 @@ def list_tags(
 ) -> TagList:
     is_hidden = restrictions.is_tag_hidden if restrictions.active else None  # restricted tags are never suggested
     page = tags.tag_page(prefix, namespace, limit, is_hidden, cursor)
-    items = [TagWithCount(tag=str(match.tag), image_count=match.image_count) for match in page.items]
+    items = [TagWithCount(tag=str(match.tag), image_count=match.media_count) for match in page.items]
     return TagList(items=items, next_cursor=page.next_cursor)
 
 

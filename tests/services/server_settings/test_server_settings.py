@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from photobook_db.db import Database
-from photobook_db.services.images import ImagesService
+from photobook_db.services.media import MediaService
 from photobook_db.services.importer import DEFAULT_MAX_UPLOAD_BYTES, DEFAULT_MAX_VIDEO_UPLOAD_BYTES, ImporterService
 from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.jobs import JobKind, JobsService, JobStatus, Relayout
@@ -33,7 +33,7 @@ def server_settings(database: Database, tmp_path: Path) -> ServerSettings:
     settings = SettingsService(database)
     tags = TagsService(database, lambda: storage.path_template_namespaces())
     storage = StorageService(database, settings, Path("/srv/library"), tags.namespace_names)
-    images = ImagesService(database, tags, storage)
+    images = MediaService(database, tags, storage)
     importer = ImporterService(
         images, tags, storage, ThumbnailsService(tmp_path / "thumbnails"), settings, MediaProbe()
     )

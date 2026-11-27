@@ -81,7 +81,7 @@ def restrictions(access: AccessService, user: UserInfo, terms: list[str]) -> Res
 
 def visible(database: Database, user_restrictions: Restrictions) -> set[str]:
     with database.session() as session:
-        return set(session.scalars(select(Media.original_filename).where(user_restrictions.visible_images_filter())))
+        return set(session.scalars(select(Media.original_filename).where(user_restrictions.visible_media_filter())))
 
 
 # --- Storing restrictions

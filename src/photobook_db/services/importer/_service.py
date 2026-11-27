@@ -8,9 +8,9 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from photobook_db.services.access import Restrictions
-from photobook_db.services.images import ImageRecord, ImagesService, NewImage, duplicate_image
+from photobook_db.services.media import MediaRecord, MediaService, NewMedia, duplicate_media
 from photobook_db.services.importer._inspection import (
-    ImageFacts,
+    MediaFacts,
     file_sha256,
     inspect_image,
     sniffed_video_type,
@@ -59,7 +59,7 @@ def local_now() -> datetime:
 class ImporterService:
     def __init__(
         self,
-        images: ImagesService,
+        media: MediaService,
         tags: TagsService,
         storage: StorageService,
         thumbnails: ThumbnailsService,
@@ -67,7 +67,7 @@ class ImporterService:
         media_probe: MediaProbe,
         now: Callable[[], datetime] = local_now,
     ) -> None:
-        self._images = images
+        self._media = media
         self._tags = tags
         self._storage = storage
         self._thumbnails = thumbnails
@@ -97,12 +97,12 @@ class ImporterService:
         return max(self.max_upload_bytes(), self.max_video_upload_bytes())
 
     def new_incoming_path(self) -> Path:
-        """Where to write an upload before passing it to import_image()."""
+        """Where to write an upload before passing it to import_media()."""
         return self._storage.new_incoming_path()
 
-    def import_image(
+    def import_media(
         self, incoming: Path, metadata: UploadMetadata, user_id: int | None, restrictions: Restrictions
-    ) -> ImageRecord:
+    ) -> MediaRecord:
         """Takes over `incoming`: it ends up in the library or is deleted. Raises 409 duplicate_image,
         403 tag_restricted, 413 file_too_large (over the limit for images or for videos), 415 unsupported_media_type,
         422 checksum_mismatch or 422 invalid_tag; nothing is stored then. The server adds the file's meta tags; meta
@@ -112,20 +112,20 @@ class ImporterService:
             tags, taken_at.time, file_name(metadata.original_filename, sha256, facts.type.extension)
         )
         stored_path = self._storage.store_incoming(incoming, library_path)
-        new_image = self._new_image(metadata, sha256, facts, taken_at, stored_path, user_id)
+        new_media = self._new_media(metadata, sha256, facts, taken_at, stored_path, user_id)
         try:
-            return self._images.create_image(new_image, tags)
+            return self._media.create_media(new_media, tags)
         except Exception:
             self._storage.delete_library_file(stored_path)
-            if self._images.find_id_by_sha256(sha256) is None:  # not another upload of the same file
+            if self._media.find_id_by_sha256(sha256) is None:  # not another upload of the same file
                 self._thumbnails.delete_thumbnails(sha256)
 
             raise
 
     def import_copy(
         self, source: Path, metadata: UploadMetadata, user_id: int | None, restrictions: Restrictions
-    ) -> ImageRecord:
-        """Imports a copy of `source` and leaves the file itself alone. Raises like import_image()."""
+    ) -> MediaRecord:
+        """Imports a copy of `source` and leaves the file itself alone. Raises like import_media()."""
         largest = self.largest_upload_bytes()
         if source.stat().st_size > largest:  # too large whatever it is: not worth hashing or copying
             raise file_too_large(largest)
@@ -140,7 +140,7 @@ class ImporterService:
             raise
 
         # The checksum finds a source that changed while it was copied.
-        return self.import_image(incoming, replace(metadata, client_sha256=sha256), user_id, restrictions)
+        return self.import_media(incoming, replace(metadata, client_sha256=sha256), user_id, restrictions)
 
     def make_thumbnails(self, path: Path, sha256: str, revision: int = 0, video_duration_ms: int | None = None) -> None:
         """The grid's thumbnails: of the image, or of a video's poster frame (video_duration_ms is a video's duration;
@@ -166,7 +166,7 @@ class ImporterService:
         frame = self._media_probe.frame(path, min(duration_ms // 10, POSTER_LATEST_MS), largest)
         return frame if frame is not None else self._media_probe.frame(path, 0, largest)
 
-    def _inspect(self, path: Path) -> ImageFacts:
+    def _inspect(self, path: Path) -> MediaFacts:
         """An image, as Pillow reads it; else a video, as FFmpeg does. Raises 415 unsupported_media_type."""
         try:
             return inspect_image(path)
@@ -186,7 +186,7 @@ class ImporterService:
 
     def _checked_upload(
         self, incoming: Path, metadata: UploadMetadata, restrictions: Restrictions
-    ) -> tuple[str, list[TagName], ImageFacts, TakenAt]:
+    ) -> tuple[str, list[TagName], MediaFacts, TakenAt]:
         """Everything that can refuse an upload, before anything is stored."""
         try:
             sha256 = file_sha256(incoming)
@@ -211,7 +211,7 @@ class ImporterService:
 
         return sha256, tags, facts, taken_at
 
-    def _check_size(self, path: Path, facts: ImageFacts) -> None:
+    def _check_size(self, path: Path, facts: MediaFacts) -> None:
         if facts.video is None:
             limit, kind = self.max_upload_bytes(), "images"
         else:
@@ -221,22 +221,22 @@ class ImporterService:
             raise file_too_large(limit, kind)
 
     def _check_not_duplicate(self, sha256: str, restrictions: Restrictions) -> None:
-        existing_image_id = self._images.find_id_by_sha256(sha256)
+        existing_image_id = self._media.find_id_by_sha256(sha256)
         if existing_image_id is not None:
-            # The user has the file already; confirming a copy exists reveals little, but not which image.
-            visible = self._images.is_visible(existing_image_id, restrictions)
-            raise duplicate_image(sha256, existing_image_id if visible else None)
+            # The user has the file already; confirming a copy exists reveals little, but not which one.
+            visible = self._media.is_visible(existing_image_id, restrictions)
+            raise duplicate_media(sha256, existing_image_id if visible else None)
 
-    def _new_image(
+    def _new_media(
         self,
         metadata: UploadMetadata,
         sha256: str,
-        facts: ImageFacts,
+        facts: MediaFacts,
         taken_at: TakenAt,
         stored_path: PurePosixPath,
         user_id: int | None,
-    ) -> NewImage:
-        return NewImage(
+    ) -> NewMedia:
+        return NewMedia(
             sha256=sha256,
             storage_path=str(stored_path),
             original_filename=metadata.original_filename,
@@ -251,7 +251,7 @@ class ImporterService:
             **_video_fields(facts),
         )
 
-    def _taken_at(self, metadata: UploadMetadata, facts: ImageFacts) -> TakenAt:
+    def _taken_at(self, metadata: UploadMetadata, facts: MediaFacts) -> TakenAt:
         """From EXIF or the video itself; else the original file's modification time; else now. The source is
         recorded too."""
         if facts.taken_at is not None:
@@ -264,7 +264,7 @@ class ImporterService:
         return TakenAt(self._now(), "import_time", None)
 
 
-def _meta_tags(facts: ImageFacts) -> list[TagName]:
+def _meta_tags(facts: MediaFacts) -> list[TagName]:
     video = facts.video
     if video is None:
         return meta_tags_for(facts.type.mime_type, facts.width, facts.height, facts.animated)
@@ -272,7 +272,7 @@ def _meta_tags(facts: ImageFacts) -> list[TagName]:
     return video_meta_tags(video.container, video.width, video.height, video.audio_codec is not None, video.duration_ms)
 
 
-def _video_fields(facts: ImageFacts) -> dict[str, object]:
+def _video_fields(facts: MediaFacts) -> dict[str, object]:
     video = facts.video
     if video is None:
         return {}

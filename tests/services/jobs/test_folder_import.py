@@ -15,7 +15,7 @@ from PIL import Image
 
 from photobook_db.db import Database
 from photobook_db.services.auth import AuthService, Role
-from photobook_db.services.images import ImagesService
+from photobook_db.services.media import MediaService
 from photobook_db.services.importer import ImporterService
 from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.jobs import FolderImport, JobInfo, JobKind, JobsService, JobStatus
@@ -35,7 +35,7 @@ class Server:
         self.settings = settings = SettingsService(database)
         tags = TagsService(database, lambda: self.storage.path_template_namespaces())
         self.storage = StorageService(database, settings, self.library_dir, tags.namespace_names)
-        self.images = ImagesService(database, tags, self.storage)
+        self.images = MediaService(database, tags, self.storage)
         thumbnails = ThumbnailsService(tmp_path / "thumbnails")
         importer = ImporterService(self.images, tags, self.storage, thumbnails, settings, MediaProbe())
         self.jobs = JobsService(database)
@@ -118,7 +118,7 @@ def test_imports_the_folder_and_its_subfolders(server: Server, trip: Path) -> No
 def test_imported_images_get_the_tags_and_the_admin(server: Server, trip: Path) -> None:
     server.import_folder("trip/day 2", tags=["album:trip", "summer"])
 
-    [record] = server.images.get_images([1])
+    [record] = server.images.get_media_list([1])
     assert user_tags(record.tags) == ["album:trip", "general:summer"]
     assert (record.original_filename, record.imported_by_user_id) == ("hills.jpg", server.admin.id)
     assert record.taken_at_source == "file_mtime"

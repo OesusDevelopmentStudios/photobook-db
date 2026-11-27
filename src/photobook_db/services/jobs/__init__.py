@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Long tasks run one at a time by a background worker: folder imports, re-layouts, meta tags of older images."""
+"""Long tasks run one at a time by a background worker: folder imports, re-layouts, meta tags of older media."""
 
 from photobook_db.services.jobs._folder_import import FolderImport
 from photobook_db.services.jobs._meta_tags import MetaTagging

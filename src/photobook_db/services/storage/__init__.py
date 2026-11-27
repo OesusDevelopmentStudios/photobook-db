@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""The library folder: where each image is stored, and moving files safely when their tags change."""
+"""The library folder: where each media item is stored, and moving files safely when their tags change."""
 
 from photobook_db.services.storage._paths import (
     DEFAULT_PATH_TEMPLATE,

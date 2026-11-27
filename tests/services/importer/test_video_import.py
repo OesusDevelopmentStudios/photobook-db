@@ -51,7 +51,7 @@ def tag_names(record: object) -> set[str]:
 def test_imports_a_video_with_its_details(library: Library) -> None:
     incoming = incoming_video(library, *picture(), *SOUND, "-c:v", "mpeg4", "-c:a", "aac")
 
-    record = library.import_image(incoming, UploadMetadata("waves.mp4", tags=("general:coast",)), None)
+    record = library.import_media(incoming, UploadMetadata("waves.mp4", tags=("general:coast",)), None)
 
     assert record.media_kind == "video"
     assert (record.mime_type, record.width, record.height) == ("video/mp4", 320, 240)
@@ -68,7 +68,7 @@ def test_names_the_file_after_its_container(library: Library) -> None:
     for container, name in (("mov", "clip.mov"), ("matroska", "clip.mkv"), ("avi", "clip.avi")):
         incoming = incoming_video(library, *picture(rate=24 + len(name)), "-c:v", "mpeg4", container=container)
 
-        record = library.import_image(incoming, UploadMetadata(name), None)
+        record = library.import_media(incoming, UploadMetadata(name), None)
 
         assert record.storage_path.endswith(name.rsplit(".", 1)[1])
 
@@ -83,7 +83,7 @@ def test_poster_frame_is_the_thumbnail_upright(library: Library) -> None:
     )
     plain.unlink()
 
-    record = library.import_image(rotated, UploadMetadata("upright.mp4"), None)
+    record = library.import_media(rotated, UploadMetadata("upright.mp4"), None)
 
     assert (record.width, record.height) == (240, 320)
     with Image.open(library.thumbnails.thumbnail_path(record.sha256, 256)) as thumbnail:
@@ -97,7 +97,7 @@ def test_takes_the_videos_own_recording_time(library: Library) -> None:
         "-metadata", "com.apple.quicktime.creationdate=2025-07-14T18:03:12+0200", container="mov",
     )
 
-    record = library.import_image(incoming, UploadMetadata("phone.mov", file_mtime=datetime(2026, 1, 1)), None)
+    record = library.import_media(incoming, UploadMetadata("phone.mov", file_mtime=datetime(2026, 1, 1)), None)
 
     assert (record.taken_at, record.taken_at_source) == (datetime(2025, 7, 14, 18, 3, 12), "container")
     assert record.taken_at_utc_offset_minutes == 120
@@ -107,7 +107,7 @@ def test_takes_the_videos_own_recording_time(library: Library) -> None:
 def test_a_silent_long_video(library: Library) -> None:
     incoming = incoming_video(library, *picture(seconds=301, rate=1), "-c:v", "mpeg4")
 
-    record = library.import_image(incoming, UploadMetadata("timelapse.mp4"), None)
+    record = library.import_media(incoming, UploadMetadata("timelapse.mp4"), None)
 
     assert {"meta:no_sound", "meta:long_video"} <= tag_names(record)
     assert record.audio_codec is None
@@ -119,7 +119,7 @@ def test_refuses_a_video_over_the_video_limit(library: Library) -> None:
     limit = incoming.stat().st_size - 1
     library.settings.set("max_video_upload_bytes", limit)  # images keep their larger limit
 
-    problem = refused(lambda: library.import_image(incoming, UploadMetadata("waves.mp4"), None))
+    problem = refused(lambda: library.import_media(incoming, UploadMetadata("waves.mp4"), None))
 
     assert (problem.status, problem.code, problem.extra["limit_bytes"]) == (413, "file_too_large", limit)
     assert "videos" in problem.detail
@@ -130,7 +130,7 @@ def test_a_video_may_be_larger_than_the_image_limit(library: Library) -> None:
     incoming = incoming_video(library, *picture(), "-c:v", "mpeg4")
     library.settings.set("max_upload_bytes", incoming.stat().st_size // 2)
 
-    record = library.import_image(incoming, UploadMetadata("waves.mp4"), None)
+    record = library.import_media(incoming, UploadMetadata("waves.mp4"), None)
 
     assert record.media_kind == "video"
 
@@ -139,7 +139,7 @@ def test_refuses_a_video_without_a_decodable_picture(library: Library, monkeypat
     incoming = incoming_video(library, *picture(), "-c:v", "mpeg4")
     monkeypatch.setattr(library.media_probe, "frame", lambda *_arguments: None)
 
-    problem = refused(lambda: library.import_image(incoming, UploadMetadata("broken.mp4"), None))
+    problem = refused(lambda: library.import_media(incoming, UploadMetadata("broken.mp4"), None))
 
     assert (problem.status, problem.code) == (415, "unsupported_media_type")
     assert problem.title == "The video cannot be decoded"  # not "Not a supported image": the file is a video
@@ -151,7 +151,7 @@ def test_without_ffmpeg_says_videos_are_not_supported(library: Library) -> None:
     incoming = incoming_video(library, *picture(), "-c:v", "mpeg4")
     library.importer._media_probe = MediaProbe(ffprobe="no-such-ffprobe", ffmpeg="no-such-ffmpeg")
 
-    problem = refused(lambda: library.import_image(incoming, UploadMetadata("waves.mp4"), None))
+    problem = refused(lambda: library.import_media(incoming, UploadMetadata("waves.mp4"), None))
 
     assert (problem.status, problem.code) == (415, "unsupported_media_type")
     assert problem.title == "Videos are not supported here"
@@ -163,7 +163,7 @@ def test_still_refuses_files_that_are_neither(library: Library) -> None:
     incoming = library.importer.new_incoming_path()
     incoming.write_text("not a picture, not a video")
 
-    problem = refused(lambda: library.import_image(incoming, UploadMetadata("notes.txt"), None))
+    problem = refused(lambda: library.import_media(incoming, UploadMetadata("notes.txt"), None))
 
     assert problem.code == "unsupported_media_type"
     assert "detected_type" not in problem.extra
@@ -171,7 +171,7 @@ def test_still_refuses_files_that_are_neither(library: Library) -> None:
 
 
 def test_makes_a_videos_thumbnails_again(library: Library) -> None:
-    record = library.import_image(incoming_video(library, *picture(), "-c:v", "mpeg4"), UploadMetadata("a.mp4"), None)
+    record = library.import_media(incoming_video(library, *picture(), "-c:v", "mpeg4"), UploadMetadata("a.mp4"), None)
     library.thumbnails.delete_thumbnails(record.sha256)
 
     library.importer.make_thumbnails(
@@ -182,7 +182,7 @@ def test_makes_a_videos_thumbnails_again(library: Library) -> None:
 
 
 def test_a_video_is_never_turned(library: Library) -> None:
-    record = library.import_image(incoming_video(library, *picture(), "-c:v", "mpeg4"), UploadMetadata("a.mp4"), None)
+    record = library.import_media(incoming_video(library, *picture(), "-c:v", "mpeg4"), UploadMetadata("a.mp4"), None)
     rotation = RotationService(library.images, library.storage, library.thumbnails)
 
     with pytest.raises(Problem) as raised:

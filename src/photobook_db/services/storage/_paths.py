@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Where an image is stored in the library: folders from the path template, a file name from the
-original name and the image's SHA-256."""
+"""Where a media item is stored in the library: folders from the path template, a file name from the
+original name and the media item's SHA-256."""
 
 import re
 import unicodedata
@@ -16,8 +16,8 @@ from photobook_db.utils.problems import Problem
 DEFAULT_PATH_TEMPLATE = "{category}/{author}/{year}"
 DATE_PLACEHOLDERS = frozenset({"year", "month"})
 
-UNKNOWN_FOLDER = "_unknown"  # the image has no tag in the namespace
-VARIOUS_FOLDER = "_various"  # the image has several tags in the namespace, e.g. two authors
+UNKNOWN_FOLDER = "_unknown"  # the media item has no tag in the namespace
+VARIOUS_FOLDER = "_various"  # the media item has several tags in the namespace, e.g. two authors
 
 FOLDER_NAME_MAX_BYTES = 100
 FILE_STEM_MAX_BYTES = 200  # with the hash and the extension, below the usual 255-byte limit
@@ -61,13 +61,13 @@ def parse_path_template(text: str, namespace_names: Collection[str]) -> PathTemp
 
 
 def folder_path(template: PathTemplate, tags: Mapping[str, Sequence[str]], taken_at: datetime) -> PurePosixPath:
-    """The folder of an image, relative to the library. `tags` maps a namespace to the image's tag names."""
+    """The folder of a media item, relative to the library. `tags` maps a namespace to the media item's tag names."""
     return PurePosixPath(*(_render_folder(folder, tags, taken_at) for folder in template.folders))
 
 
 def file_name(original_filename: str, sha256: str, extension: str) -> str:
     """'<original stem>_<first 8 hex digits of the SHA-256>.<extension>': readable, and unique in practice.
-    The extension comes from the detected image type, not from the original name."""
+    The extension comes from the detected file type, not from the original name."""
     return f"{_file_stem(original_filename)}_{sha256[:HASH_LENGTH_IN_FILE_NAME]}.{extension}"
 
 

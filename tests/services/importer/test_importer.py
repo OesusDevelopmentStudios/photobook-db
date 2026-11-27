@@ -15,7 +15,7 @@ from photobook_db.db import Database
 from photobook_db.db.models import Media as MediaRow
 from photobook_db.db.models import User
 from photobook_db.services.access import Restrictions
-from photobook_db.services.images import ImageRecord, ImagesService
+from photobook_db.services.media import MediaRecord, MediaService
 from photobook_db.services.importer import (
     DEFAULT_MAX_UPLOAD_BYTES,
     DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
@@ -46,7 +46,7 @@ class Library:
         self.tags = TagsService(database, lambda: self.storage.path_template_namespaces())
         self.storage = StorageService(database, self.settings, self.library_dir, self.tags.namespace_names)
         self.thumbnails = ThumbnailsService(self.thumbnails_dir)
-        self.images = ImagesService(database, self.tags, self.storage)
+        self.images = MediaService(database, self.tags, self.storage)
         self.media_probe = MediaProbe()
         self.importer = ImporterService(
             self.images,
@@ -58,9 +58,9 @@ class Library:
             now=lambda: IMPORT_TIME,
         )
 
-    def import_image(self, incoming: Path, metadata: UploadMetadata, user_id: int | None) -> ImageRecord:
+    def import_media(self, incoming: Path, metadata: UploadMetadata, user_id: int | None) -> MediaRecord:
         """For a user without restrictions."""
-        return self.importer.import_image(incoming, metadata, user_id, NO_RESTRICTIONS)
+        return self.importer.import_media(incoming, metadata, user_id, NO_RESTRICTIONS)
 
     def incoming_image(self, size: tuple[int, int] = (40, 30), taken: str | None = None, colour: str = "teal") -> Path:
         incoming = self.importer.new_incoming_path()
@@ -109,7 +109,7 @@ def test_stores_the_image_where_its_tags_and_date_say(library: Library) -> None:
     file_size = incoming.stat().st_size
     metadata = UploadMetadata("beach.JPG", tags=("category:photo", "author:Sample Artist", "summer"))
 
-    record = library.import_image(incoming, metadata, user_id=None)
+    record = library.import_media(incoming, metadata, user_id=None)
 
     expected_path = f"photo/sample_artist/2024/beach_{sha256[:8]}.jpg"
     assert record.storage_path == expected_path
@@ -130,7 +130,7 @@ def test_records_who_imported_the_image(library: Library) -> None:
         session.commit()
         user_id = user.id
 
-    record = library.import_image(library.incoming_image(), UploadMetadata("a.jpg"), user_id=user_id)
+    record = library.import_media(library.incoming_image(), UploadMetadata("a.jpg"), user_id=user_id)
 
     assert record.imported_by_user_id == user_id
 
@@ -138,13 +138,13 @@ def test_records_who_imported_the_image(library: Library) -> None:
 def test_date_comes_from_the_file_time_without_exif(library: Library) -> None:
     metadata = UploadMetadata("scan.jpg", file_mtime=datetime(2019, 3, 1, 10, 0))
 
-    record = library.import_image(library.incoming_image(), metadata, user_id=None)
+    record = library.import_media(library.incoming_image(), metadata, user_id=None)
 
     assert (record.taken_at, record.taken_at_source) == (datetime(2019, 3, 1, 10, 0), "file_mtime")
 
 
 def test_date_is_the_import_time_without_anything_else(library: Library) -> None:
-    record = library.import_image(library.incoming_image(), UploadMetadata("scan.jpg"), user_id=None)
+    record = library.import_media(library.incoming_image(), UploadMetadata("scan.jpg"), user_id=None)
 
     assert (record.taken_at, record.taken_at_source) == (IMPORT_TIME, "import_time")
 
@@ -152,14 +152,14 @@ def test_date_is_the_import_time_without_anything_else(library: Library) -> None
 def test_later_tag_replaces_earlier_one_in_single_value_namespace(library: Library) -> None:
     metadata = UploadMetadata("art.jpg", tags=("category:photo", "category:artwork"))
 
-    record = library.import_image(library.incoming_image(), metadata, user_id=None)
+    record = library.import_media(library.incoming_image(), metadata, user_id=None)
 
     assert user_tags(record.tags) == ["category:artwork"]
     assert record.storage_path.startswith("artwork/")
 
 
 def test_image_without_tags_goes_to_unknown_folders(library: Library) -> None:
-    record = library.import_image(library.incoming_image(), UploadMetadata("a.jpg"), user_id=None)
+    record = library.import_media(library.incoming_image(), UploadMetadata("a.jpg"), user_id=None)
 
     assert record.storage_path.startswith("_unknown/_unknown/2026/")
 
@@ -168,7 +168,7 @@ def test_client_checksum_may_be_in_capitals(library: Library) -> None:
     incoming = library.incoming_image()
     metadata = UploadMetadata("a.jpg", client_sha256=sha256_of(incoming).upper())
 
-    library.import_image(incoming, metadata, user_id=None)
+    library.import_media(incoming, metadata, user_id=None)
 
 
 def test_taken_file_name_gets_a_number(library: Library) -> None:
@@ -177,7 +177,7 @@ def test_taken_file_name_gets_a_number(library: Library) -> None:
     taken_path.parent.mkdir(parents=True)
     taken_path.write_bytes(b"a different file")
 
-    record = library.import_image(incoming, UploadMetadata("a.jpg"), user_id=None)
+    record = library.import_media(incoming, UploadMetadata("a.jpg"), user_id=None)
 
     assert record.storage_path.endswith("_2.jpg")
 
@@ -187,18 +187,18 @@ def test_taken_file_name_gets_a_number(library: Library) -> None:
 def test_refuses_a_file_damaged_on_the_way(library: Library) -> None:
     metadata = UploadMetadata("a.jpg", client_sha256="0" * 64)
 
-    problem = refused(lambda: library.import_image(library.incoming_image(), metadata, user_id=None))
+    problem = refused(lambda: library.import_media(library.incoming_image(), metadata, user_id=None))
 
     assert (problem.status, problem.code) == (422, "checksum_mismatch")
     library.assert_nothing_stored()
 
 
 def test_refuses_a_duplicate_and_keeps_the_existing_image(library: Library) -> None:
-    first = library.import_image(library.incoming_image(), UploadMetadata("a.jpg"), user_id=None)
+    first = library.import_media(library.incoming_image(), UploadMetadata("a.jpg"), user_id=None)
     again = library.incoming_image()  # the same picture, so the same bytes
 
     problem = refused(
-        lambda: library.import_image(again, UploadMetadata("b.jpg", tags=("summer",)), user_id=None)
+        lambda: library.import_media(again, UploadMetadata("b.jpg", tags=("summer",)), user_id=None)
     )
 
     assert (problem.status, problem.code) == (409, "duplicate_image")
@@ -206,13 +206,13 @@ def test_refuses_a_duplicate_and_keeps_the_existing_image(library: Library) -> N
     assert not again.exists()
     assert library.library_files() == [first.storage_path]
     assert library.thumbnails.thumbnail_path(first.sha256, 256).exists()
-    assert user_tags(library.images.get_image(first.id).tags) == []
+    assert user_tags(library.images.get_media(first.id).tags) == []
 
 
 def test_refuses_an_invalid_tag(library: Library) -> None:
     metadata = UploadMetadata("a.jpg", tags=("rating:public", "a|b"))
 
-    problem = refused(lambda: library.import_image(library.incoming_image(), metadata, user_id=None))
+    problem = refused(lambda: library.import_media(library.incoming_image(), metadata, user_id=None))
 
     assert (problem.status, problem.code) == (422, "invalid_tag")
     library.assert_nothing_stored()
@@ -222,7 +222,7 @@ def test_refuses_a_file_that_is_not_an_image(library: Library) -> None:
     incoming = library.importer.new_incoming_path()
     incoming.write_text("not an image")
 
-    problem = refused(lambda: library.import_image(incoming, UploadMetadata("notes.jpg"), user_id=None))
+    problem = refused(lambda: library.import_media(incoming, UploadMetadata("notes.jpg"), user_id=None))
 
     assert (problem.status, problem.code) == (415, "unsupported_media_type")
     library.assert_nothing_stored()
@@ -233,7 +233,7 @@ def test_refuses_damaged_image_data(library: Library) -> None:
     whole = incoming.read_bytes()
     incoming.write_bytes(whole[: len(whole) // 2])  # the header is fine, the picture is cut off
 
-    problem = refused(lambda: library.import_image(incoming, UploadMetadata("a.jpg"), user_id=None))
+    problem = refused(lambda: library.import_media(incoming, UploadMetadata("a.jpg"), user_id=None))
 
     assert problem.detail == "The image data is damaged."
     library.assert_nothing_stored()
@@ -243,10 +243,10 @@ def test_removes_the_stored_file_when_recording_fails(library: Library, monkeypa
     def database_fails(*_arguments: object) -> None:
         raise RuntimeError("database is gone")
 
-    monkeypatch.setattr(library.images, "create_image", database_fails)
+    monkeypatch.setattr(library.images, "create_media", database_fails)
 
     with pytest.raises(RuntimeError):
-        library.import_image(library.incoming_image(), UploadMetadata("a.jpg"), user_id=None)
+        library.import_media(library.incoming_image(), UploadMetadata("a.jpg"), user_id=None)
 
     library.assert_nothing_stored()
     assert [path.name for path in library.library_dir.iterdir()] == [".incoming"]  # empty folders removed too
@@ -269,7 +269,7 @@ def test_copy_leaves_the_source_alone(library: Library, tmp_path: Path) -> None:
 def test_copy_of_a_duplicate_is_refused_before_copying(
     library: Library, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    first = library.import_image(library.incoming_image(), UploadMetadata("a.jpg"), user_id=None)
+    first = library.import_media(library.incoming_image(), UploadMetadata("a.jpg"), user_id=None)
     source = tmp_path / "again.jpg"
     library.incoming_image().rename(source)
     monkeypatch.setattr(library.importer, "new_incoming_path", lambda: pytest.fail("copied a duplicate"))
@@ -285,7 +285,7 @@ def test_refuses_an_image_over_the_image_limit(library: Library) -> None:
     limit = incoming.stat().st_size - 1
     library.settings.set("max_upload_bytes", limit)  # videos keep their larger limit
 
-    problem = refused(lambda: library.import_image(incoming, UploadMetadata("a.jpg"), None))
+    problem = refused(lambda: library.import_media(incoming, UploadMetadata("a.jpg"), None))
 
     assert (problem.status, problem.code, problem.extra["limit_bytes"]) == (413, "file_too_large", limit)
     assert "images" in problem.detail
@@ -296,7 +296,7 @@ def test_takes_an_image_of_exactly_the_limit(library: Library) -> None:
     incoming = library.incoming_image()
     library.settings.set("max_upload_bytes", incoming.stat().st_size)
 
-    library.import_image(incoming, UploadMetadata("a.jpg"), None)
+    library.import_media(incoming, UploadMetadata("a.jpg"), None)
 
 
 def test_copy_over_both_limits_is_refused_before_reading_it(

@@ -89,8 +89,8 @@ def test_renames_a_tag(admin_browser: TestClient, tags: TagsService, library: No
 
     location = response.headers["location"]
     assert location == "/admin/namespaces/general/tags?search=summer_holiday&renamed=general%3Asummer_holiday"
-    assert tags.image_count(TagName("general", "summer")) is None
-    assert tags.image_count(TagName("general", "summer_holiday")) == 3
+    assert tags.media_count(TagName("general", "summer")) is None
+    assert tags.media_count(TagName("general", "summer_holiday")) == 3
     page = admin_browser.get(location).text
     assert "The images now have <code>general:summer_holiday</code> instead of the old tag." in page
     assert list(rows(page)) == ["summer_holiday"]
@@ -100,7 +100,7 @@ def test_a_new_name_stays_in_the_namespace(admin_browser: TestClient, tags: Tags
     response = post(admin_browser, "/admin/namespaces/author/tags/sam_other/rename", new_tag="anon_two")
 
     assert response.headers["location"].startswith("/admin/namespaces/author/tags?search=anon_two&")
-    assert tags.image_count(TagName("author", "anon_two")) == 1
+    assert tags.media_count(TagName("author", "anon_two")) == 1
 
 
 def test_a_colon_that_names_no_namespace_is_part_of_the_name(
@@ -108,7 +108,7 @@ def test_a_colon_that_names_no_namespace_is_part_of_the_name(
 ) -> None:
     post(admin_browser, "/admin/namespaces/general/tags/summer/rename", new_tag="re:zero")
 
-    assert tags.image_count(TagName("general", "re:zero")) == 3
+    assert tags.media_count(TagName("general", "re:zero")) == 3
 
 
 def test_renaming_into_another_namespace_shows_that_one(admin_browser: TestClient, library: None) -> None:
@@ -124,7 +124,7 @@ def test_merging_into_a_path_tag_links_to_the_job_that_moves_the_files(
 
     location = response.headers["location"]
     job_id = int(location.rsplit("relayout_job=", 1)[1])
-    assert tags.image_count(TagName("author", "sample_artist")) == 3
+    assert tags.media_count(TagName("author", "sample_artist")) == 3
     assert f'<a href="/admin/import/{job_id}">Job {job_id}</a> moves' in admin_browser.get(location).text
 
 
@@ -147,7 +147,7 @@ def test_a_refused_rename_keeps_its_row_open_with_what_was_typed(
     row = rows(response.text)["summer"]
     assert '<details class="rename" open>' in row and 'value="a|b"' in row
     assert 'name="search" value="sum"' in row  # the same page as before
-    assert tags.image_count(TagName("general", "summer")) == 3
+    assert tags.media_count(TagName("general", "summer")) == 3
 
 
 # --- Deleting
@@ -160,7 +160,7 @@ def test_deletes_a_tag_after_asking(admin_browser: TestClient, tags: TagsService
     response = post(admin_browser, "/admin/namespaces/general/tags/summer/delete")
 
     assert (response.status_code, response.headers["location"]) == (303, "/admin/namespaces/general/tags?deleted=true")
-    assert tags.image_count(TagName("general", "summer")) is None
+    assert tags.media_count(TagName("general", "summer")) is None
     assert "The tag has been deleted." in admin_browser.get(response.headers["location"]).text
 
 

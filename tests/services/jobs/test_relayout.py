@@ -13,7 +13,7 @@ from PIL import ExifTags, Image
 from photobook_db.db import Database
 from photobook_db.services.access import Restrictions
 from photobook_db.services.auth import AuthService, Role
-from photobook_db.services.images import ImageRecord, ImagesService
+from photobook_db.services.media import MediaRecord, MediaService
 from photobook_db.services.importer import ImporterService, UploadMetadata
 from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.jobs import JobInfo, JobKind, JobsService, JobStatus, Relayout
@@ -29,7 +29,7 @@ class Library:
         settings = SettingsService(database)
         tags = TagsService(database, lambda: self.storage.path_template_namespaces())
         self.storage = StorageService(database, settings, self.library_dir, tags.namespace_names)
-        self.images = ImagesService(database, tags, self.storage)
+        self.images = MediaService(database, tags, self.storage)
         thumbnails = ThumbnailsService(tmp_path / "thumbnails")
         self.importer = ImporterService(self.images, tags, self.storage, thumbnails, settings, MediaProbe())
         self.jobs = JobsService(database)
@@ -37,13 +37,13 @@ class Library:
         self.jobs.register(JobKind.RELAYOUT, self.relayout.run)
         self.admin = AuthService(database).create_user("admin_user", "correct horse battery", Role.ADMIN)
 
-    def add_image(self, colour: str, tags: tuple[str, ...]) -> ImageRecord:
+    def add_media(self, colour: str, tags: tuple[str, ...]) -> MediaRecord:
         """Taken in 2024."""
         incoming = self.importer.new_incoming_path()
         exif = Image.Exif()
         exif.get_ifd(ExifTags.IFD.Exif)[ExifTags.Base.DateTimeOriginal] = "2024:05:01 10:00:00"
         Image.new("RGB", (8, 8), colour).save(incoming, format="JPEG", exif=exif)
-        return self.importer.import_image(incoming, UploadMetadata(f"{colour}.jpg", tags=tags), None, Restrictions([]))
+        return self.importer.import_media(incoming, UploadMetadata(f"{colour}.jpg", tags=tags), None, Restrictions([]))
 
     def run_relayout(self) -> JobInfo:
         job = self.relayout.start(self.admin.id)
@@ -58,10 +58,10 @@ class Library:
         raise AssertionError("The relayout did not finish in time")
 
     def folders(self) -> list[str]:
-        return sorted(str(PurePosixPath(record.storage_path).parent) for record in self.all_images())
+        return sorted(str(PurePosixPath(record.storage_path).parent) for record in self.all_media())
 
-    def all_images(self) -> list[ImageRecord]:
-        return self.images.get_images(self.images.all_image_ids())
+    def all_media(self) -> list[MediaRecord]:
+        return self.images.get_media_list(self.images.all_media_ids())
 
 
 @pytest.fixture
@@ -73,8 +73,8 @@ def library(database: Database, tmp_path: Path) -> Iterator[Library]:
 
 
 def test_moves_every_file_to_the_new_layout(library: Library) -> None:
-    library.add_image("red", ("category:photo", "author:sample_artist"))
-    library.add_image("green", ("category:artwork",))
+    library.add_media("red", ("category:photo", "author:sample_artist"))
+    library.add_media("green", ("category:artwork",))
     assert library.folders() == ["artwork/_unknown/2024", "photo/sample_artist/2024"]
 
     library.storage.set_path_template("{year}/{category}")
@@ -84,13 +84,13 @@ def test_moves_every_file_to_the_new_layout(library: Library) -> None:
     assert job.result == {"moved": 2, "unchanged": 0, "failed": []}
     assert (job.progress_done, job.progress_total) == (2, 2)
     assert library.folders() == ["2024/artwork", "2024/photo"]
-    assert all((library.library_dir / record.storage_path).is_file() for record in library.all_images())
+    assert all((library.library_dir / record.storage_path).is_file() for record in library.all_media())
     assert not (library.library_dir / "photo").exists()  # the old folders are gone
 
 
 def test_files_already_in_place_stay(library: Library) -> None:
-    library.add_image("red", ("category:photo",))
-    library.add_image("green", ("category:artwork",))
+    library.add_media("red", ("category:photo",))
+    library.add_media("green", ("category:artwork",))
 
     assert library.run_relayout().result == {"moved": 0, "unchanged": 2, "failed": []}
 
@@ -98,21 +98,21 @@ def test_files_already_in_place_stay(library: Library) -> None:
 def test_failed_move_is_reported_and_the_rest_moves(
     library: Library, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    stuck = library.add_image("red", ("category:photo",))
-    library.add_image("green", ("category:photo",))
-    move_image_file = library.storage.move_image_file
+    stuck = library.add_media("red", ("category:photo",))
+    library.add_media("green", ("category:photo",))
+    move_image_file = library.storage.move_media_file
 
-    def disk_error_for_one(image_id: int, to_path: PurePosixPath) -> None:
-        if image_id == stuck.id:
+    def disk_error_for_one(media_id: int, to_path: PurePosixPath) -> None:
+        if media_id == stuck.id:
             raise OSError("disk unavailable")
 
-        move_image_file(image_id, to_path)
+        move_image_file(media_id, to_path)
 
-    monkeypatch.setattr(library.storage, "move_image_file", disk_error_for_one)
+    monkeypatch.setattr(library.storage, "move_media_file", disk_error_for_one)
     library.storage.set_path_template("{year}")
     job = library.run_relayout()
 
     assert job.result == {"moved": 1, "unchanged": 0, "failed": [{"image_id": stuck.id, "code": "move_failed"}]}
-    assert library.images.get_image(stuck.id).storage_path == stuck.storage_path
+    assert library.images.get_media(stuck.id).storage_path == stuck.storage_path
     assert (library.library_dir / stuck.storage_path).is_file()
-    assert "Could not move the file of image" in caplog.text
+    assert "Could not move the file of media" in caplog.text

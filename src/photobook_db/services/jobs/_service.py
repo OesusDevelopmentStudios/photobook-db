@@ -31,7 +31,7 @@ _logger = logging.getLogger(__name__)
 class JobKind(StrEnum):
     FOLDER_IMPORT = "folder_import"
     RELAYOUT = "relayout"
-    META_TAGS = "meta_tags"  # the meta tags of images stored before the server set them
+    META_TAGS = "meta_tags"  # the meta tags of media stored before the server set them
 
 
 class JobStatus(StrEnum):

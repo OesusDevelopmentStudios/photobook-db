@@ -13,7 +13,7 @@ from PIL import ExifTags, Image
 from photobook_db.db import Database
 from photobook_db.services.access import AccessService, Restrictions
 from photobook_db.services.auth import AuthService, Role
-from photobook_db.services.images import ImageRecord, ImagesService
+from photobook_db.services.media import MediaRecord, MediaService
 from photobook_db.services.importer import ImporterService, UploadMetadata
 from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.jobs import JobInfo, JobKind, JobsService, JobStatus, Relayout
@@ -34,7 +34,7 @@ class Library:
         settings = SettingsService(database)
         self.tags = TagsService(database, lambda: self.storage.path_template_namespaces())
         self.storage = StorageService(database, settings, self.library_dir, self.tags.namespace_names)
-        self.images = ImagesService(database, self.tags, self.storage)
+        self.images = MediaService(database, self.tags, self.storage)
         thumbnails = ThumbnailsService(tmp_path / "thumbnails")
         self.importer = ImporterService(self.images, self.tags, self.storage, thumbnails, settings, MediaProbe())
         self.access = AccessService(database, self.tags.namespace_names)
@@ -47,13 +47,13 @@ class Library:
         self.admin = auth.create_user("admin_user", "correct horse battery", Role.ADMIN)
         self.restricted_user = auth.create_user("restricted_user", "correct horse battery", Role.USER)
 
-    def add_image(self, colour: str, tags: tuple[str, ...]) -> ImageRecord:
+    def add_media(self, colour: str, tags: tuple[str, ...]) -> MediaRecord:
         """Taken in 2024, so its folder is <category>/<author>/2024."""
         incoming = self.importer.new_incoming_path()
         exif = Image.Exif()
         exif.get_ifd(ExifTags.IFD.Exif)[ExifTags.Base.DateTimeOriginal] = "2024:05:01 10:00:00"
         Image.new("RGB", (8, 8), colour).save(incoming, format="JPEG", exif=exif)
-        return self.importer.import_image(incoming, UploadMetadata(f"{colour}.jpg", tags=tags), None, Restrictions([]))
+        return self.importer.import_media(incoming, UploadMetadata(f"{colour}.jpg", tags=tags), None, Restrictions([]))
 
     def rename(self, old_tag: str, new_tag: str) -> tuple[TagName, JobInfo | None]:
         return self.tag_admin.rename_tag(TagName(*old_tag.split(":")), new_tag, self.admin.id)
@@ -61,11 +61,11 @@ class Library:
     def delete(self, tag: str) -> JobInfo | None:
         return self.tag_admin.delete_tag(TagName(*tag.split(":")), self.admin.id)
 
-    def tags_of(self, image: ImageRecord) -> list[str]:
-        return user_tags(self.images.get_image(image.id).tags)
+    def tags_of(self, image: MediaRecord) -> list[str]:
+        return user_tags(self.images.get_media(image.id).tags)
 
-    def folder_of(self, image: ImageRecord) -> str:
-        return str(PurePosixPath(self.images.get_image(image.id).storage_path).parent)
+    def folder_of(self, image: MediaRecord) -> str:
+        return str(PurePosixPath(self.images.get_media(image.id).storage_path).parent)
 
     def exists(self, tag: str) -> bool:
         return self.tags.tag_exists(TagName(*tag.split(":")))
@@ -100,7 +100,7 @@ def problem_of(action: object) -> Problem:
 # --- Renaming and merging
 
 def test_renames_a_tag_on_every_image(library: Library) -> None:
-    images = [library.add_image(colour, ("sunset",)) for colour in ("red", "green")]
+    images = [library.add_media(colour, ("sunset",)) for colour in ("red", "green")]
 
     new_tag, job = library.rename("general:sunset", "Golden Hour")
 
@@ -110,8 +110,8 @@ def test_renames_a_tag_on_every_image(library: Library) -> None:
 
 
 def test_merges_into_an_existing_tag(library: Library) -> None:
-    both = library.add_image("red", ("sea", "ocean"))
-    one = library.add_image("green", ("sea",))
+    both = library.add_media("red", ("sea", "ocean"))
+    one = library.add_media("green", ("sea",))
 
     library.rename("general:sea", "ocean")
 
@@ -120,17 +120,17 @@ def test_merges_into_an_existing_tag(library: Library) -> None:
 
 
 def test_renaming_a_folder_tag_moves_the_files(library: Library) -> None:
-    image = library.add_image("red", ("category:photo", "author:anon_one"))
+    image = library.add_media("red", ("category:photo", "author:anon_one"))
 
     _new_tag, job = library.rename("author:anon_one", "author:anon_two")
 
     assert library.wait_for(job).result == {"moved": 1, "unchanged": 0, "failed": []}
     assert library.folder_of(image) == "photo/anon_two/2024"
-    assert (library.library_dir / library.images.get_image(image.id).storage_path).is_file()
+    assert (library.library_dir / library.images.get_media(image.id).storage_path).is_file()
 
 
 def test_new_tag_in_a_single_value_namespace_replaces_the_current_one(library: Library) -> None:
-    image = library.add_image("red", ("category:photo", "painting"))
+    image = library.add_media("red", ("category:photo", "painting"))
 
     _new_tag, job = library.rename("general:painting", "category:artwork")
 
@@ -140,7 +140,7 @@ def test_new_tag_in_a_single_value_namespace_replaces_the_current_one(library: L
 
 
 def test_tag_without_images_is_renamed_too(library: Library) -> None:
-    image = library.add_image("red", ("sunset",))
+    image = library.add_media("red", ("sunset",))
     library.images.change_tags(image.id, add_tags=[], remove_tags=["sunset"], restrictions=Restrictions([]))
 
     assert library.rename("general:sunset", "dusk") == (TagName("general", "dusk"), None)
@@ -148,7 +148,7 @@ def test_tag_without_images_is_renamed_too(library: Library) -> None:
 
 
 def test_renaming_to_the_same_tag_changes_nothing(library: Library) -> None:
-    image = library.add_image("red", ("sunset",))
+    image = library.add_media("red", ("sunset",))
 
     assert library.rename("general:sunset", "Sunset") == (TagName("general", "sunset"), None)
     assert library.tags_of(image) == ["general:sunset"]
@@ -160,7 +160,7 @@ def test_unknown_tag_is_not_found(library: Library, new_tag: str) -> None:
 
 
 def test_invalid_new_tag_changes_nothing(library: Library) -> None:
-    image = library.add_image("red", ("rating:public",))
+    image = library.add_media("red", ("rating:public",))
 
     problem = problem_of(lambda: library.rename("rating:public", "rating:a|b"))
 
@@ -172,28 +172,28 @@ def test_invalid_new_tag_changes_nothing(library: Library) -> None:
     ("old_tag", "new_tag"), [("meta:jpeg", "meta:png"), ("meta:jpeg", "general:jpeg"), ("general:sunset", "meta:dusk")]
 )
 def test_the_servers_own_tags_are_not_renamed(library: Library, old_tag: str, new_tag: str) -> None:
-    image = library.add_image("red", ("sunset",))
-    before = [str(tag) for tag in library.images.get_image(image.id).tags]
+    image = library.add_media("red", ("sunset",))
+    before = [str(tag) for tag in library.images.get_media(image.id).tags]
 
     problem = problem_of(lambda: library.rename(old_tag, new_tag))
 
     assert (problem.status, problem.code) == (422, "namespace_read_only")
-    assert [str(tag) for tag in library.images.get_image(image.id).tags] == before
+    assert [str(tag) for tag in library.images.get_media(image.id).tags] == before
 
 
 # --- Deleting
 
 def test_the_servers_own_tags_are_not_deleted(library: Library) -> None:
-    image = library.add_image("red", ("sunset",))
+    image = library.add_media("red", ("sunset",))
 
     problem = problem_of(lambda: library.delete("meta:jpeg"))
 
     assert (problem.status, problem.code) == (422, "namespace_read_only")
-    assert "meta:jpeg" in [str(tag) for tag in library.images.get_image(image.id).tags]
+    assert "meta:jpeg" in [str(tag) for tag in library.images.get_media(image.id).tags]
 
 
 def test_deletes_a_tag_from_every_image(library: Library) -> None:
-    images = [library.add_image(colour, ("sunset", "beach")) for colour in ("red", "green")]
+    images = [library.add_media(colour, ("sunset", "beach")) for colour in ("red", "green")]
 
     assert library.delete("general:sunset") is None
     assert [library.tags_of(image) for image in images] == [["general:beach"]] * 2
@@ -201,7 +201,7 @@ def test_deletes_a_tag_from_every_image(library: Library) -> None:
 
 
 def test_deleting_a_folder_tag_moves_the_files(library: Library) -> None:
-    image = library.add_image("red", ("category:photo", "author:anon_one"))
+    image = library.add_media("red", ("category:photo", "author:anon_one"))
 
     library.wait_for(library.delete("author:anon_one"))
 
@@ -217,7 +217,7 @@ def test_deleting_an_unknown_tag_is_not_found(library: Library) -> None:
 def test_restrictions_and_hidden_filters_follow_a_rename(library: Library) -> None:
     library.access.set_restricted_terms(library.restricted_user.id, ["rating:private", "character:*"])
     library.preferences.set_hidden_filters(library.restricted_user.id, ["rating:private|public", "beach"])
-    image = library.add_image("red", ("rating:private",))
+    image = library.add_media("red", ("rating:private",))
 
     library.rename("rating:private", "rating:secret")
 
@@ -231,7 +231,7 @@ def test_restrictions_and_hidden_filters_follow_a_rename(library: Library) -> No
 
 def test_removing_a_namespace_takes_its_tags_and_their_terms(library: Library) -> None:
     library.tags.create_namespace("weather", single_value=False)
-    image = library.add_image("red", ("weather:sunny", "beach"))
+    image = library.add_media("red", ("weather:sunny", "beach"))
     library.access.set_restricted_terms(library.restricted_user.id, ["weather:*", "rating:private"])
     # "weather:sunny|beach" would mean weather:beach too: a prefix at a term's start applies to all of it
     library.preferences.set_hidden_filters(library.restricted_user.id, ["weather:sunny|general:beach", "weather:*"])
@@ -259,7 +259,7 @@ def test_restrictions_and_hidden_filters_lose_a_deleted_tag(library: Library) ->
         library.restricted_user.id, ["rating:private", "category:photo,rating:private", "character:*"]
     )
     library.preferences.set_hidden_filters(library.restricted_user.id, ["rating:private|public"])
-    image = library.add_image("red", ("rating:private",))
+    image = library.add_media("red", ("rating:private",))
 
     library.delete("rating:private")
 

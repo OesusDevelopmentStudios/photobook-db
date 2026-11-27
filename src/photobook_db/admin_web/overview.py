@@ -18,7 +18,7 @@ def overview(request: Request, session: AdminPage) -> HTMLResponse:
     context = {
         "session": session,
         "version": photobook_db.__version__,
-        "image_count": state.images.image_count(),
+        "image_count": state.media.media_count(),
         "user_count": len(state.auth.list_users()),
         "settings": state.server_settings.current(),
         "recent_jobs": state.jobs.list_jobs(session.user)[:RECENT_JOBS],

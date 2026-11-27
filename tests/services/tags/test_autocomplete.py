@@ -22,7 +22,7 @@ TAGGED_IMAGES = {
 }
 
 
-def add_tagged_images(database: Database, image_counts: dict[str, int]) -> None:
+def add_tagged_media(database: Database, image_counts: dict[str, int]) -> None:
     with database.session() as session:
         namespace_rows = session.execute(select(Namespace.name, Namespace.id))
         namespace_ids = {name: namespace_id for name, namespace_id in namespace_rows}
@@ -59,7 +59,7 @@ def new_image(unique_part: str) -> Media:
 
 @pytest.fixture
 def tags(database: Database) -> TagsService:
-    add_tagged_images(database, TAGGED_IMAGES)
+    add_tagged_media(database, TAGGED_IMAGES)
     return TagsService(database, lambda: frozenset({"category", "author"}))
 
 
@@ -70,7 +70,7 @@ def suggestions(tags: TagsService, prefix: str = "", namespace: str | None = Non
 def test_most_used_tags_come_first(tags: TagsService) -> None:
     matches = tags.autocomplete()
 
-    assert [(str(match.tag), match.image_count) for match in matches][:2] == [
+    assert [(str(match.tag), match.media_count) for match in matches][:2] == [
         ("author:sample_artist", 3),
         ("general:samurai", 2),
     ]
@@ -78,10 +78,10 @@ def test_most_used_tags_come_first(tags: TagsService) -> None:
 
 def test_tags_without_images_come_last(tags: TagsService) -> None:
     found = tags.autocomplete(limit=100)
-    counts = [match.image_count for match in found]
+    counts = [match.media_count for match in found]
 
     assert counts == sorted(counts, reverse=True) and counts[-1] == 0
-    assert "character:nobody_yet" in [str(match.tag) for match in found if match.image_count == 0]
+    assert "character:nobody_yet" in [str(match.tag) for match in found if match.media_count == 0]
 
 
 def test_equally_used_tags_are_in_alphabetical_order(tags: TagsService) -> None:
@@ -129,4 +129,4 @@ def test_limit(tags: TagsService) -> None:
     ids=["used", "unused", "unknown", "other namespace"],
 )
 def test_counts_the_images_of_one_tag(tags: TagsService, tag: TagName, count: int | None) -> None:
-    assert tags.image_count(tag) == count
+    assert tags.media_count(tag) == count

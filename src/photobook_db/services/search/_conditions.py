@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""A parsed query as a condition on the image table."""
+"""A parsed query as a condition on the media table."""
 
 from datetime import datetime, time, timedelta
 
@@ -31,7 +31,7 @@ def matching_condition(node: Node) -> ColumnElement[bool]:
 
 
 def _has_tag(match: TagMatch) -> ColumnElement[bool]:
-    """Finds the matching tags first, then their images: both steps use an index."""
+    """Finds the matching tags first, then their media: both steps use an index."""
     matching_tags = select(Tag.id).join(Namespace, Tag.namespace_id == Namespace.id).where(
         Namespace.name == match.namespace
     )
@@ -41,8 +41,8 @@ def _has_tag(match: TagMatch) -> ColumnElement[bool]:
     else:
         matching_tags = matching_tags.where(Tag.name == match.name)
 
-    images_with_tag = select(media_tag.c.media_id).where(media_tag.c.tag_id.in_(matching_tags))
-    return Media.id.in_(images_with_tag)
+    media_with_tag = select(media_tag.c.media_id).where(media_tag.c.tag_id.in_(matching_tags))
+    return Media.id.in_(media_with_tag)
 
 
 def _taken_within(match: DateMatch) -> ColumnElement[bool]:

@@ -6,7 +6,7 @@ import io
 from PIL import Image
 
 from photobook_db.services.access import Restrictions
-from photobook_db.services.images import ImageRecord, ImagesService
+from photobook_db.services.media import MediaRecord, MediaService
 from photobook_db.services.storage import StorageService
 from photobook_db.services.thumbnails import ThumbnailsService
 from photobook_db.utils import image_limits  # noqa: F401  (allows the large JPEGs the importer accepts)
@@ -32,12 +32,12 @@ _KEPT_INFO = ("icc_profile", "dpi", "transparency")
 
 
 class RotationService:
-    def __init__(self, images: ImagesService, storage: StorageService, thumbnails: ThumbnailsService) -> None:
-        self._images = images
+    def __init__(self, media: MediaService, storage: StorageService, thumbnails: ThumbnailsService) -> None:
+        self._media = media
         self._storage = storage
         self._thumbnails = thumbnails
 
-    def rotate(self, image_id: int, clockwise_degrees: int, restrictions: Restrictions) -> ImageRecord:
+    def rotate(self, media_id: int, clockwise_degrees: int, restrictions: Restrictions) -> MediaRecord:
         """Turns the image clockwise from how it is shown now, in its file; then its size, the next revision and
         new thumbnails. Raises 404 not_found, also for an image the user is restricted from, and 422
         rotation_not_supported for a type that cannot be turned without losing quality."""
@@ -46,7 +46,7 @@ class RotationService:
 
         # Read and written under the storage's lock: another turn, or a move after a tag change, waits.
         with self._storage.changing_files():
-            record = self._images.get_visible_image(image_id, restrictions)
+            record = self._media.get_visible_media(media_id, restrictions)
             file_path = self._storage.absolute_path(record.storage_path)
             content = _turned_file(file_path.read_bytes(), record.mime_type, clockwise_degrees)
             self._storage.replace_library_file(record.storage_path, content)
@@ -54,7 +54,7 @@ class RotationService:
             quarter_turn = clockwise_degrees != 180
             width, height = (record.height, record.width) if quarter_turn else (record.width, record.height)
             self._thumbnails.create_thumbnails(file_path, record.sha256, record.revision + 1)
-            changed = self._images.record_file_change(image_id, width, height, len(content))
+            changed = self._media.record_file_change(media_id, width, height, len(content))
             self._thumbnails.delete_thumbnails(record.sha256, record.revision)
             return changed
 

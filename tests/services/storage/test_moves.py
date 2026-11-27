@@ -46,7 +46,7 @@ def storage(database: Database, library_dir: Path) -> StorageService:
 
 
 @pytest.fixture
-def image_id(database: Database, library_dir: Path) -> int:
+def media_id(database: Database, library_dir: Path) -> int:
     """An image whose file is at OLD_PATH."""
     file_path = library_dir / OLD_PATH
     file_path.parent.mkdir(parents=True)
@@ -71,9 +71,9 @@ def image_id(database: Database, library_dir: Path) -> int:
         return image.id
 
 
-def stored_path(database: Database, image_id: int) -> str:
+def stored_path(database: Database, media_id: int) -> str:
     with database.session() as session:
-        return session.get_one(Media, image_id).storage_path
+        return session.get_one(Media, media_id).storage_path
 
 
 def journal(database: Database) -> list[tuple[str, str]]:
@@ -99,20 +99,20 @@ def crash(*_arguments: object) -> None:
 # --- Moves that go well
 
 def test_moves_the_file_and_records_the_new_path(
-    storage: StorageService, database: Database, library_dir: Path, image_id: int
+    storage: StorageService, database: Database, library_dir: Path, media_id: int
 ) -> None:
-    storage.move_image_file(image_id, NEW_PATH)
+    storage.move_media_file(media_id, NEW_PATH)
 
     assert (library_dir / NEW_PATH).read_bytes() == CONTENT
     assert not (library_dir / OLD_PATH).exists()
-    assert stored_path(database, image_id) == str(NEW_PATH)
+    assert stored_path(database, media_id) == str(NEW_PATH)
     assert journal(database) == []
 
 
 # E.g. while a rotation rewrites the file: the move waits, then moves the rewritten file.
-def test_a_move_waits_while_files_change(storage: StorageService, library_dir: Path, image_id: int) -> None:
+def test_a_move_waits_while_files_change(storage: StorageService, library_dir: Path, media_id: int) -> None:
     with storage.changing_files():
-        mover = threading.Thread(target=storage.move_image_file, args=(image_id, NEW_PATH))
+        mover = threading.Thread(target=storage.move_media_file, args=(media_id, NEW_PATH))
         mover.start()
         mover.join(timeout=0.3)
         assert mover.is_alive()
@@ -123,61 +123,61 @@ def test_a_move_waits_while_files_change(storage: StorageService, library_dir: P
 
 
 def test_removes_folders_left_empty_but_not_the_library(
-    storage: StorageService, library_dir: Path, image_id: int
+    storage: StorageService, library_dir: Path, media_id: int
 ) -> None:
-    storage.move_image_file(image_id, PurePosixPath("beach_3fa2b1c9.jpg"))
+    storage.move_media_file(media_id, PurePosixPath("beach_3fa2b1c9.jpg"))
 
     assert not (library_dir / "photo").exists()
     assert library_dir.is_dir()
 
 
-def test_keeps_folders_with_other_files(storage: StorageService, library_dir: Path, image_id: int) -> None:
+def test_keeps_folders_with_other_files(storage: StorageService, library_dir: Path, media_id: int) -> None:
     (library_dir / OLD_PATH.parent / "other.jpg").write_bytes(b"other")
 
-    storage.move_image_file(image_id, NEW_PATH)
+    storage.move_media_file(media_id, NEW_PATH)
 
     assert (library_dir / OLD_PATH.parent / "other.jpg").exists()
 
 
 def test_copies_across_filesystems(
-    storage: StorageService, database: Database, library_dir: Path, image_id: int, monkeypatch: pytest.MonkeyPatch
+    storage: StorageService, database: Database, library_dir: Path, media_id: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     force_copy_across_filesystems(monkeypatch)
 
-    storage.move_image_file(image_id, NEW_PATH)
+    storage.move_media_file(media_id, NEW_PATH)
 
     assert (library_dir / NEW_PATH).read_bytes() == CONTENT
     assert not (library_dir / OLD_PATH).exists()
     assert not _files.partial_path(library_dir / NEW_PATH).exists()
-    assert stored_path(database, image_id) == str(NEW_PATH)
+    assert stored_path(database, media_id) == str(NEW_PATH)
 
 
 # --- Moves that fail
 
 def test_never_overwrites_a_file(
-    storage: StorageService, database: Database, library_dir: Path, image_id: int
+    storage: StorageService, database: Database, library_dir: Path, media_id: int
 ) -> None:
     (library_dir / NEW_PATH).parent.mkdir(parents=True)
     (library_dir / NEW_PATH).write_bytes(b"another image")
 
     with pytest.raises(FileExistsError):
-        storage.move_image_file(image_id, NEW_PATH)
+        storage.move_media_file(media_id, NEW_PATH)
 
     assert (library_dir / NEW_PATH).read_bytes() == b"another image"
     assert (library_dir / OLD_PATH).read_bytes() == CONTENT
-    assert stored_path(database, image_id) == str(OLD_PATH)
+    assert stored_path(database, media_id) == str(OLD_PATH)
     assert journal(database) == []
 
 
 def test_failed_move_changes_nothing(
-    storage: StorageService, database: Database, library_dir: Path, image_id: int
+    storage: StorageService, database: Database, library_dir: Path, media_id: int
 ) -> None:
     (library_dir / OLD_PATH).unlink()  # e.g. removed by hand
 
     with pytest.raises(FileNotFoundError):
-        storage.move_image_file(image_id, NEW_PATH)
+        storage.move_media_file(media_id, NEW_PATH)
 
-    assert stored_path(database, image_id) == str(OLD_PATH)
+    assert stored_path(database, media_id) == str(OLD_PATH)
     assert journal(database) == []
 
 
@@ -190,43 +190,43 @@ def test_paths_cannot_leave_the_library(storage: StorageService, path: str) -> N
 # --- A crash between the steps
 
 def test_crash_before_the_file_moved(
-    storage: StorageService, database: Database, library_dir: Path, image_id: int, monkeypatch: pytest.MonkeyPatch
+    storage: StorageService, database: Database, library_dir: Path, media_id: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(_service, "move_file", crash)
     with pytest.raises(SimulatedCrash):
-        storage.move_image_file(image_id, NEW_PATH)
+        storage.move_media_file(media_id, NEW_PATH)
     assert journal(database) == [(str(OLD_PATH), str(NEW_PATH))]
 
     assert restart_and_replay(database, library_dir) == 1
 
     assert (library_dir / OLD_PATH).read_bytes() == CONTENT
-    assert stored_path(database, image_id) == str(OLD_PATH)
+    assert stored_path(database, media_id) == str(OLD_PATH)
     assert journal(database) == []
 
 
 def test_crash_after_the_file_moved(
-    storage: StorageService, database: Database, library_dir: Path, image_id: int, monkeypatch: pytest.MonkeyPatch
+    storage: StorageService, database: Database, library_dir: Path, media_id: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(storage, "_finish_move", crash)
     with pytest.raises(SimulatedCrash):
-        storage.move_image_file(image_id, NEW_PATH)
-    assert stored_path(database, image_id) == str(OLD_PATH)  # the database still points to the old place
+        storage.move_media_file(media_id, NEW_PATH)
+    assert stored_path(database, media_id) == str(OLD_PATH)  # the database still points to the old place
 
     assert restart_and_replay(database, library_dir) == 1
 
     assert (library_dir / NEW_PATH).read_bytes() == CONTENT
-    assert stored_path(database, image_id) == str(NEW_PATH)
+    assert stored_path(database, media_id) == str(NEW_PATH)
     assert journal(database) == []
     assert not (library_dir / "photo" / "_unknown").exists()
 
 
 def test_crash_while_copying_across_filesystems(
-    storage: StorageService, database: Database, library_dir: Path, image_id: int, monkeypatch: pytest.MonkeyPatch
+    storage: StorageService, database: Database, library_dir: Path, media_id: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     force_copy_across_filesystems(monkeypatch)
     monkeypatch.setattr(_files.os, "replace", crash)  # the copy is written but not yet complete
     with pytest.raises(SimulatedCrash):
-        storage.move_image_file(image_id, NEW_PATH)
+        storage.move_media_file(media_id, NEW_PATH)
     assert _files.partial_path(library_dir / NEW_PATH).exists()
     monkeypatch.undo()
 
@@ -234,17 +234,17 @@ def test_crash_while_copying_across_filesystems(
 
     assert not _files.partial_path(library_dir / NEW_PATH).exists()
     assert (library_dir / OLD_PATH).read_bytes() == CONTENT
-    assert stored_path(database, image_id) == str(OLD_PATH)
+    assert stored_path(database, media_id) == str(OLD_PATH)
     assert journal(database) == []
 
 
 def test_crash_after_copying_before_deleting_the_original(
-    storage: StorageService, database: Database, library_dir: Path, image_id: int, monkeypatch: pytest.MonkeyPatch
+    storage: StorageService, database: Database, library_dir: Path, media_id: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     force_copy_across_filesystems(monkeypatch)
     monkeypatch.setattr(_files, "delete_file", crash)
     with pytest.raises(SimulatedCrash):
-        storage.move_image_file(image_id, NEW_PATH)
+        storage.move_media_file(media_id, NEW_PATH)
     assert (library_dir / OLD_PATH).exists() and (library_dir / NEW_PATH).exists()
     monkeypatch.undo()
 
@@ -252,20 +252,20 @@ def test_crash_after_copying_before_deleting_the_original(
 
     assert not (library_dir / OLD_PATH).exists()
     assert (library_dir / NEW_PATH).read_bytes() == CONTENT
-    assert stored_path(database, image_id) == str(NEW_PATH)
+    assert stored_path(database, media_id) == str(NEW_PATH)
     assert journal(database) == []
 
 
 def test_crash_before_removing_empty_folders(
-    storage: StorageService, database: Database, library_dir: Path, image_id: int, monkeypatch: pytest.MonkeyPatch
+    storage: StorageService, database: Database, library_dir: Path, media_id: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(_service, "remove_empty_folders", crash)
     with pytest.raises(SimulatedCrash):
-        storage.move_image_file(image_id, NEW_PATH)
+        storage.move_media_file(media_id, NEW_PATH)
 
     assert restart_and_replay(database, library_dir) == 0  # nothing left to finish
 
-    assert stored_path(database, image_id) == str(NEW_PATH)
+    assert stored_path(database, media_id) == str(NEW_PATH)
     assert (library_dir / NEW_PATH).read_bytes() == CONTENT
     assert journal(database) == []
 
@@ -274,13 +274,13 @@ def test_file_found_nowhere_keeps_its_journal_entry(
     storage: StorageService,
     database: Database,
     library_dir: Path,
-    image_id: int,
+    media_id: int,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     monkeypatch.setattr(_service, "move_file", crash)
     with pytest.raises(SimulatedCrash):
-        storage.move_image_file(image_id, NEW_PATH)
+        storage.move_media_file(media_id, NEW_PATH)
     os.remove(library_dir / OLD_PATH)
 
     with caplog.at_level(logging.ERROR):

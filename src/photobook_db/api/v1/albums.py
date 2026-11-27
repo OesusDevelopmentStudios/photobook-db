@@ -48,12 +48,12 @@ def list_albums(
     ] = False,
 ) -> AlbumList:
     hidden_filters = () if include_hidden else tuple(preferences.hidden_filters(authentication.user.id))
-    albums = search.albums(restrictions.visible_images_filter(), hidden_filters)
+    albums = search.albums(restrictions.visible_media_filter(), hidden_filters)
     return AlbumList(
         items=[
             Album(
                 tag=f"album:{album.name}",
-                image_count=album.image_count,
+                image_count=album.media_count,
                 cover=AlbumCover(id=album.cover_id, revision=album.cover_revision),
                 last_changed_at=as_utc(album.last_changed_at),
             )

@@ -20,7 +20,7 @@ from photobook_db.services.rotation import RotationService
 from photobook_db.services.same_machine import SameMachine
 from photobook_db.services.search import SearchService
 from photobook_db.services.server_settings import ServerSettings
-from photobook_db.services.images import ImagesService
+from photobook_db.services.media import MediaService
 from photobook_db.services.jobs import FolderImport, JobKind, JobsService, MetaTagging, Relayout
 from photobook_db.services.importer import ImporterService
 from photobook_db.services.media_probe import MediaProbe
@@ -74,31 +74,31 @@ def _lifespan(config: Config) -> Callable[[FastAPI], AbstractAsyncContextManager
         app.state.storyboards = StoryboardService(config.data_dir / "thumbnails" / "storyboard", app.state.media_probe)
         app.state.streams = StreamService(settings)
         hide_signatures_in_access_log()  # after Uvicorn has set up its logging
-        app.state.images = ImagesService(database, app.state.tags, app.state.storage)
-        app.state.rotation = RotationService(app.state.images, app.state.storage, app.state.thumbnails)
+        app.state.media = MediaService(database, app.state.tags, app.state.storage)
+        app.state.rotation = RotationService(app.state.media, app.state.storage, app.state.thumbnails)
         app.state.search = SearchService(database, app.state.tags.namespace_names)
         app.state.preferences = PreferencesService(database, app.state.tags.namespace_names)
         app.state.access = AccessService(database, app.state.tags.namespace_names)
         app.state.importer = ImporterService(
-            app.state.images, app.state.tags, app.state.storage, app.state.thumbnails, settings, app.state.media_probe
+            app.state.media, app.state.tags, app.state.storage, app.state.thumbnails, settings, app.state.media_probe
         )
         app.state.jobs = JobsService(database)
         app.state.folder_import = FolderImport(app.state.jobs, app.state.importer, app.state.tags, config.import_dir)
         app.state.jobs.register(JobKind.FOLDER_IMPORT, app.state.folder_import.run)
-        relayout = Relayout(app.state.jobs, app.state.images)
+        relayout = Relayout(app.state.jobs, app.state.media)
         app.state.jobs.register(JobKind.RELAYOUT, relayout.run)
-        meta_tagging = MetaTagging(app.state.jobs, app.state.images, app.state.storage)
+        meta_tagging = MetaTagging(app.state.jobs, app.state.media, app.state.storage)
         app.state.jobs.register(JobKind.META_TAGS, meta_tagging.run)
         app.state.server_settings = ServerSettings(
             app.state.storage, app.state.importer, relayout, settings, config.import_dir
         )
         app.state.tag_admin = TagAdmin(
-            app.state.tags, app.state.images, app.state.access, app.state.preferences, app.state.storage, relayout
+            app.state.tags, app.state.media, app.state.access, app.state.preferences, app.state.storage, relayout
         )
         app.state.same_machine = SameMachine(
             config.host_machine_id_file, config.host_library_dir or config.library_dir
         )
-        meta_tagging.start_if_needed()  # images stored before 0.2.0
+        meta_tagging.start_if_needed()  # media stored before 0.2.0
         app.state.jobs.start()
         _announce_setup_code(app.state.auth)
         yield

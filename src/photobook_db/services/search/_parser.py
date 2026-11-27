@@ -60,7 +60,7 @@ class Not:
 
 @dataclass(frozen=True)
 class All:
-    operands: tuple["Node", ...]  # no operands: every image
+    operands: tuple["Node", ...]  # no operands: every media item
 
 
 @dataclass(frozen=True)

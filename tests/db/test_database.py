@@ -34,7 +34,7 @@ def now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
-def add_image_with_tag(database: Database) -> int:
+def add_media_with_tag(database: Database) -> int:
     with database.session() as session:
         general = session.scalars(select(Namespace).where(Namespace.name == "general")).one()
         tag = Tag(namespace_id=general.id, name="summer")
@@ -83,7 +83,7 @@ def test_uses_write_ahead_log_and_foreign_keys(database: Database) -> None:
 
 def test_opening_again_keeps_data(database_path: Path) -> None:
     first_opening = open_database(database_path)
-    add_image_with_tag(first_opening)
+    add_media_with_tag(first_opening)
     first_opening.close()
 
     second_opening = open_database(database_path)
@@ -118,13 +118,13 @@ def migrate(database_path: Path, revision: str, downgrade: bool = False) -> None
     engine.dispose()
 
 
-def tags_of(database: Database, image_id: int) -> set[str]:
+def tags_of(database: Database, media_id: int) -> set[str]:
     with database.session() as session:
         rows = session.execute(
             select(Namespace.name, Tag.name)
             .join(Tag, Tag.namespace_id == Namespace.id)
             .join(media_tag, media_tag.c.tag_id == Tag.id)
-            .where(media_tag.c.media_id == image_id)
+            .where(media_tag.c.media_id == media_id)
         )
         return {f"{namespace}:{name}" for namespace, name in rows}
 
@@ -140,13 +140,13 @@ def test_upgrade_from_0001_keeps_the_data_and_adds_meta(database_path: Path) -> 
         ), {"now": now().isoformat(sep=" ")})
     engine.dispose()
     old_database = open_database(database_path)
-    image_id = add_image_with_tag(old_database)  # tagged general:summer
+    media_id = add_media_with_tag(old_database)  # tagged general:summer
     old_database.close()
 
     database = open_database(database_path)  # the server upgrades the file on opening
     with database.session() as session:
         editable = {namespace.name: namespace.user_editable for namespace in session.scalars(select(Namespace))}
-    image_tags = tags_of(database, image_id)
+    image_tags = tags_of(database, media_id)
     database.close()
 
     assert editable == {name: name != "meta" for name in
@@ -156,13 +156,13 @@ def test_upgrade_from_0001_keeps_the_data_and_adds_meta(database_path: Path) -> 
 
 def test_undoing_0002_removes_the_meta_tags_and_keeps_the_others(database_path: Path) -> None:
     database = open_database(database_path)
-    image_id = add_image_with_tag(database)
+    media_id = add_media_with_tag(database)
     with database.session() as session:
         meta = session.scalars(select(Namespace).where(Namespace.name == "meta")).one()
         tag = Tag(namespace_id=meta.id, name="hi_res")
         session.add(tag)
         session.flush()
-        session.execute(media_tag.insert().values(media_id=image_id, tag_id=tag.id))
+        session.execute(media_tag.insert().values(media_id=media_id, tag_id=tag.id))
         session.commit()
     database.close()
 
@@ -182,10 +182,10 @@ def test_undoing_0002_removes_the_meta_tags_and_keeps_the_others(database_path: 
 
 
 def test_deleting_image_removes_its_tag_links(database: Database) -> None:
-    image_id = add_image_with_tag(database)
+    media_id = add_media_with_tag(database)
 
     with database.session() as session:
-        session.execute(delete(Media).where(Media.id == image_id))
+        session.execute(delete(Media).where(Media.id == media_id))
         session.commit()
         remaining_links = session.execute(select(media_tag)).all()
 
@@ -253,11 +253,11 @@ def test_without_stored_ratings_the_defaults_become_tags(database_path: Path) ->
 
 def test_undoing_0003_stores_the_ratings_again_and_drops_unused_tags(database_path: Path) -> None:
     database = open_database(database_path)
-    image_id = add_image_with_tag(database)
+    media_id = add_media_with_tag(database)
     with database.session() as session:
         rating_tag = select(Tag).join(Namespace).where(Namespace.name == "rating", Tag.name == "public")
         public = session.scalars(rating_tag).one()
-        session.execute(media_tag.insert().values(media_id=image_id, tag_id=public.id))
+        session.execute(media_tag.insert().values(media_id=media_id, tag_id=public.id))
         session.commit()
     database.close()
 
@@ -286,11 +286,11 @@ def test_upgrade_to_0004_makes_the_categories_values(database_path: Path) -> Non
 
 def test_undoing_0004_keeps_only_the_categories_images_have(database_path: Path) -> None:
     database = open_database(database_path)
-    image_id = add_image_with_tag(database)
+    media_id = add_media_with_tag(database)
     with database.session() as session:
         photo_tag = select(Tag).join(Namespace).where(Namespace.name == "category", Tag.name == "photo")
         photo = session.scalars(photo_tag).one()
-        session.execute(media_tag.insert().values(media_id=image_id, tag_id=photo.id))
+        session.execute(media_tag.insert().values(media_id=media_id, tag_id=photo.id))
         session.commit()
     database.close()
 
@@ -329,7 +329,7 @@ def test_upgrade_to_0005_dates_the_links_by_their_images_import(database_path: P
 
 def test_undoing_0005_drops_the_times(database_path: Path) -> None:
     database = open_database(database_path)
-    add_image_with_tag(database)
+    add_media_with_tag(database)
     database.close()
 
     migrate(database_path, "0004", downgrade=True)
@@ -352,13 +352,13 @@ def count_rows(database_path: Path, table: str) -> int:
     return count
 
 
-def add_file_move(database_path: Path, image_id: int) -> None:
+def add_file_move(database_path: Path, media_id: int) -> None:
     engine = create_sqlite_engine(database_path)
     with engine.begin() as connection:
         connection.execute(text(
             "INSERT INTO file_move (image_id, from_path, to_path, created_at) "
             "VALUES (:image_id, 'a.jpg', 'b.jpg', '2025-01-01 00:00:00')"
-        ), {"image_id": image_id})
+        ), {"image_id": media_id})
     engine.dispose()
 
 
@@ -395,9 +395,9 @@ def test_upgrade_to_0006_keeps_every_image_and_what_refers_to_it(database_path: 
 
 
 def test_0006_takes_videos_with_their_own_date(database: Database) -> None:
-    image_id = add_image_with_tag(database)
+    media_id = add_media_with_tag(database)
     with database.session() as session:
-        video = session.get(Media, image_id)
+        video = session.get(Media, media_id)
         video.media_kind = "video"
         video.taken_at_source = "container"
         video.duration_ms = 222400
@@ -405,23 +405,23 @@ def test_0006_takes_videos_with_their_own_date(database: Database) -> None:
         session.commit()
 
     with database.session() as session:
-        stored = session.get(Media, image_id)
+        stored = session.get(Media, media_id)
         assert (stored.media_kind, stored.taken_at_source, stored.frame_rate) == ("video", "container", 29.97)
 
 
 def test_0006_refuses_an_unknown_kind(database: Database) -> None:
-    image_id = add_image_with_tag(database)
+    media_id = add_media_with_tag(database)
     with database.session() as session, pytest.raises(IntegrityError):
-        session.get(Media, image_id).media_kind = "sound"
+        session.get(Media, media_id).media_kind = "sound"
         session.commit()
 
 
 def test_undoing_0006_keeps_the_images_and_their_links(database_path: Path) -> None:
     database = open_database(database_path)
-    image_id = add_image_with_tag(database)
+    media_id = add_media_with_tag(database)
     database.close()
     migrate(database_path, "0006", downgrade=True)  # the tables as 0006 named them
-    add_file_move(database_path, image_id)
+    add_file_move(database_path, media_id)
 
     migrate(database_path, "0005", downgrade=True)
 
@@ -437,9 +437,9 @@ def test_undoing_0006_keeps_the_images_and_their_links(database_path: Path) -> N
 # The schema before 0006 cannot hold a video; going back must not lose one quietly.
 def test_undoing_0006_refuses_while_videos_are_stored(database_path: Path) -> None:
     database = open_database(database_path)
-    image_id = add_image_with_tag(database)
+    media_id = add_media_with_tag(database)
     with database.session() as session:
-        session.get(Media, image_id).media_kind = "video"
+        session.get(Media, media_id).media_kind = "video"
         session.commit()
     database.close()
     migrate(database_path, "0006", downgrade=True)
@@ -550,7 +550,7 @@ def test_constraints_are_named_as_the_models_name_them(database: Database, datab
 
 
 def test_deleting_media_removes_what_refers_to_it(database: Database, database_path: Path) -> None:
-    media_id = add_image_with_tag(database)
+    media_id = add_media_with_tag(database)
     engine = create_sqlite_engine(database_path)
     with engine.begin() as connection:
         connection.execute(text(

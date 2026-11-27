@@ -16,7 +16,7 @@ from photobook_db.api.v1.dependencies import (
     CurrentAuthentication,
     CurrentRestrictions,
     FileRestrictions,
-    ImagesServiceDependency,
+    MediaServiceDependency,
     ImporterServiceDependency,
     PreferencesServiceDependency,
     RotationServiceDependency,
@@ -28,7 +28,7 @@ from photobook_db.api.v1.dependencies import (
     ThumbnailsServiceDependency,
 )
 from photobook_db.services.access import Restrictions
-from photobook_db.services.images import ImageRecord, ImagesService
+from photobook_db.services.media import MediaRecord, MediaService
 from photobook_db.services.importer import UploadMetadata
 from photobook_db.services.search import DEFAULT_LIMIT, MAX_LIMIT, MediaKinds, Order, SearchRequest, Sort
 from photobook_db.services.storage import StorageService
@@ -186,7 +186,7 @@ def search_images(
     authentication: CurrentAuthentication,
     restrictions: CurrentRestrictions,
     search: SearchServiceDependency,
-    images: ImagesServiceDependency,
+    media_service: MediaServiceDependency,
     preferences: PreferencesServiceDependency,
     q: SearchText = "",
     sort: Annotated[Sort, Query(description="album: the order images were added to `album`; needs it")] = Sort.TAKEN_AT,
@@ -210,9 +210,9 @@ def search_images(
         album=album,
         media=media,
     )
-    page = search.search(request, restrictions.visible_images_filter())
+    page = search.search(request, restrictions.visible_media_filter())
     return ImageList(
-        items=[_image_object(record) for record in images.get_images(page.image_ids)],
+        items=[_image_object(record) for record in media_service.get_media_list(page.media_ids)],
         next_cursor=page.next_cursor,
         effective_query=page.effective_query,
     )
@@ -231,7 +231,7 @@ def count_images(
     media: MediaChoice = MediaKinds.IMAGE,
 ) -> ImageCount:
     hidden_filters = preferences.hidden_filters(authentication.user.id) if apply_hidden_filters else []
-    found = search.count(q, tuple(hidden_filters), restrictions.visible_images_filter(), album, media)
+    found = search.count(q, tuple(hidden_filters), restrictions.visible_media_filter(), album, media)
     return ImageCount(count=found.count, effective_query=found.effective_query)
 
 
@@ -260,7 +260,7 @@ async def upload_image(
 
     # Hashing and thumbnails take a while; the server keeps answering other requests meanwhile.
     record = await run_in_threadpool(
-        importer.import_image, incoming, metadata, authentication.user.id, restrictions
+        importer.import_media, incoming, metadata, authentication.user.id, restrictions
     )
     response.headers["Location"] = f"/api/v1/images/{record.id}"
     return _image_object(record)
@@ -272,10 +272,10 @@ async def upload_image(
     responses=problem_responses(401, 403, 404, 422),
 )
 async def change_tags_of_many(
-    changes: BulkTagChanges, restrictions: CurrentRestrictions, images: ImagesServiceDependency
+    changes: BulkTagChanges, restrictions: CurrentRestrictions, media_service: MediaServiceDependency
 ) -> BulkTagResult:
     updated = await run_in_threadpool(
-        images.change_tags_of_many, changes.image_ids, changes.add_tags, changes.remove_tags, restrictions
+        media_service.change_tags_of_many, changes.image_ids, changes.add_tags, changes.remove_tags, restrictions
     )
     return BulkTagResult(updated=updated)
 
@@ -286,10 +286,10 @@ async def change_tags_of_many(
     responses=problem_responses(401, 403, 404, 422),
 )
 async def change_tags(
-    image_id: int, changes: TagChanges, restrictions: CurrentRestrictions, images: ImagesServiceDependency
+    image_id: int, changes: TagChanges, restrictions: CurrentRestrictions, media_service: MediaServiceDependency
 ) -> ImageObject:
     record = await run_in_threadpool(
-        images.change_tags, image_id, changes.add_tags, changes.remove_tags, restrictions
+        media_service.change_tags, image_id, changes.add_tags, changes.remove_tags, restrictions
     )
     return _image_object(record)
 
@@ -312,8 +312,8 @@ async def rotate_image(
 
 
 @router.get("/{image_id}", summary="One image", responses=problem_responses(401, 404, 422))
-def get_image(image_id: int, restrictions: CurrentRestrictions, images: ImagesServiceDependency) -> ImageObject:
-    return _image_object(images.get_visible_image(image_id, restrictions))
+def get_image(image_id: int, restrictions: CurrentRestrictions, media_service: MediaServiceDependency) -> ImageObject:
+    return _image_object(media_service.get_visible_media(image_id, restrictions))
 
 
 @router.get(
@@ -324,11 +324,11 @@ def get_image(image_id: int, restrictions: CurrentRestrictions, images: ImagesSe
     responses=problem_responses(401, 404, 422),
 )
 def get_tag_counts(
-    image_id: int, restrictions: CurrentRestrictions, images: ImagesServiceDependency, tags: TagsServiceDependency
+    image_id: int, restrictions: CurrentRestrictions, media_service: MediaServiceDependency, tags: TagsServiceDependency
 ) -> TagCountList:
-    image = images.get_visible_image(image_id, restrictions)
-    counts = tags.image_counts(list(image.tags))
-    return TagCountList(items=[TagCountItem(tag=str(count.tag), image_count=count.image_count) for count in counts])
+    image = media_service.get_visible_media(image_id, restrictions)
+    counts = tags.media_counts(list(image.tags))
+    return TagCountList(items=[TagCountItem(tag=str(count.tag), image_count=count.media_count) for count in counts])
 
 
 @router.get(
@@ -341,10 +341,10 @@ def get_image_file(
     image_id: int,
     request: Request,
     restrictions: FileRestrictions,
-    images: ImagesServiceDependency,
+    media_service: MediaServiceDependency,
     storage: StorageServiceDependency,
 ) -> Response:
-    record = images.get_visible_image(image_id, restrictions)
+    record = media_service.get_visible_media(image_id, restrictions)
     etag = f'"{record.sha256}-{record.revision}"'
     if _client_has(request, etag):
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers={"ETag": etag})
@@ -372,7 +372,7 @@ def get_image_thumbnail(
     image_id: int,
     request: Request,
     restrictions: CurrentRestrictions,
-    images: ImagesServiceDependency,
+    media_service: MediaServiceDependency,
     storage: StorageServiceDependency,
     thumbnails: ThumbnailsServiceDependency,
     importer: ImporterServiceDependency,
@@ -391,7 +391,7 @@ def get_image_thumbnail(
             errors=[{"field": "query.size", "message": f"One of {list(THUMBNAIL_SIZES)}"}],
         )
 
-    record = images.get_visible_image(image_id, restrictions)
+    record = media_service.get_visible_media(image_id, restrictions)
     etag = f'"{record.sha256}-{record.revision}-{size}"'
     headers = {"ETag": etag, "Cache-Control": THUMBNAIL_CACHE_CONTROL}
     if _client_has(request, etag):
@@ -417,11 +417,11 @@ def get_image_thumbnail(
 def get_storyboard(
     image_id: int,
     restrictions: CurrentRestrictions,
-    images: ImagesServiceDependency,
+    media_service: MediaServiceDependency,
     storage: StorageServiceDependency,
     storyboards: StoryboardServiceDependency,
 ) -> Storyboard:
-    record = _visible_video(image_id, restrictions, images)
+    record = _visible_video(image_id, restrictions, media_service)
     layout = _storyboard_of(record, storage, storyboards)
     return Storyboard(**layout.to_json(), sprite=f"/api/v1/images/{record.id}/storyboard/sprite")
 
@@ -440,11 +440,11 @@ def get_storyboard_sprite(
     image_id: int,
     request: Request,
     restrictions: CurrentRestrictions,
-    images: ImagesServiceDependency,
+    media_service: MediaServiceDependency,
     storage: StorageServiceDependency,
     storyboards: StoryboardServiceDependency,
 ) -> Response:
-    record = _visible_video(image_id, restrictions, images)
+    record = _visible_video(image_id, restrictions, media_service)
     etag = f'"{record.sha256}-storyboard"'
     headers = {"ETag": etag, "Cache-Control": THUMBNAIL_CACHE_CONTROL}  # a video's file never changes
     if _client_has(request, etag):
@@ -463,23 +463,23 @@ def create_stream_url(
     image_id: int,
     authentication: CurrentAuthentication,
     restrictions: CurrentRestrictions,
-    images: ImagesServiceDependency,
+    media_service: MediaServiceDependency,
     streams: StreamServiceDependency,
 ) -> StreamUrl:
-    record = _visible_video(image_id, restrictions, images)
+    record = _visible_video(image_id, restrictions, media_service)
     grant = streams.grant(record.id, authentication.token_id)
     return StreamUrl(url=f"/api/v1/images/{record.id}/file?{grant.query()}", expires_at=grant.expires_at)
 
 
-def _visible_video(image_id: int, restrictions: Restrictions, images: ImagesService) -> ImageRecord:
-    record = images.get_visible_image(image_id, restrictions)
+def _visible_video(image_id: int, restrictions: Restrictions, media_service: MediaService) -> MediaRecord:
+    record = media_service.get_visible_media(image_id, restrictions)
     if record.media_kind != "video":
         raise Problem(404, "not_found", "Not a video", "This is an image; only videos have this.")
 
     return record
 
 
-def _storyboard_of(record: ImageRecord, storage: StorageService, storyboards: StoryboardService) -> StoryboardLayout:
+def _storyboard_of(record: MediaRecord, storage: StorageService, storyboards: StoryboardService) -> StoryboardLayout:
     return storyboards.storyboard(
         storage.absolute_path(record.storage_path), record.sha256, record.duration_ms or 0, record.width, record.height
     )
@@ -514,7 +514,7 @@ def _client_has(request: Request, etag: str) -> bool:
     return etag in (tag.strip() for tag in if_none_match.split(",")) or if_none_match.strip() == "*"
 
 
-def _image_object(record: ImageRecord) -> ImageObject:
+def _image_object(record: MediaRecord) -> ImageObject:
     base = f"/api/v1/images/{record.id}"
     return ImageObject(
         id=record.id,
@@ -543,7 +543,7 @@ def _image_object(record: ImageRecord) -> ImageObject:
     )
 
 
-def _video_details(record: ImageRecord) -> VideoDetails | None:
+def _video_details(record: MediaRecord) -> VideoDetails | None:
     if record.media_kind != "video":
         return None
 

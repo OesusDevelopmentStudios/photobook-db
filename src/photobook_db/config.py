@@ -24,13 +24,13 @@ class Config:
     host: str
     port: int
     data_dir: Path  # the database and the thumbnails; the container image sets /data
-    library_dir: Path  # the images, arranged by their tags; the container image sets /library
+    library_dir: Path  # the photos and videos, arranged by their tags; the container image sets /library
     import_dir: Path | None = None  # folders admins can import from on the server; the container sets /import
     # Addresses whose X-Forwarded-For and X-Forwarded-Proto are believed, e.g. from Caddy: then the server knows
     # that the browser used HTTPS, and which address it came from. "*" trusts every address.
     trusted_proxies: tuple[str, ...] = DEFAULT_TRUSTED_PROXIES
     # The machine ID of the computer the server runs on, and the library folder as programs there see it: a
-    # desktop app on that computer can then open an image's folder. In a container, both differ from the
+    # desktop app on that computer can then open a file's folder. In a container, both differ from the
     # container's own; the install script mounts the one and sets the other.
     host_machine_id_file: Path = DEFAULT_HOST_MACHINE_ID_FILE
     host_library_dir: Path | None = None  # None: library_dir

@@ -42,7 +42,7 @@ class TagPage:
 @dataclass(frozen=True)
 class TagCount:
     tag: TagName
-    image_count: int
+    media_count: int
 
 
 META_NAMESPACE = "meta"
@@ -60,7 +60,7 @@ class TagsService:
         self._path_template_namespaces = path_template_namespaces
 
     def resolve_tags(self, texts: list[str], new_values_allowed: bool = False) -> list[TagName]:
-        """Parses tags as given for an image: each tag once, and in a single-value namespace only the last
+        """Parses tags as given for a media item: each tag once, and in a single-value namespace only the last
         one, because a later tag replaces an earlier one (category:photo, category:artwork → artwork).
         In a namespace with fixed values (ratings) a tag must exist, unless an admin adds a value
         (`new_values_allowed`): a typo must not slip past a restriction such as rating:private."""
@@ -128,8 +128,8 @@ class TagsService:
         with self._database.session() as session:
             return session.scalar(query) is not None
 
-    def image_count(self, tag: TagName) -> int | None:
-        """How many images have the tag, counting all of them; None if the tag does not exist."""
+    def media_count(self, tag: TagName) -> int | None:
+        """How many media have the tag, counting all of them; None if the tag does not exist."""
         query = (
             select(func.count(media_tag.c.media_id))
             .select_from(Tag)
@@ -141,9 +141,9 @@ class TagsService:
         with self._database.session() as session:
             return session.scalar(query)
 
-    def image_counts(self, tags: list[TagName]) -> list[TagCount]:
-        """How many images have each tag, counting all of them, in the order given. In one query: the viewer asks
-        for every tag of the image on screen."""
+    def media_counts(self, tags: list[TagName]) -> list[TagCount]:
+        """How many media have each tag, counting all of them, in the order given. In one query: the viewer asks
+        for every tag of the media item on screen."""
         names_by_namespace: dict[str, list[str]] = {}
         for tag in tags:
             names_by_namespace.setdefault(tag.namespace, []).append(tag.name)
@@ -173,8 +173,8 @@ class TagsService:
         is_hidden: Callable[[TagName], bool] | None = None,
     ) -> list[TagCount]:
         """Tags starting with `prefix`, most used first. "author:sam" searches one namespace, "sam" all of them.
-        Tags for which `is_hidden` says so are left out (a restricted user's tags). `image_count` counts all
-        images, also ones a restricted user cannot see."""
+        Tags for which `is_hidden` says so are left out (a restricted user's tags). `media_count` counts all
+        media, also ones a restricted user cannot see."""
         return self._most_used(prefix, namespace, limit, is_hidden, after=None)
 
     def tag_page(
@@ -185,7 +185,7 @@ class TagsService:
         is_hidden: Callable[[TagName], bool] | None = None,
         cursor: str | None = None,
     ) -> TagPage:
-        """As autocomplete(), a page at a time, for browsing every tag of a namespace. Images tagged meanwhile
+        """As autocomplete(), a page at a time, for browsing every tag of a namespace. Media tagged meanwhile
         change the counts, so a tag may be skipped or repeated across pages. Raises 422 validation_error for a
         damaged cursor."""
         after = None if cursor is None else _decode_cursor(cursor)
@@ -194,7 +194,7 @@ class TagsService:
         return TagPage(items, _encode_cursor(items[-1]) if len(found) > limit else None)
 
     def create_tag(self, tag: TagName) -> None:
-        """A tag that no image has yet. Raises 409 already_exists."""
+        """A tag that no media item has yet. Raises 409 already_exists."""
         with self._database.session() as session:
             namespace_id = session.scalar(select(Namespace.id).where(Namespace.name == tag.namespace))
             session.add(Tag(namespace_id=namespace_id, name=tag.name))
@@ -217,13 +217,13 @@ class TagsService:
         if len(namespaces) > 1:
             return []  # the namespace filter and the prefix's namespace disagree
 
-        image_count = func.count(media_tag.c.media_id)
+        media_count = func.count(media_tag.c.media_id)
         query = (
-            select(Namespace.name, Tag.name, image_count)
+            select(Namespace.name, Tag.name, media_count)
             .join(Namespace, Tag.namespace_id == Namespace.id)
             .outerjoin(media_tag, media_tag.c.tag_id == Tag.id)
             .group_by(Tag.id)
-            .order_by(image_count.desc(), Namespace.name, Tag.name)
+            .order_by(media_count.desc(), Namespace.name, Tag.name)
         )
         if namespaces:
             query = query.where(Namespace.name == namespaces.pop())
@@ -233,10 +233,10 @@ class TagsService:
 
         if after is not None:
             same_count_later = and_(
-                image_count == after.image_count,
+                media_count == after.media_count,
                 tuple_(Namespace.name, Tag.name) > tuple_(after.tag.namespace, after.tag.name),
             )
-            query = query.having(or_(image_count < after.image_count, same_count_later))
+            query = query.having(or_(media_count < after.media_count, same_count_later))
 
         # Hidden tags are dropped after reading, so more rows are read until the page is full.
         found: list[TagCount] = []
@@ -329,12 +329,12 @@ class TagsService:
                 raise Problem(409, "namespace_in_use", "Namespace is in use", reason)
 
     def namespace_usage(self, name: str) -> tuple[int, int]:
-        """How many tags the namespace has, and how many images have one of them."""
+        """How many tags the namespace has, and how many media have one of them."""
         tag_ids = select(Tag.id).join(Namespace, Tag.namespace_id == Namespace.id).where(Namespace.name == name)
-        image_count = select(func.count(media_tag.c.media_id.distinct())).where(media_tag.c.tag_id.in_(tag_ids))
+        media_count = select(func.count(media_tag.c.media_id.distinct())).where(media_tag.c.tag_id.in_(tag_ids))
         with self._database.session() as session:
             tag_count = session.scalar(select(func.count()).select_from(tag_ids.subquery())) or 0
-            return tag_count, session.scalar(image_count) or 0
+            return tag_count, session.scalar(media_count) or 0
 
     def delete_namespace(self, name: str) -> None:
         """A removable namespace (check_namespace_removable()) without tags; the tag admin takes its tags first."""
@@ -372,8 +372,8 @@ def _namespace_info(
 
 
 def _encode_cursor(last: TagCount) -> str:
-    """base64url JSON {"count": <its image count>, "tag": "<namespace>:<name>"} of the page's last tag."""
-    text = json.dumps({"count": last.image_count, "tag": str(last.tag)}, separators=(",", ":"))
+    """base64url JSON {"count": <its media count>, "tag": "<namespace>:<name>"} of the page's last tag."""
+    text = json.dumps({"count": last.media_count, "tag": str(last.tag)}, separators=(",", ":"))
     return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
 
 

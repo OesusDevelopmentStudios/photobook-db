@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Single search terms as stored lists: hidden filters and restrictions. And whether a term matches an image
+"""Single search terms as stored lists: hidden filters and restrictions. And whether a term matches a media item
 whose tags are known, without asking the database."""
 
 from collections.abc import Collection
@@ -29,7 +29,7 @@ def checked_terms(terms: list[str], field: str, namespace_names: Collection[str]
 
 
 def tree_matches(node: Node, tags: Collection[TagName], taken_at: datetime | None) -> bool:
-    """The same meaning as the database condition built from the tree, for an image not stored yet."""
+    """The same meaning as the database condition built from the tree, for a media item not stored yet."""
     if isinstance(node, TagMatch):
         return any(_tag_matches(node, tag) for tag in tags)
 

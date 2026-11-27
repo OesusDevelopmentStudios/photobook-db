@@ -16,7 +16,7 @@ NAMESPACES = {"category", "author", "character", "rating", "album", "general"}
 FIRST_DAY = datetime(2025, 1, 1, 12, 0)
 
 
-def add_image(database: Database, number: int, taken_at: datetime, tags: list[str] = ()) -> int:
+def add_media(database: Database, number: int, taken_at: datetime, tags: list[str] = ()) -> int:
     """imported_at runs the other way round than taken_at, so the two sorts differ."""
     with database.session() as session:
         image = Media(
@@ -68,12 +68,12 @@ def search(database: Database) -> UnrestrictedSearch:
 
 
 @pytest.fixture
-def image_ids(database: Database) -> list[int]:
+def media_ids(database: Database) -> list[int]:
     """Seven images, one a day; images 3 and 4 were taken at the same moment. Even numbers are artworks."""
     taken = [FIRST_DAY + timedelta(days=number) for number in range(7)]
     taken[4] = taken[3]
     return [
-        add_image(database, number, taken[number], ["category:artwork" if number % 2 == 0 else "category:photo"])
+        add_media(database, number, taken[number], ["category:artwork" if number % 2 == 0 else "category:photo"])
         for number in range(7)
     ]
 
@@ -83,7 +83,7 @@ def all_pages(search: UnrestrictedSearch, request: SearchRequest) -> list[int]:
     cursor = None
     while True:
         page = search.search(SearchRequest(**{**vars(request), "cursor": cursor}))
-        found += page.image_ids
+        found += page.media_ids
         cursor = page.next_cursor
         if cursor is None:
             return found
@@ -99,21 +99,21 @@ def invalid_field(action: object) -> str:
 
 # --- Sorting
 
-def test_newest_taken_first_by_default(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_newest_taken_first_by_default(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     # 3 and 4 were taken at the same moment; the higher id comes first among equals
-    assert search.search(SearchRequest()).image_ids == [image_ids[number] for number in (6, 5, 4, 3, 2, 1, 0)]
+    assert search.search(SearchRequest()).media_ids == [media_ids[number] for number in (6, 5, 4, 3, 2, 1, 0)]
 
 
-def test_oldest_first(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_oldest_first(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     page = search.search(SearchRequest(order=Order.ASC))
 
-    assert page.image_ids == [image_ids[number] for number in (0, 1, 2, 3, 4, 5, 6)]
+    assert page.media_ids == [media_ids[number] for number in (0, 1, 2, 3, 4, 5, 6)]
 
 
-def test_by_import_time(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_by_import_time(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     page = search.search(SearchRequest(sort=Sort.IMPORTED_AT))
 
-    assert page.image_ids == image_ids  # image 0 was imported last
+    assert page.media_ids == media_ids  # image 0 was imported last
 
 
 # --- Paging
@@ -129,46 +129,46 @@ def test_by_import_time(search: UnrestrictedSearch, image_ids: list[int]) -> Non
     ids=["taken, newest first", "taken, oldest first", "imported", "random"],
 )
 def test_pages_together_hold_every_image_once(
-    search: UnrestrictedSearch, image_ids: list[int], request_without_cursor: SearchRequest
+    search: UnrestrictedSearch, media_ids: list[int], request_without_cursor: SearchRequest
 ) -> None:
-    one_page = search.search(SearchRequest(**{**vars(request_without_cursor), "limit": 100})).image_ids
+    one_page = search.search(SearchRequest(**{**vars(request_without_cursor), "limit": 100})).media_ids
 
     assert all_pages(search, request_without_cursor) == one_page
-    assert sorted(one_page) == sorted(image_ids)
+    assert sorted(one_page) == sorted(media_ids)
 
 
-def test_last_page_has_no_cursor(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_last_page_has_no_cursor(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     assert search.search(SearchRequest(limit=7)).next_cursor is None
     assert search.search(SearchRequest(limit=6)).next_cursor is not None
 
 
 def test_new_image_does_not_shift_the_next_page(
-    search: UnrestrictedSearch, database: Database, image_ids: list[int]
+    search: UnrestrictedSearch, database: Database, media_ids: list[int]
 ) -> None:
     first_page = search.search(SearchRequest(limit=3))
-    add_image(database, 99, FIRST_DAY + timedelta(days=100))  # newer than everything
+    add_media(database, 99, FIRST_DAY + timedelta(days=100))  # newer than everything
 
     second_page = search.search(SearchRequest(limit=3, cursor=first_page.next_cursor))
 
-    assert second_page.image_ids == [image_ids[number] for number in (3, 2, 1)]
+    assert second_page.media_ids == [media_ids[number] for number in (3, 2, 1)]
 
 
-def test_paging_through_search_results(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_paging_through_search_results(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     request = SearchRequest(query="category:artwork", limit=2)
 
-    assert all_pages(search, request) == [image_ids[number] for number in (6, 4, 2, 0)]
+    assert all_pages(search, request) == [media_ids[number] for number in (6, 4, 2, 0)]
 
 
 # --- Random order
 
-def test_same_seed_gives_the_same_order(search: UnrestrictedSearch, image_ids: list[int]) -> None:
-    first = search.search(SearchRequest(sort=Sort.RANDOM, seed=7)).image_ids
+def test_same_seed_gives_the_same_order(search: UnrestrictedSearch, media_ids: list[int]) -> None:
+    first = search.search(SearchRequest(sort=Sort.RANDOM, seed=7)).media_ids
 
-    assert search.search(SearchRequest(sort=Sort.RANDOM, seed=7)).image_ids == first
-    assert search.search(SearchRequest(sort=Sort.RANDOM, seed=8)).image_ids != first
+    assert search.search(SearchRequest(sort=Sort.RANDOM, seed=7)).media_ids == first
+    assert search.search(SearchRequest(sort=Sort.RANDOM, seed=8)).media_ids != first
 
 
-def test_random_order_needs_a_seed(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_random_order_needs_a_seed(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     assert invalid_field(lambda: search.search(SearchRequest(sort=Sort.RANDOM))) == "query.seed"
 
 
@@ -181,11 +181,11 @@ def test_shuffled_position_depends_on_seed_and_image() -> None:
 # --- Cursors
 
 @pytest.mark.parametrize("cursor", ["not base64!", "bm90IGpzb24", "eyJ2IjoxfQ", "eyJ2Ijoibm8gZGF0ZSIsImlkIjoxfQ"])
-def test_damaged_cursor_is_refused(search: UnrestrictedSearch, image_ids: list[int], cursor: str) -> None:
+def test_damaged_cursor_is_refused(search: UnrestrictedSearch, media_ids: list[int], cursor: str) -> None:
     assert invalid_field(lambda: search.search(SearchRequest(cursor=cursor))) == "query.cursor"
 
 
-def test_cursor_of_another_sort_is_refused(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_cursor_of_another_sort_is_refused(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     date_cursor = search.search(SearchRequest(limit=1)).next_cursor
 
     request = SearchRequest(sort=Sort.RANDOM, seed=1, cursor=date_cursor)
@@ -195,31 +195,31 @@ def test_cursor_of_another_sort_is_refused(search: UnrestrictedSearch, image_ids
 
 # --- Hidden filters
 
-def test_hidden_filters_are_applied_and_shown(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_hidden_filters_are_applied_and_shown(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     page = search.search(SearchRequest(query="year:2025", hidden_filters=("category:artwork",)))
 
     assert page.effective_query == "year:2025 -category:artwork"
-    assert sorted(page.image_ids) == [image_ids[number] for number in (1, 3, 5)]
+    assert sorted(page.media_ids) == [media_ids[number] for number in (1, 3, 5)]
 
 
 # --- Counting
 
-def test_count_is_the_number_of_images_over_all_pages(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_count_is_the_number_of_images_over_all_pages(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     assert search.count("").count == len(all_pages(search, SearchRequest(limit=2)))
     assert search.count("category:photo").count == 3
 
 
-def test_count_applies_hidden_filters_like_the_search(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_count_applies_hidden_filters_like_the_search(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     found = search.count("year:2025", ("category:artwork",))
 
     assert found == SearchCount(3, "year:2025 -category:artwork")
 
 
-def test_count_of_nothing_found(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_count_of_nothing_found(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     assert search.count("category:refs").count == 0
 
 
-def test_count_refuses_an_invalid_query(search: UnrestrictedSearch, image_ids: list[int]) -> None:
+def test_count_refuses_an_invalid_query(search: UnrestrictedSearch, media_ids: list[int]) -> None:
     with pytest.raises(Problem) as raised:
         search.count("summer,,beach")
 
