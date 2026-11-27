@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from photobook_db.admin_web._theme import readable_text_on
 
@@ -16,5 +17,9 @@ def _accent(request: Request) -> dict[str, Any]:
     return {"accent_color": accent_color, "accent_text_color": readable_text_on(accent_color)}
 
 
-# HTML templates escape every value they insert, so user input cannot inject markup.
-templates = Jinja2Templates(directory=Path(__file__).parent / "templates", context_processors=[_accent])
+_environment = Environment(
+    loader=FileSystemLoader(Path(__file__).parent / "templates"),
+    autoescape=True,  # every value inserted is escaped, so user input cannot inject markup
+    undefined=StrictUndefined,  # a misspelled or renamed variable fails the page instead of showing nothing
+)
+templates = Jinja2Templates(env=_environment, context_processors=[_accent])
