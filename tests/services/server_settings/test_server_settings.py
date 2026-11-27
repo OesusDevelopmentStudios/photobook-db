@@ -7,7 +7,7 @@ import pytest
 
 from photobook_db.db import Database
 from photobook_db.services.images import ImagesService
-from photobook_db.services.importer import DEFAULT_MAX_UPLOAD_BYTES, ImporterService
+from photobook_db.services.importer import DEFAULT_MAX_UPLOAD_BYTES, DEFAULT_MAX_VIDEO_UPLOAD_BYTES, ImporterService
 from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.jobs import JobKind, JobsService, JobStatus, Relayout
 from photobook_db.services.server_settings import ServerSettings, ServerSettingsInfo, SettingsChanges
@@ -20,6 +20,7 @@ from photobook_db.utils.problems import Problem
 DEFAULTS = ServerSettingsInfo(
     path_template="{category}/{author}/{year}",
     max_upload_bytes=DEFAULT_MAX_UPLOAD_BYTES,
+    max_video_upload_bytes=DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
     web_accent_color="#3daee9",
     library_dir=Path("/srv/library"),
     import_dir=Path("/srv/import"),
@@ -53,6 +54,13 @@ def test_changes_the_given_settings_only(server_settings: ServerSettings) -> Non
     assert server_settings.current() == settings
 
 
+def test_changes_the_video_limit_on_its_own(server_settings: ServerSettings) -> None:
+    settings, _job = server_settings.change(SettingsChanges(max_video_upload_bytes=8 * 1024**3), None)
+
+    assert (settings.max_upload_bytes, settings.max_video_upload_bytes) == (DEFAULT_MAX_UPLOAD_BYTES, 8 * 1024**3)
+    assert server_settings.current() == settings
+
+
 def test_new_path_template_starts_a_relayout(server_settings: ServerSettings) -> None:
     settings, job = server_settings.change(SettingsChanges(path_template=" {year}/{category} "), user_id=None)
 
@@ -69,9 +77,10 @@ def test_same_path_template_moves_nothing(server_settings: ServerSettings) -> No
     [
         SettingsChanges(path_template="{nonsense}", max_upload_bytes=50_000_000),
         SettingsChanges(path_template="{year}", max_upload_bytes=1),
+        SettingsChanges(max_upload_bytes=50_000_000, max_video_upload_bytes=65 * 1024**3),
         SettingsChanges(path_template="{year}", web_accent_color="blue"),
     ],
-    ids=["template", "upload limit", "accent colour"],
+    ids=["template", "upload limit", "video upload limit", "accent colour"],
 )
 def test_one_invalid_setting_changes_nothing(server_settings: ServerSettings, changes: SettingsChanges) -> None:
     with pytest.raises(Problem) as raised:

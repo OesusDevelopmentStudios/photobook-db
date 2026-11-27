@@ -57,6 +57,7 @@ def test_admin_sees_the_settings(client: TestClient, admin: dict[str, str], conf
     assert response.json() == {
         "path_template": "{category}/{author}/{year}",
         "max_upload_bytes": 200 * 1024 * 1024,
+        "max_video_upload_bytes": 4 * 1024**3,
         "web_accent_color": "#3daee9",
         "library_dir": str(config.library_dir),
         "import_dir": None,
@@ -91,10 +92,32 @@ def test_other_changes_start_no_job(client: TestClient, admin: dict[str, str]) -
     assert client.get("/api/v1/jobs", headers=admin).json() == []
 
 
+def test_changes_the_video_upload_limit(client: TestClient, admin: dict[str, str]) -> None:
+    response = client.patch("/api/v1/admin/settings", json={"max_video_upload_bytes": 64 * 1024**3}, headers=admin)
+
+    assert response.status_code == 200
+    settings = client.get("/api/v1/admin/settings", headers=admin).json()
+    assert (settings["max_upload_bytes"], settings["max_video_upload_bytes"]) == (200 * 1024 * 1024, 64 * 1024**3)
+
+
 @pytest.mark.parametrize(
     "changes",
-    [{"path_template": "{nonsense}"}, {"max_upload_bytes": 1000}, {"web_accent_color": "red"}],
-    ids=["unknown placeholder", "upload limit too small", "not a colour"],
+    [
+        {"path_template": "{nonsense}"},
+        {"max_upload_bytes": 1000},
+        {"max_upload_bytes": 10 * 1024**3 + 1},
+        {"max_video_upload_bytes": 1000},
+        {"max_video_upload_bytes": 64 * 1024**3 + 1},
+        {"web_accent_color": "red"},
+    ],
+    ids=[
+        "unknown placeholder",
+        "upload limit too small",
+        "upload limit too large",
+        "video upload limit too small",
+        "video upload limit too large",
+        "not a colour",
+    ],
 )
 def test_invalid_setting_is_refused(client: TestClient, admin: dict[str, str], changes: dict[str, Any]) -> None:
     before = client.get("/api/v1/admin/settings", headers=admin).json()

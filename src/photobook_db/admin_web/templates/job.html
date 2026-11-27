@@ -33,7 +33,10 @@
     {% if job.kind == "folder_import" %}
     <dt>Imported</dt><dd>{{ job.result.imported }}</dd>
     <dt>In the library already</dt><dd>{{ job.result.duplicates }}</dd>
-    <dt>Not images</dt><dd>{{ job.result.unsupported }} <span class="hint">(left in the folder)</span></dd>
+    <dt>Not images or videos</dt><dd>{{ job.result.unsupported }} <span class="hint">(left in the folder)</span></dd>
+    {# Jobs from before the upload limits applied to folder imports have no count of their own. #}
+    <dt>Too large</dt><dd>{{ job.result.too_large | default(0) }} <span class="hint">(left in the folder; the
+        upload limits are in <a href="/admin/settings">Settings</a>)</span></dd>
     {% elif job.kind == "relayout" %}
     <dt>Moved</dt><dd>{{ job.result.moved }}</dd>
     <dt>In place already</dt><dd>{{ job.result.unchanged }}</dd>

@@ -25,9 +25,14 @@ from photobook_db.services.tags import TagName, TagsService
 from photobook_db.services.thumbnails import THUMBNAIL_SIZES, ThumbnailsService
 from photobook_db.utils.problems import Problem
 
-MAX_UPLOAD_BYTES_SETTING = "max_upload_bytes"
-DEFAULT_MAX_UPLOAD_BYTES = 200 * 1024 * 1024
-UPLOAD_LIMIT_RANGE = (1024 * 1024, 10 * 1024 * 1024 * 1024)  # what an admin may set: 1 MiB to 10 GiB
+MIB = 1024 * 1024
+GIB = 1024 * MIB
+MAX_UPLOAD_BYTES_SETTING = "max_upload_bytes"  # for images; the name is older than videos
+DEFAULT_MAX_UPLOAD_BYTES = 200 * MIB
+UPLOAD_LIMIT_RANGE = (MIB, 10 * GIB)  # what an admin may set
+MAX_VIDEO_UPLOAD_BYTES_SETTING = "max_video_upload_bytes"
+DEFAULT_MAX_VIDEO_UPLOAD_BYTES = 4 * GIB
+VIDEO_UPLOAD_LIMIT_RANGE = (MIB, 64 * GIB)
 POSTER_LATEST_MS = 10_000  # a video's poster frame is at most this far in
 
 
@@ -71,12 +76,25 @@ class ImporterService:
         self._now = now
 
     def max_upload_bytes(self) -> int:
+        """The largest image accepted."""
         stored_limit = self._settings.get(MAX_UPLOAD_BYTES_SETTING)
         return DEFAULT_MAX_UPLOAD_BYTES if stored_limit is None else stored_limit
 
     def set_max_upload_bytes(self, limit: int) -> None:
         check_upload_limit(limit)
         self._settings.set(MAX_UPLOAD_BYTES_SETTING, limit)
+
+    def max_video_upload_bytes(self) -> int:
+        stored_limit = self._settings.get(MAX_VIDEO_UPLOAD_BYTES_SETTING)
+        return DEFAULT_MAX_VIDEO_UPLOAD_BYTES if stored_limit is None else stored_limit
+
+    def set_max_video_upload_bytes(self, limit: int) -> None:
+        check_video_upload_limit(limit)
+        self._settings.set(MAX_VIDEO_UPLOAD_BYTES_SETTING, limit)
+
+    def largest_upload_bytes(self) -> int:
+        """What an upload may bring before its kind is known: the larger of the two limits."""
+        return max(self.max_upload_bytes(), self.max_video_upload_bytes())
 
     def new_incoming_path(self) -> Path:
         """Where to write an upload before passing it to import_image()."""
@@ -86,8 +104,9 @@ class ImporterService:
         self, incoming: Path, metadata: UploadMetadata, user_id: int | None, restrictions: Restrictions
     ) -> ImageRecord:
         """Takes over `incoming`: it ends up in the library or is deleted. Raises 409 duplicate_image,
-        403 tag_restricted, 415 unsupported_media_type, 422 checksum_mismatch or 422 invalid_tag; nothing is
-        stored then. The server adds the file's meta tags; meta tags in the metadata raise 422 tag_read_only."""
+        403 tag_restricted, 413 file_too_large (over the limit for images or for videos), 415 unsupported_media_type,
+        422 checksum_mismatch or 422 invalid_tag; nothing is stored then. The server adds the file's meta tags; meta
+        tags in the metadata raise 422 tag_read_only."""
         sha256, tags, facts, taken_at = self._checked_upload(incoming, metadata, restrictions)
         library_path = self._storage.path_for(
             tags, taken_at.time, file_name(metadata.original_filename, sha256, facts.type.extension)
@@ -107,6 +126,10 @@ class ImporterService:
         self, source: Path, metadata: UploadMetadata, user_id: int | None, restrictions: Restrictions
     ) -> ImageRecord:
         """Imports a copy of `source` and leaves the file itself alone. Raises like import_image()."""
+        largest = self.largest_upload_bytes()
+        if source.stat().st_size > largest:  # too large whatever it is: not worth hashing or copying
+            raise file_too_large(largest)
+
         sha256 = file_sha256(source)
         self._check_not_duplicate(sha256, restrictions)  # before copying: a repeated import is mostly duplicates
         incoming = self.new_incoming_path()
@@ -170,6 +193,7 @@ class ImporterService:
             _check_client_sha256(metadata.client_sha256, sha256)
             self._check_not_duplicate(sha256, restrictions)
             facts = self._inspect(incoming)
+            self._check_size(incoming, facts)
             tags = self._tags.resolve_tags(list(metadata.tags))
             tags += _meta_tags(facts)
             taken_at = self._taken_at(metadata, facts)
@@ -186,6 +210,15 @@ class ImporterService:
             raise
 
         return sha256, tags, facts, taken_at
+
+    def _check_size(self, path: Path, facts: ImageFacts) -> None:
+        if facts.video is None:
+            limit, kind = self.max_upload_bytes(), "images"
+        else:
+            limit, kind = self.max_video_upload_bytes(), "videos"
+
+        if path.stat().st_size > limit:
+            raise file_too_large(limit, kind)
 
     def _check_not_duplicate(self, sha256: str, restrictions: Restrictions) -> None:
         existing_image_id = self._images.find_id_by_sha256(sha256)
@@ -255,12 +288,34 @@ def _video_fields(facts: ImageFacts) -> dict[str, object]:
 
 
 def check_upload_limit(limit: int) -> None:
+    """The image limit. Raises 422 validation_error if an admin may not set it."""
+    _check_limit(limit, UPLOAD_LIMIT_RANGE, "image")
+
+
+def check_video_upload_limit(limit: int) -> None:
     """Raises 422 validation_error if an admin may not set it."""
-    smallest, largest = UPLOAD_LIMIT_RANGE
+    _check_limit(limit, VIDEO_UPLOAD_LIMIT_RANGE, "video")
+
+
+def _check_limit(limit: int, allowed: tuple[int, int], kind: str) -> None:
+    smallest, largest = allowed
     if not smallest <= limit <= largest:
         raise Problem(
-            422, "validation_error", "Invalid upload limit", f"The limit must be from {smallest} to {largest} bytes."
+            422,
+            "validation_error",
+            "Invalid upload limit",
+            f"The {kind} upload limit must be from {smallest} to {largest} bytes.",
         )
+
+
+def file_too_large(limit_bytes: int, kind: str = "files") -> Problem:
+    return Problem(
+        413,
+        "file_too_large",
+        "File too large",
+        f"The server accepts {kind} of at most {limit_bytes} bytes.",
+        limit_bytes=limit_bytes,
+    )
 
 
 def _check_client_sha256(client_sha256: str | None, sha256: str) -> None:

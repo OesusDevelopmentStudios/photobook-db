@@ -2826,7 +2826,13 @@
           },
           "max_upload_bytes": {
             "type": "integer",
-            "title": "Max Upload Bytes"
+            "title": "Max Upload Bytes",
+            "description": "The largest image that can be uploaded or imported, in bytes"
+          },
+          "max_video_upload_bytes": {
+            "type": "integer",
+            "title": "Max Video Upload Bytes",
+            "description": "The largest video that can be uploaded or imported, in bytes"
           },
           "web_accent_color": {
             "type": "string",
@@ -2870,6 +2876,7 @@
         "required": [
           "path_template",
           "max_upload_bytes",
+          "max_video_upload_bytes",
           "web_accent_color",
           "library_dir",
           "import_dir",
@@ -3817,7 +3824,13 @@
           },
           "max_upload_bytes": {
             "type": "integer",
-            "title": "Max Upload Bytes"
+            "title": "Max Upload Bytes",
+            "description": "The largest image that can be uploaded or imported, in bytes"
+          },
+          "max_video_upload_bytes": {
+            "type": "integer",
+            "title": "Max Video Upload Bytes",
+            "description": "The largest video that can be uploaded or imported, in bytes"
           },
           "web_accent_color": {
             "type": "string",
@@ -3849,6 +3862,7 @@
         "required": [
           "path_template",
           "max_upload_bytes",
+          "max_video_upload_bytes",
           "web_accent_color",
           "library_dir",
           "import_dir"
@@ -3882,6 +3896,19 @@
               }
             ],
             "title": "Max Upload Bytes"
+          },
+          "max_video_upload_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 68719476736.0,
+                "minimum": 1048576.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Video Upload Bytes"
           },
           "web_accent_color": {
             "anyOf": [

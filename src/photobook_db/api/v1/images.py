@@ -222,7 +222,8 @@ async def upload_image(
     importer: ImporterServiceDependency,
 ) -> ImageObject:
     incoming = importer.new_incoming_path()
-    metadata_json = await receive_upload(request, incoming, importer.max_upload_bytes())
+    # The importer checks the limit for the kind of file once it knows what the file is.
+    metadata_json = await receive_upload(request, incoming, importer.largest_upload_bytes())
     try:
         metadata = _parse_metadata(metadata_json)
     except Problem:

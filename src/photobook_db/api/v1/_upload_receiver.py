@@ -12,6 +12,7 @@ from typing import BinaryIO
 from fastapi import Request
 from python_multipart.multipart import MultipartParser, parse_options_header
 
+from photobook_db.services.importer import file_too_large
 from photobook_db.utils.problems import Problem
 
 FILE_PART = "file"
@@ -141,16 +142,6 @@ def _close_file(state: _UploadState) -> None:
     if state.file is not None:
         state.file.close()
         state.file = None
-
-
-def file_too_large(limit_bytes: int) -> Problem:
-    return Problem(
-        413,
-        "file_too_large",
-        "File too large",
-        f"The server accepts files of at most {limit_bytes} bytes.",
-        limit_bytes=limit_bytes,
-    )
 
 
 def _invalid(field_name: str, message: str) -> Problem:

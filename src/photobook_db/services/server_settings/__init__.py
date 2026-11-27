@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from photobook_db.services.importer import ImporterService, check_upload_limit
+from photobook_db.services.importer import ImporterService, check_upload_limit, check_video_upload_limit
 from photobook_db.services.jobs import JobInfo, Relayout
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
@@ -21,7 +21,8 @@ _COLOR_PATTERN = re.compile("#[0-9a-f]{6}")
 @dataclass(frozen=True)
 class ServerSettingsInfo:
     path_template: str
-    max_upload_bytes: int
+    max_upload_bytes: int  # for images
+    max_video_upload_bytes: int
     web_accent_color: str  # "#rrggbb"
     library_dir: Path  # from the environment; read-only here
     import_dir: Path | None
@@ -33,6 +34,7 @@ class SettingsChanges:
 
     path_template: str | None = None
     max_upload_bytes: int | None = None
+    max_video_upload_bytes: int | None = None
     web_accent_color: str | None = None
 
 
@@ -55,6 +57,7 @@ class ServerSettings:
         return ServerSettingsInfo(
             path_template=self._storage.path_template().text,
             max_upload_bytes=self._importer.max_upload_bytes(),
+            max_video_upload_bytes=self._importer.max_video_upload_bytes(),
             web_accent_color=self.web_accent_color(),
             library_dir=self._storage.library_dir,
             import_dir=self._import_dir,
@@ -70,6 +73,9 @@ class ServerSettings:
         if changes.max_upload_bytes is not None:
             check_upload_limit(changes.max_upload_bytes)
 
+        if changes.max_video_upload_bytes is not None:
+            check_video_upload_limit(changes.max_video_upload_bytes)
+
         web_accent_color = None
         if changes.web_accent_color is not None:
             web_accent_color = checked_web_accent_color(changes.web_accent_color)
@@ -79,6 +85,9 @@ class ServerSettings:
 
         if changes.max_upload_bytes is not None:
             self._importer.set_max_upload_bytes(changes.max_upload_bytes)
+
+        if changes.max_video_upload_bytes is not None:
+            self._importer.set_max_video_upload_bytes(changes.max_video_upload_bytes)
 
         relayout_job = None
         if template is not None and template.text != self._storage.path_template().text:

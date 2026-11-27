@@ -23,12 +23,18 @@ template.
     <span class="hint">The folders each image is stored in, e.g. <code>{category}/{author}/{year}</code>.
         Placeholders are namespaces, <code>{year}</code> and <code>{month}</code>.
         A change moves every file in the background.</span>
-    <label>Upload limit (MiB)
+    <label>Image upload limit (MiB)
         <input name="max_upload_mib" type="number" required step="1" value="{{ form.max_upload_mib }}"
                min="{{ upload_limit_mib[0] }}" max="{{ upload_limit_mib[1] }}">
     </label>
-    <span class="hint">The largest image that can be uploaded, from {{ upload_limit_mib[0] }} to
+    <span class="hint">The largest image that can be uploaded or imported, from {{ upload_limit_mib[0] }} to
         {{ upload_limit_mib[1] }} MiB.</span>
+    <label>Video upload limit (MiB)
+        <input name="max_video_upload_mib" type="number" required step="1" value="{{ form.max_video_upload_mib }}"
+               min="{{ video_upload_limit_mib[0] }}" max="{{ video_upload_limit_mib[1] }}">
+    </label>
+    <span class="hint">The largest video that can be uploaded or imported, from {{ video_upload_limit_mib[0] }} to
+        {{ video_upload_limit_mib[1] }} MiB.</span>
     <span class="hint">Rating values are added, renamed and removed on the
         <a href="/admin/namespaces/rating/tags">rating</a> namespace's page.</span>
     <button type="submit">Save</button>

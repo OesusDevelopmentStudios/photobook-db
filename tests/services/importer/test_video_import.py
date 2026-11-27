@@ -114,6 +114,27 @@ def test_a_silent_long_video(library: Library) -> None:
 
 
 # A video FFmpeg can read but not decode would be a black tile and a player error: it stays out.
+def test_refuses_a_video_over_the_video_limit(library: Library) -> None:
+    incoming = incoming_video(library, *picture(), "-c:v", "mpeg4")
+    limit = incoming.stat().st_size - 1
+    library.settings.set("max_video_upload_bytes", limit)  # images keep their larger limit
+
+    problem = refused(lambda: library.import_image(incoming, UploadMetadata("waves.mp4"), None))
+
+    assert (problem.status, problem.code, problem.extra["limit_bytes"]) == (413, "file_too_large", limit)
+    assert "videos" in problem.detail
+    library.assert_nothing_stored()
+
+
+def test_a_video_may_be_larger_than_the_image_limit(library: Library) -> None:
+    incoming = incoming_video(library, *picture(), "-c:v", "mpeg4")
+    library.settings.set("max_upload_bytes", incoming.stat().st_size // 2)
+
+    record = library.import_image(incoming, UploadMetadata("waves.mp4"), None)
+
+    assert record.media_kind == "video"
+
+
 def test_refuses_a_video_without_a_decodable_picture(library: Library, monkeypatch: pytest.MonkeyPatch) -> None:
     incoming = incoming_video(library, *picture(), "-c:v", "mpeg4")
     monkeypatch.setattr(library.media_probe, "frame", lambda *_arguments: None)

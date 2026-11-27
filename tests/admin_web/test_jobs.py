@@ -121,6 +121,32 @@ def test_imports_a_folder_and_shows_the_result(admin_browser: TestClient) -> Non
     assert f'<a href="/admin/import/{job_id}">{job_id}</a>' in admin_browser.get("/admin").text
 
 
+def test_shows_files_over_the_upload_limits(admin_browser: TestClient) -> None:
+    admin_browser.app.state.settings.set("max_upload_bytes", 100)
+    admin_browser.app.state.settings.set("max_video_upload_bytes", 100)
+    job_id = int(start_import(admin_browser, source_subdir="holiday").headers["location"].rsplit("/", 1)[1])
+    finished(admin_browser, job_id)
+
+    page = admin_browser.get(f"/admin/import/{job_id}").text
+
+    assert "<dt>Imported</dt><dd>0</dd>" in page
+    assert "<dt>Too large</dt><dd>1 " in page
+    assert '<a href="/admin/settings">Settings</a>' in page
+
+
+def test_older_import_results_show_no_files_too_large(admin_browser: TestClient) -> None:
+    admin_browser.app.state.jobs.stop()
+    job_id = int(start_import(admin_browser, source_subdir="holiday").headers["location"].rsplit("/", 1)[1])
+    with admin_browser.app.state.database.session() as session:
+        older_result = {"imported": 1, "duplicates": 0, "unsupported": 0, "failed": []}
+        session.execute(update(Job).values(status=JobStatus.DONE, result=older_result))
+        session.commit()
+
+    page = admin_browser.get(f"/admin/import/{job_id}").text
+
+    assert "<dt>Too large</dt><dd>0 " in page
+
+
 # The form has no field for meta tags; one sent all the same is left out.
 def test_import_ignores_a_meta_field(admin_browser: TestClient) -> None:
     response = start_import(admin_browser, source_subdir="holiday", tag_general="summer", tag_meta="video")

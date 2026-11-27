@@ -27,6 +27,7 @@ class _Counts:
     imported: int = 0
     duplicates: int = 0
     unsupported: int = 0
+    too_large: int = 0
     failed: list[dict[str, str]] = field(default_factory=list)  # {path, code}; path relative to the import folder
 
     def fail(self, path: str, code: str) -> None:
@@ -99,6 +100,7 @@ class FolderImport:
             "imported": counts.imported,
             "duplicates": counts.duplicates,
             "unsupported": counts.unsupported,
+            "too_large": counts.too_large,
             "failed": counts.failed,
         }
 
@@ -115,6 +117,10 @@ class FolderImport:
         except Problem as problem:
             if problem.code == "unsupported_media_type":
                 counts.unsupported += 1
+                return
+
+            if problem.code == "file_too_large":
+                counts.too_large += 1
                 return
 
             if problem.code != "duplicate_image":

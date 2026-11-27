@@ -16,7 +16,12 @@ from photobook_db.db.models import Image as ImageRow
 from photobook_db.db.models import User
 from photobook_db.services.access import Restrictions
 from photobook_db.services.images import ImageRecord, ImagesService
-from photobook_db.services.importer import DEFAULT_MAX_UPLOAD_BYTES, ImporterService, UploadMetadata
+from photobook_db.services.importer import (
+    DEFAULT_MAX_UPLOAD_BYTES,
+    DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
+    ImporterService,
+    UploadMetadata,
+)
 from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
@@ -275,6 +280,56 @@ def test_copy_of_a_duplicate_is_refused_before_copying(
     assert source.exists()
 
 
+def test_refuses_an_image_over_the_image_limit(library: Library) -> None:
+    incoming = library.incoming_image()
+    limit = incoming.stat().st_size - 1
+    library.settings.set("max_upload_bytes", limit)  # videos keep their larger limit
+
+    problem = refused(lambda: library.import_image(incoming, UploadMetadata("a.jpg"), None))
+
+    assert (problem.status, problem.code, problem.extra["limit_bytes"]) == (413, "file_too_large", limit)
+    assert "images" in problem.detail
+    library.assert_nothing_stored()
+
+
+def test_takes_an_image_of_exactly_the_limit(library: Library) -> None:
+    incoming = library.incoming_image()
+    library.settings.set("max_upload_bytes", incoming.stat().st_size)
+
+    library.import_image(incoming, UploadMetadata("a.jpg"), None)
+
+
+def test_copy_over_both_limits_is_refused_before_reading_it(
+    library: Library, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "large.jpg"
+    library.incoming_image().rename(source)
+    library.settings.set("max_upload_bytes", 100)
+    library.settings.set("max_video_upload_bytes", 200)
+    monkeypatch.setattr(
+        "photobook_db.services.importer._service.file_sha256", lambda _path: pytest.fail("hashed a file too large")
+    )
+    monkeypatch.setattr(library.importer, "new_incoming_path", lambda: pytest.fail("copied a file too large"))
+
+    problem = refused(lambda: library.importer.import_copy(source, UploadMetadata("a.jpg"), None, NO_RESTRICTIONS))
+
+    assert (problem.code, problem.extra["limit_bytes"]) == ("file_too_large", 200)
+    assert source.exists()
+    library.assert_nothing_stored()
+
+
+def test_copy_over_its_kinds_limit_is_refused(library: Library, tmp_path: Path) -> None:
+    source = tmp_path / "large.jpg"
+    library.incoming_image().rename(source)
+    library.settings.set("max_upload_bytes", 100)
+
+    problem = refused(lambda: library.importer.import_copy(source, UploadMetadata("a.jpg"), None, NO_RESTRICTIONS))
+
+    assert (problem.code, problem.extra["limit_bytes"]) == ("file_too_large", 100)
+    assert source.exists()
+    library.assert_nothing_stored()
+
+
 def test_copy_of_a_file_that_is_not_an_image_is_refused(library: Library, tmp_path: Path) -> None:
     source = tmp_path / "notes.txt"
     source.write_text("not an image")
@@ -288,12 +343,43 @@ def test_copy_of_a_file_that_is_not_an_image_is_refused(library: Library, tmp_pa
 
 # --- Settings and housekeeping
 
-def test_upload_limit_has_a_default_and_can_be_changed(library: Library) -> None:
-    assert library.importer.max_upload_bytes() == DEFAULT_MAX_UPLOAD_BYTES
+def test_upload_limits_have_defaults_and_can_be_changed(library: Library) -> None:
+    assert library.importer.max_upload_bytes() == DEFAULT_MAX_UPLOAD_BYTES == 200 * 1024 * 1024
+    assert library.importer.max_video_upload_bytes() == DEFAULT_MAX_VIDEO_UPLOAD_BYTES == 4 * 1024**3
 
-    library.settings.set("max_upload_bytes", 1024)
+    library.importer.set_max_upload_bytes(2 * 1024**2)
+    library.importer.set_max_video_upload_bytes(3 * 1024**2)
 
-    assert library.importer.max_upload_bytes() == 1024
+    assert library.importer.max_upload_bytes() == 2 * 1024**2
+    assert library.importer.max_video_upload_bytes() == 3 * 1024**2
+
+
+@pytest.mark.parametrize(("image_limit", "video_limit", "largest"), [(5000, 3000, 5000), (5000, 9000, 9000)])
+def test_largest_upload_is_the_larger_limit(library: Library, image_limit: int, video_limit: int, largest: int) -> None:
+    library.settings.set("max_upload_bytes", image_limit)
+    library.settings.set("max_video_upload_bytes", video_limit)
+
+    assert library.importer.largest_upload_bytes() == largest
+
+
+@pytest.mark.parametrize(
+    ("setter", "limit", "allowed"),
+    [
+        ("set_max_upload_bytes", 1024**2 - 1, False),
+        ("set_max_upload_bytes", 10 * 1024**3, True),
+        ("set_max_upload_bytes", 10 * 1024**3 + 1, False),
+        ("set_max_video_upload_bytes", 1024**2 - 1, False),
+        ("set_max_video_upload_bytes", 64 * 1024**3, True),
+        ("set_max_video_upload_bytes", 64 * 1024**3 + 1, False),
+    ],
+)
+def test_upload_limits_have_a_range(library: Library, setter: str, limit: int, allowed: bool) -> None:
+    change = getattr(library.importer, setter)
+    if allowed:
+        change(limit)
+        return
+
+    assert refused(lambda: change(limit)).code == "validation_error"
 
 
 def test_interrupted_uploads_are_removed(library: Library) -> None:

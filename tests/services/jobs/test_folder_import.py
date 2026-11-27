@@ -32,7 +32,7 @@ class Server:
     def __init__(self, database: Database, tmp_path: Path, import_dir: Path | None) -> None:
         self.import_dir = import_dir
         self.library_dir = tmp_path / "library"
-        settings = SettingsService(database)
+        self.settings = settings = SettingsService(database)
         tags = TagsService(database, lambda: self.storage.path_template_namespaces())
         self.storage = StorageService(database, settings, self.library_dir, tags.namespace_names)
         self.images = ImagesService(database, tags, self.storage)
@@ -109,7 +109,7 @@ def test_imports_the_folder_and_its_subfolders(server: Server, trip: Path) -> No
     job = server.import_folder("trip", tags=["album:trip"])
 
     assert job.status == JobStatus.DONE
-    assert job.result == {"imported": 2, "duplicates": 1, "unsupported": 2, "failed": []}
+    assert job.result == {"imported": 2, "duplicates": 1, "unsupported": 2, "too_large": 0, "failed": []}
     assert (job.progress_done, job.progress_total) == (5, 5)
     assert server.library_count() == 2
     assert len(list(trip.rglob("*.*"))) == 5  # the originals stay
@@ -133,7 +133,9 @@ def test_whole_import_folder_is_imported_with_an_empty_path(server: Server, trip
 def test_importing_again_finds_only_duplicates(server: Server, trip: Path) -> None:
     server.import_folder("trip")
 
-    assert server.import_folder("trip").result == {"imported": 0, "duplicates": 3, "unsupported": 2, "failed": []}
+    job = server.import_folder("trip")
+
+    assert job.result == {"imported": 0, "duplicates": 3, "unsupported": 2, "too_large": 0, "failed": []}
 
 
 def test_damaged_image_stays_in_the_folder(server: Server, import_dir: Path) -> None:
@@ -160,6 +162,17 @@ def test_links_are_not_followed(server: Server, import_dir: Path, tmp_path: Path
         {"path": "inbox/private", "code": "not_a_regular_file"},
         {"path": "inbox/secret.jpg", "code": "not_a_regular_file"},
     ]
+
+
+def test_files_over_the_upload_limit_are_counted_and_left(server: Server, trip: Path) -> None:
+    server.settings.set("max_upload_bytes", 100)
+    server.settings.set("max_video_upload_bytes", 100)
+
+    job = server.import_folder("trip/day 2", remove_originals=True)
+
+    assert job.result == {"imported": 0, "duplicates": 0, "unsupported": 0, "too_large": 1, "failed": []}
+    assert (trip / "day 2" / "hills.jpg").exists()
+    assert server.library_count() == 0
 
 
 # --- Removing the originals
@@ -288,8 +301,20 @@ def test_imports_videos_with_the_images(server: Server, import_dir: Path) -> Non
 
     job = server.import_folder("holiday")
 
-    assert job.result == {"imported": 2, "duplicates": 0, "unsupported": 0, "failed": []}
+    assert job.result == {"imported": 2, "duplicates": 0, "unsupported": 0, "too_large": 0, "failed": []}
     assert any(path.suffix == ".mp4" for path in server.library_dir.rglob("*.mp4"))
+
+
+@needs_ffmpeg
+def test_videos_have_their_own_limit(server: Server, import_dir: Path) -> None:
+    video = write_video(import_dir / "holiday" / "waves.mp4")
+    write_jpeg(import_dir / "holiday" / "beach.jpg", "teal")
+    server.settings.set("max_video_upload_bytes", video.stat().st_size - 1)  # images keep their larger limit
+
+    job = server.import_folder("holiday", remove_originals=True)
+
+    assert job.result == {"imported": 1, "duplicates": 0, "unsupported": 0, "too_large": 1, "failed": []}
+    assert video.exists()
 
 
 # As in 0.1.0: a server without FFmpeg counts videos as files it does not take, and leaves them.
@@ -300,5 +325,5 @@ def test_without_ffmpeg_videos_are_unsupported(server: Server, import_dir: Path)
 
     job = server.import_folder("holiday")
 
-    assert job.result == {"imported": 0, "duplicates": 0, "unsupported": 1, "failed": []}
+    assert job.result == {"imported": 0, "duplicates": 0, "unsupported": 1, "too_large": 0, "failed": []}
     assert video.exists()

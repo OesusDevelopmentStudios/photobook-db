@@ -18,6 +18,7 @@ def save(browser: TestClient, **fields: str):  # -> Response
         "csrf_token": csrf_token_in(browser.get("/admin/settings").text),
         "path_template": "{category}/{author}/{year}",
         "max_upload_mib": "200",
+        "max_video_upload_mib": "4096",
     }
     return browser.post("/admin/settings", data=form | fields, follow_redirects=False)
 
@@ -34,7 +35,8 @@ def test_shows_the_settings_and_the_folders(admin_browser: TestClient) -> None:
     page = admin_browser.get("/admin/settings").text
 
     assert 'value="{category}/{author}/{year}"' in page
-    assert 'value="200"' in page
+    assert re.search(r'name="max_upload_mib"[^>]*value="200"', page)
+    assert re.search(r'name="max_video_upload_mib"[^>]*value="4096"[^>]*\s+min="1" max="65536"', page)
     assert 'name="rating_values"' not in page  # managed on the rating namespace's page
     assert '<a href="/admin/namespaces/rating/tags">rating</a>' in page
     assert str(server_settings(admin_browser).current().library_dir) in page
@@ -50,6 +52,14 @@ def test_saves_the_upload_limit(admin_browser: TestClient) -> None:
     assert "The settings have been saved." in admin_browser.get(response.headers["location"]).text
 
 
+def test_saves_the_video_upload_limit(admin_browser: TestClient) -> None:
+    response = save(admin_browser, max_video_upload_mib="8192")
+
+    assert response.status_code == 303
+    current = server_settings(admin_browser).current()
+    assert (current.max_upload_bytes, current.max_video_upload_bytes) == (200 * MIB, 8192 * MIB)
+
+
 def test_a_new_path_template_starts_a_relayout_job(admin_browser: TestClient) -> None:
     response = save(admin_browser, path_template="{category}/{year}")
 
@@ -61,12 +71,14 @@ def test_a_new_path_template_starts_a_relayout_job(admin_browser: TestClient) ->
     assert server_settings(admin_browser).current().path_template == "{category}/{year}"
 
 
-def test_an_unchanged_limit_keeps_its_exact_bytes(admin_browser: TestClient) -> None:
-    server_settings(admin_browser).change(SettingsChanges(max_upload_bytes=50 * MIB + 123), user_id=None)
+def test_unchanged_limits_keep_their_exact_bytes(admin_browser: TestClient) -> None:
+    exact = SettingsChanges(max_upload_bytes=50 * MIB + 123, max_video_upload_bytes=5000 * MIB + 456)
+    server_settings(admin_browser).change(exact, user_id=None)
 
-    save(admin_browser, max_upload_mib="50")
+    save(admin_browser, max_upload_mib="50", max_video_upload_mib="5000")
 
-    assert server_settings(admin_browser).current().max_upload_bytes == 50 * MIB + 123
+    current = server_settings(admin_browser).current()
+    assert (current.max_upload_bytes, current.max_video_upload_bytes) == (50 * MIB + 123, 5000 * MIB + 456)
 
 
 def test_invalid_values_are_shown_in_the_form_and_nothing_is_saved(admin_browser: TestClient) -> None:
@@ -82,7 +94,16 @@ def test_problems_without_a_field_are_shown_too(admin_browser: TestClient) -> No
     response = save(admin_browser, max_upload_mib="0")
 
     assert response.status_code == 422
-    assert "Invalid upload limit. The limit must be from" in response.text
+    assert "Invalid upload limit. The image upload limit must be from" in response.text
+
+
+def test_a_refused_video_limit_stays_in_the_form(admin_browser: TestClient) -> None:
+    response = save(admin_browser, max_video_upload_mib="70000")
+
+    assert response.status_code == 422
+    assert "Invalid upload limit. The video upload limit must be from" in response.text
+    assert re.search(r'name="max_video_upload_mib"[^>]*value="70000"', response.text)
+    assert server_settings(admin_browser).current().max_video_upload_bytes == 4096 * MIB
 
 
 # --- The accent colour of these pages

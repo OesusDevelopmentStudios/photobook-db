@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""/admin/settings: the path template, the upload limit and the accent colour of these pages. Rating values are
+"""/admin/settings: the path template, the upload limits and the accent colour of these pages. Rating values are
 managed on the rating namespace's page."""
 
 from dataclasses import dataclass
@@ -14,7 +14,7 @@ from photobook_db.admin_web._messages import problem_message
 from photobook_db.admin_web._session import AdminForm, AdminPage, AdminSession
 from photobook_db.admin_web._templates import templates
 from photobook_db.admin_web._theme import PLASMA_ACCENT_COLORS
-from photobook_db.services.importer import UPLOAD_LIMIT_RANGE
+from photobook_db.services.importer import UPLOAD_LIMIT_RANGE, VIDEO_UPLOAD_LIMIT_RANGE
 from photobook_db.services.server_settings import ServerSettings, SettingsChanges
 from photobook_db.utils.problems import Problem
 
@@ -29,6 +29,7 @@ class SettingsForm:
 
     path_template: str
     max_upload_mib: int
+    max_video_upload_mib: int
 
 
 @router.get("/settings", response_class=HTMLResponse)
@@ -49,18 +50,19 @@ def save_settings(
     session: AdminForm,
     path_template: Annotated[str, Form()],
     max_upload_mib: Annotated[int, Form()],
+    max_video_upload_mib: Annotated[int, Form()],
 ) -> Response:
     server_settings = _server_settings(request)
-    unchanged_mib = server_settings.current().max_upload_bytes // MIB
+    stored = server_settings.current()
     changes = SettingsChanges(
         path_template=path_template,
-        # The form shows whole MiB, so an untouched field keeps a limit the API set in bytes.
-        max_upload_bytes=None if max_upload_mib == unchanged_mib else max_upload_mib * MIB,
+        max_upload_bytes=_changed_limit(max_upload_mib, stored.max_upload_bytes),
+        max_video_upload_bytes=_changed_limit(max_video_upload_mib, stored.max_video_upload_bytes),
     )
     try:
         _settings, relayout_job = server_settings.change(changes, session.user.id)
     except Problem as problem:
-        form = SettingsForm(path_template, max_upload_mib)
+        form = SettingsForm(path_template, max_upload_mib, max_video_upload_mib)
         return _page(request, session, form, error=problem_message(problem), status_code=problem.status)
 
     # Back to the page with a GET, so reloading it does not send the form again.
@@ -89,13 +91,20 @@ def save_accent_color(
     return RedirectResponse("/admin/settings?accent_saved=true#appearance", status_code=303)
 
 
+def _changed_limit(entered_mib: int, stored_bytes: int) -> int | None:
+    """The form shows whole MiB, so an untouched field keeps a limit the API set in bytes."""
+    return None if entered_mib == stored_bytes // MIB else entered_mib * MIB
+
+
 def _server_settings(request: Request) -> ServerSettings:
     return request.app.state.server_settings
 
 
 def _stored_form(request: Request) -> SettingsForm:
     settings = _server_settings(request).current()
-    return SettingsForm(settings.path_template, settings.max_upload_bytes // MIB)
+    return SettingsForm(
+        settings.path_template, settings.max_upload_bytes // MIB, settings.max_video_upload_bytes // MIB
+    )
 
 
 def _page(
@@ -119,6 +128,7 @@ def _page(
         "library_dir": settings.library_dir,
         "import_dir": settings.import_dir,
         "upload_limit_mib": (UPLOAD_LIMIT_RANGE[0] // MIB, UPLOAD_LIMIT_RANGE[1] // MIB),
+        "video_upload_limit_mib": (VIDEO_UPLOAD_LIMIT_RANGE[0] // MIB, VIDEO_UPLOAD_LIMIT_RANGE[1] // MIB),
         "accent_error": accent_error,
         "accent_saved": accent_saved,
         "plasma_accent_colors": PLASMA_ACCENT_COLORS,

@@ -210,6 +210,7 @@ def test_too_large_upload_is_refused(
     parsing_started: bool,
 ) -> None:
     client.app.state.settings.set("max_upload_bytes", 1000)
+    client.app.state.settings.set("max_video_upload_bytes", 1000)
     content = noise_jpeg_bytes(image_size)
     parsers_created = []
     real_parser = _upload_receiver.MultipartParser
@@ -222,6 +223,18 @@ def test_too_large_upload_is_refused(
     assert response.status_code == 413
     assert (response.json()["code"], response.json()["limit_bytes"]) == ("file_too_large", 1000)
     assert bool(parsers_created) is parsing_started
+    assert incoming_files(config) == []
+
+
+def test_image_over_the_image_limit_is_refused_when_videos_may_be_larger(
+    client: TestClient, headers: dict[str, str], config: Config
+) -> None:
+    client.app.state.settings.set("max_upload_bytes", 1000)  # videos keep their own, larger limit
+
+    response = upload(client, headers, noise_jpeg_bytes((300, 200)))
+
+    assert response.status_code == 413
+    assert (response.json()["code"], response.json()["limit_bytes"]) == ("file_too_large", 1000)
     assert incoming_files(config) == []
 
 

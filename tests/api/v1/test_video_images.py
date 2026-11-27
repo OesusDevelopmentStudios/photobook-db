@@ -167,6 +167,30 @@ def test_makes_a_videos_thumbnail_again(client: TestClient, headers: dict[str, s
 
 
 @needs_ffmpeg
+def test_a_video_may_be_larger_than_the_image_limit(
+    client: TestClient, headers: dict[str, str], tmp_path: Path
+) -> None:
+    content = video_bytes(tmp_path)
+    client.app.state.settings.set("max_upload_bytes", len(content) // 2)
+
+    response = upload_video(client, headers, content)
+
+    assert response.status_code == 201, response.text
+
+
+@needs_ffmpeg
+def test_a_video_over_the_video_limit_is_refused(client: TestClient, headers: dict[str, str], tmp_path: Path) -> None:
+    content = video_bytes(tmp_path)
+    client.app.state.settings.set("max_video_upload_bytes", len(content) - 1)  # images keep a larger limit
+
+    response = upload_video(client, headers, content)
+
+    assert response.status_code == 413
+    assert (response.json()["code"], response.json()["limit_bytes"]) == ("file_too_large", len(content) - 1)
+    assert found(client, headers, media="all") == []
+
+
+@needs_ffmpeg
 def test_a_server_without_ffmpeg_says_why(client: TestClient, headers: dict[str, str], tmp_path: Path) -> None:
     client.app.state.importer._media_probe = MediaProbe(ffprobe="no-such-ffprobe", ffmpeg="no-such-ffmpeg")
 
