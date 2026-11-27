@@ -16,7 +16,7 @@ from PIL import Image
 from sqlalchemy import update
 
 from photobook_db.config import Config
-from photobook_db.db.models import Image as ImageModel
+from photobook_db.db.models import Media as MediaModel
 from photobook_db.services.auth import Role
 
 PASSWORD = "correct horse battery"
@@ -224,7 +224,7 @@ def expect_video_not_found(path: str, method: str = "GET") -> Callable[[TestClie
     def check(client: TestClient, setup: Setup) -> None:
         with client.app.state.database.session() as session:
             session.execute(
-                update(ImageModel).where(ImageModel.id == setup.private_id).values(media_kind="video", duration_ms=2000)
+                update(MediaModel).where(MediaModel.id == setup.private_id).values(media_kind="video", duration_ms=2000)
             )
             session.commit()
 

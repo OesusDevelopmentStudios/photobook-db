@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import update
 
-from photobook_db.db.models import Image as ImageModel
+from photobook_db.db.models import Media as MediaModel
 from photobook_db.services.auth import Role
 from photobook_db.services.media_probe import MediaProbe
 from photobook_db.utils.time import utc_now
@@ -54,8 +54,8 @@ def coast(client: TestClient, headers: dict[str, str]) -> dict[str, int]:
     video = upload(client, headers, "waves.jpg", "navy")
     with client.app.state.database.session() as session:
         session.execute(
-            update(ImageModel)
-            .where(ImageModel.id == video)
+            update(MediaModel)
+            .where(MediaModel.id == video)
             .values(
                 media_kind="video",
                 mime_type="video/mp4",

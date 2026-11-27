@@ -12,7 +12,7 @@ from PIL import Image
 from sqlalchemy import delete, select
 
 from photobook_db.db import Database
-from photobook_db.db.models import Namespace, Tag, image_tag
+from photobook_db.db.models import Namespace, Tag, media_tag
 from photobook_db.services.access import Restrictions
 from photobook_db.services.auth import AuthService, Role
 from photobook_db.services.images import ImageRecord, ImagesService
@@ -53,7 +53,7 @@ class Library:
         meta_tag_ids = select(Tag.id).join(Namespace).where(Namespace.name == "meta")
         with self.database.session() as session:
             session.execute(
-                delete(image_tag).where(image_tag.c.image_id == image_id, image_tag.c.tag_id.in_(meta_tag_ids))
+                delete(media_tag).where(media_tag.c.media_id == image_id, media_tag.c.tag_id.in_(meta_tag_ids))
             )
             session.commit()
 

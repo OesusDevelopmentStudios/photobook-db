@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 from sqlalchemy import delete, select, update
 
 from photobook_db.db import Database
-from photobook_db.db.models import FileMove, Image
+from photobook_db.db.models import FileMove, Media
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage._files import delete_file, move_file, partial_path, remove_empty_folders
 from photobook_db.services.storage._paths import (
@@ -192,8 +192,8 @@ class StorageService:
 
     def _record_move(self, image_id: int, to_path: PurePosixPath) -> tuple[int, PurePosixPath]:
         with self._database.session() as session:
-            from_path = session.get_one(Image, image_id).storage_path
-            move = FileMove(image_id=image_id, from_path=from_path, to_path=str(to_path), created_at=utc_now())
+            from_path = session.get_one(Media, image_id).storage_path
+            move = FileMove(media_id=image_id, from_path=from_path, to_path=str(to_path), created_at=utc_now())
             session.add(move)
             session.commit()
             return move.id, PurePosixPath(from_path)
@@ -202,7 +202,7 @@ class StorageService:
         """The new path and the end of the move are recorded in one transaction."""
         with self._database.session() as session:
             session.execute(
-                update(Image).where(Image.id == image_id).values(storage_path=str(to_path), updated_at=utc_now())
+                update(Media).where(Media.id == image_id).values(storage_path=str(to_path), updated_at=utc_now())
             )
             session.execute(delete(FileMove).where(FileMove.id == move_id))
             session.commit()
@@ -219,20 +219,20 @@ class StorageService:
             if source.exists():
                 delete_file(source)  # the copy across filesystems was complete; only the original was left
 
-            self._finish_move(move.id, move.image_id, move.to_path)
+            self._finish_move(move.id, move.media_id, move.to_path)
             remove_empty_folders(source.parent, self.library_dir)
-            _logger.info("Finished an interrupted move of image %s to %s", move.image_id, move.to_path)
+            _logger.info("Finished an interrupted move of image %s to %s", move.media_id, move.to_path)
             return True
 
         if source.exists():
             partial_path(target).unlink(missing_ok=True)  # the copy had not finished; the original is intact
             self._forget_move(move.id)
-            _logger.info("Undid an interrupted move of image %s; it stays at %s", move.image_id, move.from_path)
+            _logger.info("Undid an interrupted move of image %s; it stays at %s", move.media_id, move.from_path)
             return True
 
         _logger.error(
             "The file of image %s is neither at %s nor at %s; the move is kept for an admin to look at",
-            move.image_id,
+            move.media_id,
             move.from_path,
             move.to_path,
         )

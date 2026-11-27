@@ -12,7 +12,7 @@ from PIL import ExifTags, Image
 from sqlalchemy import func, select
 
 from photobook_db.db import Database
-from photobook_db.db.models import Image as ImageRow
+from photobook_db.db.models import Media as MediaRow
 from photobook_db.db.models import User
 from photobook_db.services.access import Restrictions
 from photobook_db.services.images import ImageRecord, ImagesService
@@ -83,7 +83,7 @@ class Library:
         assert list((self.library_dir / ".incoming").iterdir()) == []
         assert not self.thumbnails_dir.exists() or not any(self.thumbnails_dir.rglob("*.webp"))
         with self.database.session() as session:
-            assert session.scalar(select(func.count()).select_from(ImageRow)) == 0
+            assert session.scalar(select(func.count()).select_from(MediaRow)) == 0
 
 
 @pytest.fixture

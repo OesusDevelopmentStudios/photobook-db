@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import delete, select
 
 from photobook_db.db import Database
-from photobook_db.db.models import Image, Namespace, Tag, User, image_tag
+from photobook_db.db.models import Media, Namespace, Tag, User, media_tag
 from photobook_db.services.access import AccessService, Restrictions
 from photobook_db.services.auth import AuthService, Role, UserInfo
 from photobook_db.services.tags import TagName
@@ -52,7 +52,7 @@ def library(database: Database) -> Database:
         existing = session.execute(select(Namespace.name, Tag.name, Tag.id).join(Tag, Tag.namespace_id == Namespace.id))
         tag_ids = {f"{namespace}:{name}": tag_id for namespace, name, tag_id in existing}  # e.g. the ratings
         for number, (name, (tag_texts, taken_at)) in enumerate(LIBRARY.items()):
-            image = Image(
+            image = Media(
                 sha256=f"{number:064x}", storage_path=name, original_filename=name, mime_type="image/jpeg",
                 width=1, height=1, file_size=1, taken_at=taken_at, taken_at_source="exif",
                 imported_at=taken_at, updated_at=taken_at,
@@ -67,7 +67,7 @@ def library(database: Database) -> Database:
                     session.flush()
                     tag_ids[tag_text] = tag.id
 
-                session.execute(image_tag.insert().values(image_id=image.id, tag_id=tag_ids[tag_text]))
+                session.execute(media_tag.insert().values(media_id=image.id, tag_id=tag_ids[tag_text]))
 
         session.commit()
 
@@ -81,7 +81,7 @@ def restrictions(access: AccessService, user: UserInfo, terms: list[str]) -> Res
 
 def visible(database: Database, user_restrictions: Restrictions) -> set[str]:
     with database.session() as session:
-        return set(session.scalars(select(Image.original_filename).where(user_restrictions.visible_images_filter())))
+        return set(session.scalars(select(Media.original_filename).where(user_restrictions.visible_images_filter())))
 
 
 # --- Storing restrictions

@@ -30,7 +30,7 @@ from photobook_db.api.v1.dependencies import (
 from photobook_db.services.access import Restrictions
 from photobook_db.services.images import ImageRecord, ImagesService
 from photobook_db.services.importer import UploadMetadata
-from photobook_db.services.search import DEFAULT_LIMIT, MAX_LIMIT, Media, Order, SearchRequest, Sort
+from photobook_db.services.search import DEFAULT_LIMIT, MAX_LIMIT, MediaKinds, Order, SearchRequest, Sort
 from photobook_db.services.storage import StorageService
 from photobook_db.services.storyboard import StoryboardLayout, StoryboardService
 from photobook_db.services.thumbnails import THUMBNAIL_SIZES
@@ -49,7 +49,7 @@ AlbumName = Annotated[
     str | None, Query(max_length=200, description="Only this album's images: the name of an album: tag, e.g. trip")
 ]
 MediaChoice = Annotated[
-    Media, Query(description="image (the default, as clients from before videos expect), video, or all")
+    MediaKinds, Query(description="image (the default, as clients from before videos expect), video, or all")
 ]
 
 
@@ -196,7 +196,7 @@ def search_images(
     cursor: Annotated[str | None, Query(max_length=500, description="next_cursor of the previous page")] = None,
     apply_hidden_filters: ApplyHiddenFilters = True,
     album: AlbumName = None,
-    media: MediaChoice = Media.IMAGE,
+    media: MediaChoice = MediaKinds.IMAGE,
 ) -> ImageList:
     hidden_filters = preferences.hidden_filters(authentication.user.id) if apply_hidden_filters else []
     request = SearchRequest(
@@ -228,7 +228,7 @@ def count_images(
     q: SearchText = "",
     apply_hidden_filters: ApplyHiddenFilters = True,
     album: AlbumName = None,
-    media: MediaChoice = Media.IMAGE,
+    media: MediaChoice = MediaKinds.IMAGE,
 ) -> ImageCount:
     hidden_filters = preferences.hidden_filters(authentication.user.id) if apply_hidden_filters else []
     found = search.count(q, tuple(hidden_filters), restrictions.visible_images_filter(), album, media)

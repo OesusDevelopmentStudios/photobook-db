@@ -8,7 +8,7 @@ from sqlalchemy import select, true
 
 from photobook_db.db import Database
 from photobook_db.db._connection import shuffled_position
-from photobook_db.db.models import Image, Namespace, Tag, image_tag
+from photobook_db.db.models import Media, Namespace, Tag, media_tag
 from photobook_db.services.search import Order, SearchCount, SearchPage, SearchRequest, SearchService, Sort
 from photobook_db.utils.problems import Problem
 
@@ -19,7 +19,7 @@ FIRST_DAY = datetime(2025, 1, 1, 12, 0)
 def add_image(database: Database, number: int, taken_at: datetime, tags: list[str] = ()) -> int:
     """imported_at runs the other way round than taken_at, so the two sorts differ."""
     with database.session() as session:
-        image = Image(
+        image = Media(
             sha256=f"{number:064x}",
             storage_path=f"{number}.jpg",
             original_filename=f"{number}.jpg",
@@ -43,7 +43,7 @@ def add_image(database: Database, number: int, taken_at: datetime, tags: list[st
                 session.add(tag)
                 session.flush()
 
-            session.execute(image_tag.insert().values(image_id=image.id, tag_id=tag.id))
+            session.execute(media_tag.insert().values(media_id=image.id, tag_id=tag.id))
 
         session.commit()
         return image.id

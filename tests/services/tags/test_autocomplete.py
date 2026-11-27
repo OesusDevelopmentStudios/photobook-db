@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import select
 
 from photobook_db.db import Database
-from photobook_db.db.models import Image, Namespace, Tag, image_tag
+from photobook_db.db.models import Media, Namespace, Tag, media_tag
 from photobook_db.services.tags import TagName, TagsService
 
 # tag → number of images that carry it
@@ -35,14 +35,14 @@ def add_tagged_images(database: Database, image_counts: dict[str, int]) -> None:
                 image = new_image(f"{image_number:02}{copy_number:02}")
                 session.add(image)
                 session.flush()
-                session.execute(image_tag.insert().values(image_id=image.id, tag_id=tag.id))
+                session.execute(media_tag.insert().values(media_id=image.id, tag_id=tag.id))
 
         session.commit()
 
 
-def new_image(unique_part: str) -> Image:
+def new_image(unique_part: str) -> Media:
     now = datetime(2026, 11, 12, 12, 0)
-    return Image(
+    return Media(
         sha256=unique_part.ljust(64, "0"),
         storage_path=f"photo/{unique_part}.jpg",
         original_filename=f"{unique_part}.jpg",

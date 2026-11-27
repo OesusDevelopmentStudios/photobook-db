@@ -7,7 +7,7 @@ from datetime import datetime, time, timedelta
 
 from sqlalchemy import ColumnElement, and_, not_, or_, select, true
 
-from photobook_db.db.models import Image, Namespace, Tag, image_tag
+from photobook_db.db.models import Media, Namespace, Tag, media_tag
 from photobook_db.services.search._parser import All, DateMatch, Node, Not, TagMatch
 
 # Sorts after every other character: names from `prefix` up to `prefix + this` start with `prefix`.
@@ -41,11 +41,11 @@ def _has_tag(match: TagMatch) -> ColumnElement[bool]:
     else:
         matching_tags = matching_tags.where(Tag.name == match.name)
 
-    images_with_tag = select(image_tag.c.image_id).where(image_tag.c.tag_id.in_(matching_tags))
-    return Image.id.in_(images_with_tag)
+    images_with_tag = select(media_tag.c.media_id).where(media_tag.c.tag_id.in_(matching_tags))
+    return Media.id.in_(images_with_tag)
 
 
 def _taken_within(match: DateMatch) -> ColumnElement[bool]:
     start = datetime.combine(match.first, time.min)
     end = datetime.combine(match.last + timedelta(days=1), time.min)
-    return and_(Image.taken_at >= start, Image.taken_at < end)
+    return and_(Media.taken_at >= start, Media.taken_at < end)

@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from photobook_db.db import Database
-from photobook_db.db.models import Image, Namespace, Tag, image_tag
+from photobook_db.db.models import Media, Namespace, Tag, media_tag
 from photobook_db.services.access import Restrictions
 from photobook_db.services.storage import StorageService
 from photobook_db.services.tags import META_NAMESPACE, TagName, TagsService
@@ -83,7 +83,7 @@ class ImagesService:
 
     def get_image(self, image_id: int) -> ImageRecord:
         with self._database.session() as session:
-            image = session.get(Image, image_id)
+            image = session.get(Media, image_id)
             if image is None:
                 raise Problem(404, "not_found", "Image not found")
 
@@ -98,13 +98,13 @@ class ImagesService:
 
     def is_visible(self, image_id: int, restrictions: Restrictions) -> bool:
         with self._database.session() as session:
-            statement = select(Image.id).where(Image.id == image_id, restrictions.visible_images_filter())
+            statement = select(Media.id).where(Media.id == image_id, restrictions.visible_images_filter())
             return session.scalar(statement) is not None
 
     def get_images(self, image_ids: list[int]) -> list[ImageRecord]:
         """In the order of `image_ids`; ids that do not exist are left out. Tags are read in one query."""
         with self._database.session() as session:
-            images = {image.id: image for image in session.scalars(select(Image).where(Image.id.in_(image_ids)))}
+            images = {image.id: image for image in session.scalars(select(Media).where(Media.id.in_(image_ids)))}
             tags = _tags_of(session, list(images))
             return [
                 _record_with_tags(images[image_id], tags.get(image_id, []))
@@ -134,7 +134,7 @@ class ImagesService:
         unique_ids = list(dict.fromkeys(image_ids))
         with self._database.session() as session:
             images = session.scalars(
-                select(Image).where(Image.id.in_(unique_ids), restrictions.visible_images_filter())
+                select(Media).where(Media.id.in_(unique_ids), restrictions.visible_images_filter())
             ).all()
             if len(images) != len(unique_ids):
                 raise Problem(404, "not_found", "Image not found", "One of the images does not exist.")
@@ -152,7 +152,7 @@ class ImagesService:
         """The server's own tags of an image, read from its file, instead of those it had. No restrictions apply:
         they describe the file, and no user asked for them. Raises 404 not_found."""
         with self._database.session() as session:
-            image = session.get(Image, image_id)
+            image = session.get(Media, image_id)
             if image is None:
                 raise Problem(404, "not_found", "Image not found")
 
@@ -164,14 +164,14 @@ class ImagesService:
     def ids_without_meta_tags(self) -> list[int]:
         """Images stored before the server set meta tags on import."""
         has_meta_tag = (
-            select(image_tag.c.image_id)
-            .join(Tag, Tag.id == image_tag.c.tag_id)
+            select(media_tag.c.media_id)
+            .join(Tag, Tag.id == media_tag.c.tag_id)
             .join(Namespace, Namespace.id == Tag.namespace_id)
-            .where(Namespace.name == META_NAMESPACE, image_tag.c.image_id == Image.id)
+            .where(Namespace.name == META_NAMESPACE, media_tag.c.media_id == Media.id)
             .exists()
         )
         with self._database.session() as session:
-            return list(session.scalars(select(Image.id).where(~has_meta_tag).order_by(Image.id)))
+            return list(session.scalars(select(Media.id).where(~has_meta_tag).order_by(Media.id)))
 
     def replace_tag(self, old_tag: TagName, new_tag: TagName | None) -> list[int]:
         """For admins: every image with old_tag gets new_tag instead (a rename, or a merge if new_tag exists), or
@@ -190,8 +190,8 @@ class ImagesService:
             additions = [] if new_tag is None else [new_tag]
             # The new tag exists afterwards, even if no image had the old one.
             new_tag_ids = _tag_ids(session, additions)
-            tagged_ids = select(image_tag.c.image_id).where(image_tag.c.tag_id == old_tag_id)
-            images = session.scalars(select(Image).where(Image.id.in_(tagged_ids))).all()
+            tagged_ids = select(media_tag.c.media_id).where(media_tag.c.tag_id == old_tag_id)
+            images = session.scalars(select(Media).where(Media.id.in_(tagged_ids))).all()
             added_times = _added_times(session, old_tag_id)
             had_new_tag = set(_added_times(session, new_tag_ids[0])) if new_tag_ids else set()
             changed_ids = self._change_tags(session, images, tagged_ids, additions, {old_tag}, _no_check)
@@ -219,8 +219,8 @@ class ImagesService:
             )
             rows = session.execute(namespace_tags).all()
             tag_ids = [tag_id for tag_id, _name in rows]
-            tagged_ids = select(image_tag.c.image_id).where(image_tag.c.tag_id.in_(tag_ids)).distinct()
-            images = session.scalars(select(Image).where(Image.id.in_(tagged_ids))).all()
+            tagged_ids = select(media_tag.c.media_id).where(media_tag.c.tag_id.in_(tag_ids)).distinct()
+            images = session.scalars(select(Media).where(Media.id.in_(tagged_ids))).all()
             removals = {TagName(namespace, name) for _tag_id, name in rows}
             changed_ids = self._change_tags(session, images, tagged_ids, [], removals, _no_check)
             session.execute(delete(Tag).where(Tag.id.in_(tag_ids)))
@@ -230,11 +230,11 @@ class ImagesService:
 
     def image_count(self) -> int:
         with self._database.session() as session:
-            return session.scalar(select(func.count()).select_from(Image)) or 0
+            return session.scalar(select(func.count()).select_from(Media)) or 0
 
     def all_image_ids(self) -> list[int]:
         with self._database.session() as session:
-            return list(session.scalars(select(Image.id).order_by(Image.id)))
+            return list(session.scalars(select(Media.id).order_by(Media.id)))
 
     def move_file_to_layout(self, image_id: int) -> bool:
         """Moves the image's file to where its tags and the path template place it. False if it was there.
@@ -248,13 +248,13 @@ class ImagesService:
         sha256 stays the uploaded file's."""
         with self._database.session() as session:
             session.execute(
-                update(Image)
-                .where(Image.id == image_id)
+                update(Media)
+                .where(Media.id == image_id)
                 .values(
                     width=width,
                     height=height,
                     file_size=file_size,
-                    revision=Image.revision + 1,
+                    revision=Media.revision + 1,
                     updated_at=utc_now(),
                 )
             )
@@ -264,13 +264,13 @@ class ImagesService:
 
     def find_id_by_sha256(self, sha256: str) -> int | None:
         with self._database.session() as session:
-            return session.scalar(select(Image.id).where(Image.sha256 == sha256))
+            return session.scalar(select(Media.id).where(Media.sha256 == sha256))
 
     def create_image(self, new_image: NewImage, tags: list[TagName]) -> ImageRecord:
         """The image, its new tags and their links in one transaction. Raises 409 duplicate_image if an
         image with the same SHA-256 exists, also when another upload was a moment faster."""
         now = utc_now()
-        image = Image(**vars(new_image), imported_at=now, updated_at=now)
+        image = Media(**vars(new_image), imported_at=now, updated_at=now)
         with self._database.session() as session:
             session.add(image)
             try:
@@ -284,7 +284,7 @@ class ImagesService:
                 raise duplicate_image(new_image.sha256, existing_image_id) from None
 
             for tag_id in _tag_ids(session, tags):
-                session.execute(image_tag.insert().values(image_id=image.id, tag_id=tag_id))
+                session.execute(media_tag.insert().values(media_id=image.id, tag_id=tag_id))
 
             session.commit()
             return _record(session, image)
@@ -292,7 +292,7 @@ class ImagesService:
     def _change_tags(
         self,
         session: Session,
-        images: Sequence[Image],
+        images: Sequence[Media],
         image_ids: list[int] | Select[tuple[int]],
         additions: list[TagName],
         removals: set[TagName],
@@ -368,38 +368,38 @@ def _save_tag_changes(session: Session, changes: list[_TagChange]) -> None:
 
     tags = list(dict.fromkeys(tag for change in changes for tag in [*change.removed, *change.added]))
     tag_ids = dict(zip(tags, _tag_ids(session, tags)))
-    links = image_tag.c
+    links = media_tag.c
     removed_links = [
         {"link_image_id": change.image_id, "link_tag_id": tag_ids[tag]} for change in changes for tag in change.removed
     ]
     if removed_links:
-        is_link = and_(links.image_id == bindparam("link_image_id"), links.tag_id == bindparam("link_tag_id"))
-        session.execute(delete(image_tag).where(is_link), removed_links)
+        is_link = and_(links.media_id == bindparam("link_image_id"), links.tag_id == bindparam("link_tag_id"))
+        session.execute(delete(media_tag).where(is_link), removed_links)
 
-    added_links = [{"image_id": change.image_id, "tag_id": tag_ids[tag]} for change in changes for tag in change.added]
+    added_links = [{"media_id": change.image_id, "tag_id": tag_ids[tag]} for change in changes for tag in change.added]
     if added_links:
-        session.execute(insert(image_tag), added_links)
+        session.execute(insert(media_tag), added_links)
 
-    # The images table itself, not the Image class: an ORM update would check every loaded Image object.
-    images = Image.__table__.c
+    # The media table itself, not the Media class: an ORM update would check every loaded Media object.
+    images = Media.__table__.c
     session.execute(
-        update(Image.__table__).where(images.id == bindparam("changed_id")).values(updated_at=utc_now()),
+        update(Media.__table__).where(images.id == bindparam("changed_id")).values(updated_at=utc_now()),
         [{"changed_id": change.image_id} for change in changes],
     )
 
 
 def _added_times(session: Session, tag_id: int) -> dict[int, datetime]:
     """When each image got the tag, by image id."""
-    links = image_tag.c
-    return dict(session.execute(select(links.image_id, links.added_at).where(links.tag_id == tag_id)).all())
+    links = media_tag.c
+    return dict(session.execute(select(links.media_id, links.added_at).where(links.tag_id == tag_id)).all())
 
 
 def _set_added_times(session: Session, times: list[dict[str, object]]) -> None:
     """Rows of link_image_id, link_tag_id and kept_added_at."""
     if times:
-        links = image_tag.c
-        is_link = and_(links.image_id == bindparam("link_image_id"), links.tag_id == bindparam("link_tag_id"))
-        session.execute(update(image_tag).where(is_link).values(added_at=bindparam("kept_added_at")), times)
+        links = media_tag.c
+        is_link = and_(links.media_id == bindparam("link_image_id"), links.tag_id == bindparam("link_tag_id"))
+        session.execute(update(media_tag).where(is_link).values(added_at=bindparam("kept_added_at")), times)
 
 
 def _tag_ids(session: Session, tags: list[TagName]) -> list[int]:
@@ -419,7 +419,7 @@ def _tag_ids(session: Session, tags: list[TagName]) -> list[int]:
     return tag_ids
 
 
-def _record(session: Session, image: Image) -> ImageRecord:
+def _record(session: Session, image: Media) -> ImageRecord:
     return _record_with_tags(image, _tags_of(session, [image.id]).get(image.id, []))
 
 
@@ -427,10 +427,10 @@ def _tags_of(session: Session, image_ids: list[int] | Select[tuple[int]]) -> dic
     """The tags of each image, sorted by namespace, then name. A query for the ids avoids SQLite's limit on the
     number of values in one statement."""
     tag_rows = session.execute(
-        select(image_tag.c.image_id, Namespace.name, Tag.name)
+        select(media_tag.c.media_id, Namespace.name, Tag.name)
         .join(Tag, Tag.namespace_id == Namespace.id)
-        .join(image_tag, image_tag.c.tag_id == Tag.id)
-        .where(image_tag.c.image_id.in_(image_ids))
+        .join(media_tag, media_tag.c.tag_id == Tag.id)
+        .where(media_tag.c.media_id.in_(image_ids))
         .order_by(Namespace.name, Tag.name)
     )
     tags: dict[int, list[TagName]] = {}
@@ -440,7 +440,7 @@ def _tags_of(session: Session, image_ids: list[int] | Select[tuple[int]]) -> dic
     return tags
 
 
-def _record_with_tags(image: Image, tags: list[TagName]) -> ImageRecord:
+def _record_with_tags(image: Media, tags: list[TagName]) -> ImageRecord:
     return ImageRecord(
         id=image.id,
         sha256=image.sha256,

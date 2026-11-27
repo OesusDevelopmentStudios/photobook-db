@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import select, update
 
-from photobook_db.db.models import Namespace, Tag, image_tag
+from photobook_db.db.models import Namespace, Tag, media_tag
 from photobook_db.services.auth import Role
 
 PASSWORD = "correct horse battery"
@@ -42,8 +42,8 @@ def added_to_album(client: TestClient, image_id: int, album: str, when: datetime
     album_tag = select(Tag.id).join(Namespace).where(Namespace.name == "album", Tag.name == album)
     with client.app.state.database.session() as session:
         session.execute(
-            update(image_tag)
-            .where(image_tag.c.image_id == image_id, image_tag.c.tag_id == album_tag.scalar_subquery())
+            update(media_tag)
+            .where(media_tag.c.media_id == image_id, media_tag.c.tag_id == album_tag.scalar_subquery())
             .values(added_at=when)
         )
         session.commit()

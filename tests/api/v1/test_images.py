@@ -15,7 +15,7 @@ from sqlalchemy import update
 
 from photobook_db.api.v1 import _upload_receiver
 from photobook_db.config import Config
-from photobook_db.db.models import Image as ImageModel
+from photobook_db.db.models import Media as MediaModel
 from photobook_db.services.access import Restrictions
 from photobook_db.utils.exif_orientation import read_orientation
 from photobook_db.services.auth import Role
@@ -322,7 +322,7 @@ def test_a_new_revision_has_new_etags_and_thumbnails(
 ) -> None:
     assert uploaded["revision"] == 0
     with client.app.state.database.session() as session:
-        session.execute(update(ImageModel).where(ImageModel.id == uploaded["id"]).values(revision=1))
+        session.execute(update(MediaModel).where(MediaModel.id == uploaded["id"]).values(revision=1))
         session.commit()
 
     image = client.get(f"/api/v1/images/{uploaded['id']}", headers=headers).json()

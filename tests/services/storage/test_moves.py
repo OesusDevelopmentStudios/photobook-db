@@ -15,7 +15,7 @@ import pytest
 from sqlalchemy import select
 
 from photobook_db.db import Database
-from photobook_db.db.models import FileMove, Image
+from photobook_db.db.models import FileMove, Media
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
 from photobook_db.services.storage import _files, _service
@@ -52,7 +52,7 @@ def image_id(database: Database, library_dir: Path) -> int:
     file_path.parent.mkdir(parents=True)
     file_path.write_bytes(CONTENT)
     moment = datetime(2026, 11, 12, 12, 0)
-    image = Image(
+    image = Media(
         sha256="3fa2b1c9".ljust(64, "0"),
         storage_path=str(OLD_PATH),
         original_filename="beach.jpg",
@@ -73,7 +73,7 @@ def image_id(database: Database, library_dir: Path) -> int:
 
 def stored_path(database: Database, image_id: int) -> str:
     with database.session() as session:
-        return session.get_one(Image, image_id).storage_path
+        return session.get_one(Media, image_id).storage_path
 
 
 def journal(database: Database) -> list[tuple[str, str]]:

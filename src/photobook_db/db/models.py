@@ -63,7 +63,7 @@ class Namespace(Base):
     single_value: Mapped[bool]  # a second tag in this namespace replaces the first one
     is_builtin: Mapped[bool]  # built-in namespaces cannot be deleted or renamed
     user_editable: Mapped[bool] = mapped_column(default=True, server_default=true())  # false: only the server tags
-    # true: its tags are the only values an image may have, e.g. the ratings; only admins add one
+    # true: its tags are the only values media may have, e.g. the ratings; only admins add one
     fixed_values: Mapped[bool] = mapped_column(default=False, server_default=false())
     created_at: Mapped[datetime]
 
@@ -77,8 +77,10 @@ class Tag(Base):
     name: Mapped[str] = mapped_column(String(TAG_NAME_MAX_LENGTH))
 
 
-class Image(Base):
-    __tablename__ = "image"
+class Media(Base):
+    """A photo or a video."""
+
+    __tablename__ = "media"
     __table_args__ = (
         CheckConstraint(f"taken_at_source IN ({_TAKEN_AT_SOURCES_SQL})", name="taken_at_source"),
         CheckConstraint(f"media_kind IN ({_MEDIA_KINDS_SQL})", name="media_kind"),
@@ -103,7 +105,7 @@ class Image(Base):
     imported_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id", ondelete="SET NULL"))
     # Counts changes to the file, e.g. a saved rotation; the sha256 stays the uploaded file's.
     revision: Mapped[int] = mapped_column(default=0, server_default="0")
-    # A video is an image row too; these are NULL for images.
+    # Only for videos; NULL for images.
     media_kind: Mapped[str] = mapped_column(default="image", server_default="image")  # one of MEDIA_KINDS
     duration_ms: Mapped[int | None]
     video_codec: Mapped[str | None]  # e.g. "h264", "hevc", "vp9", "av1"
@@ -112,14 +114,14 @@ class Image(Base):
     frame_rate: Mapped[float | None] = mapped_column(Float)
 
 
-image_tag = Table(
-    "image_tag",
+media_tag = Table(
+    "media_tag",
     Base.metadata,
-    Column("image_id", ForeignKey("image.id", ondelete="CASCADE"), primary_key=True),
+    Column("media_id", ForeignKey("media.id", ondelete="CASCADE"), primary_key=True),
     Column("tag_id", ForeignKey("tag.id"), primary_key=True),
-    Column("added_at", DateTime, nullable=False, default=utc_now),  # an album's images are in this order
-    Index(None, "tag_id", "image_id"),  # finds the images with a tag
-    Index(None, "tag_id", "added_at", "image_id"),  # an album's images, in the order they were added
+    Column("added_at", DateTime, nullable=False, default=utc_now),  # an album's media are in this order
+    Index(None, "tag_id", "media_id"),  # finds the media with a tag
+    Index(None, "tag_id", "added_at", "media_id"),  # an album's media, in the order they were added
 )
 
 
@@ -167,7 +169,7 @@ class FileMove(Base):
     __tablename__ = "file_move"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    image_id: Mapped[int] = mapped_column(ForeignKey("image.id", ondelete="CASCADE"))
+    media_id: Mapped[int] = mapped_column(ForeignKey("media.id", ondelete="CASCADE"))
     from_path: Mapped[str]  # relative to the library folder
     to_path: Mapped[str]  # relative to the library folder
     created_at: Mapped[datetime]  # UTC
@@ -181,7 +183,7 @@ class UserPreferences(Base):
 
 
 class UserRestriction(Base):
-    """A search term naming images this user may not see, find, download, upload or tag."""
+    """A search term naming media this user may not see, find, download, upload or tag."""
 
     __tablename__ = "user_restriction"
 

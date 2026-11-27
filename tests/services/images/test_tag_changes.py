@@ -12,7 +12,7 @@ from PIL import ExifTags, Image
 from sqlalchemy import select, update
 
 from photobook_db.db import Database
-from photobook_db.db.models import Namespace, Tag, image_tag
+from photobook_db.db.models import Namespace, Tag, media_tag
 from photobook_db.services.access import Restrictions
 from photobook_db.services.images import ImageRecord, ImagesService
 from photobook_db.services.importer import ImporterService, UploadMetadata
@@ -70,8 +70,8 @@ class Library:
     def added_times(self, tag: str) -> dict[int, datetime]:
         namespace, name = tag.split(":")
         query = (
-            select(image_tag.c.image_id, image_tag.c.added_at)
-            .join(Tag, Tag.id == image_tag.c.tag_id)
+            select(media_tag.c.media_id, media_tag.c.added_at)
+            .join(Tag, Tag.id == media_tag.c.tag_id)
             .join(Namespace, Namespace.id == Tag.namespace_id)
             .where(Namespace.name == namespace, Tag.name == name)
         )
@@ -84,8 +84,8 @@ class Library:
         tag_id = select(Tag.id).join(Namespace).where(Namespace.name == namespace, Tag.name == name)
         with self.database.session() as session:
             session.execute(
-                update(image_tag)
-                .where(image_tag.c.image_id == image_id, image_tag.c.tag_id == tag_id.scalar_subquery())
+                update(media_tag)
+                .where(media_tag.c.media_id == image_id, media_tag.c.tag_id == tag_id.scalar_subquery())
                 .values(added_at=when)
             )
             session.commit()

@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from photobook_db.db import Database
-from photobook_db.db.models import Image, Namespace, Tag, image_tag
+from photobook_db.db.models import Media, Namespace, Tag, media_tag
 from photobook_db.services.search import (
     TagMatch,
     apply_hidden_filters,
@@ -49,7 +49,7 @@ def library(database: Database) -> Database:
         existing = session.execute(select(Namespace.name, Tag.name, Tag.id).join(Tag, Tag.namespace_id == Namespace.id))
         tag_ids = {f"{namespace}:{name}": tag_id for namespace, name, tag_id in existing}  # e.g. the ratings
         for number, (name, (tags, taken_at)) in enumerate(LIBRARY.items()):
-            image = Image(
+            image = Media(
                 sha256=f"{number:064x}",
                 storage_path=f"{name}.jpg",
                 original_filename=f"{name}.jpg",
@@ -72,7 +72,7 @@ def library(database: Database) -> Database:
                     session.flush()
                     tag_ids[tag_text] = tag.id
 
-                session.execute(image_tag.insert().values(image_id=image.id, tag_id=tag_ids[tag_text]))
+                session.execute(media_tag.insert().values(media_id=image.id, tag_id=tag_ids[tag_text]))
 
         session.commit()
 
@@ -85,7 +85,7 @@ def found(database: Database, query: str, hidden_filters: list[str] | None = Non
         tree = apply_hidden_filters(query, tree, hidden_filters, NAMESPACES).tree
 
     with database.session() as session:
-        file_names = session.scalars(select(Image.original_filename).where(matching_condition(tree)))
+        file_names = session.scalars(select(Media.original_filename).where(matching_condition(tree)))
         return {file_name.removesuffix(".jpg") for file_name in file_names}
 
 

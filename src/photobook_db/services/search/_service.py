@@ -14,7 +14,7 @@ from sqlalchemy import ColumnElement, Select, Subquery, and_, func, literal, or_
 from sqlalchemy.orm import Session
 
 from photobook_db.db import Database
-from photobook_db.db.models import Image, Namespace, Tag, image_tag
+from photobook_db.db.models import Media, Namespace, Tag, media_tag
 from photobook_db.services.search._conditions import matching_condition
 from photobook_db.services.search._hidden_filters import FilteredQuery, apply_hidden_filters
 from photobook_db.services.search._parser import parse_query
@@ -33,7 +33,7 @@ class Sort(StrEnum):
     ALBUM = "album"  # when the album tag was added, then by file name; only with an album
 
 
-class Media(StrEnum):
+class MediaKinds(StrEnum):
     IMAGE = "image"  # images only: what clients from before videos expect, so it is the default
     VIDEO = "video"
     ALL = "all"
@@ -54,7 +54,7 @@ class SearchRequest:
     cursor: str | None = None  # next_cursor of the previous page
     hidden_filters: tuple[str, ...] = ()
     album: str | None = None  # only this album's images, e.g. "vacation_2015"
-    media: Media = Media.IMAGE
+    media: MediaKinds = MediaKinds.IMAGE
 
 
 @dataclass(frozen=True)
@@ -95,13 +95,13 @@ class SearchService:
         links = None if request.album is None else _album_links(request.album)
         sort_keys = _sort_keys(request.sort, request.seed, links)
         descending = request.sort not in (Sort.RANDOM, Sort.ALBUM) and request.order == Order.DESC
-        statement = _in_album(select(Image.id, *sort_keys), links)
+        statement = _in_album(select(Media.id, *sort_keys), links)
         statement = statement.where(matching_condition(filtered.tree), visible_images, _of_media(request.media))
         if request.cursor is not None:
             last_values, last_id = _decode_cursor(request.cursor, request.sort)
             statement = statement.where(_after(sort_keys, last_values, last_id, descending))
 
-        directed = [key.desc() if descending else key.asc() for key in [*sort_keys, Image.id]]
+        directed = [key.desc() if descending else key.asc() for key in [*sort_keys, Media.id]]
         statement = statement.order_by(*directed).limit(request.limit + 1)  # one more: is there a next page?
 
         with self._database.session() as session:
@@ -118,12 +118,12 @@ class SearchService:
         hidden_filters: tuple[str, ...],
         visible_images: ColumnElement[bool],
         album: str | None = None,
-        media: Media = Media.IMAGE,
+        media: MediaKinds = MediaKinds.IMAGE,
     ) -> SearchCount:
         """How many images search() finds over all its pages. Raises 400 invalid_query or 422 invalid_tag."""
         filtered = self._filtered(query, hidden_filters)
         links = None if album is None else _album_links(album)
-        statement = _in_album(select(func.count(Image.id)), links)
+        statement = _in_album(select(func.count(Media.id)), links)
         statement = statement.where(matching_condition(filtered.tree), visible_images, _of_media(media))
         with self._database.session() as session:
             count = session.scalar(statement) or 0
@@ -135,12 +135,12 @@ class SearchService:
         cover, and when one was last added; most recently changed first. An album with an image that one of
         `hidden_filters` matches is left out."""
         links = (
-            select(Tag.name, Image.id, Image.revision, image_tag.c.added_at)
-            .join(image_tag, image_tag.c.image_id == Image.id)
-            .join(Tag, Tag.id == image_tag.c.tag_id)
+            select(Tag.name, Media.id, Media.revision, media_tag.c.added_at)
+            .join(media_tag, media_tag.c.media_id == Media.id)
+            .join(Tag, Tag.id == media_tag.c.tag_id)
             .join(Namespace, Namespace.id == Tag.namespace_id)
             .where(Namespace.name == ALBUM_NAMESPACE, visible_images)
-            .order_by(Tag.name, image_tag.c.added_at, Image.original_filename, Image.id)
+            .order_by(Tag.name, media_tag.c.added_at, Media.original_filename, Media.id)
         )
         with self._database.session() as session:
             rows = session.execute(links).all()
@@ -167,12 +167,12 @@ class SearchService:
         namespace_names = self._namespace_names()
         hidden = or_(*(matching_condition(parse_query(term, namespace_names)) for term in hidden_filters))
         album_images = (
-            select(image_tag.c.image_id)
-            .join(Tag, Tag.id == image_tag.c.tag_id)
+            select(media_tag.c.media_id)
+            .join(Tag, Tag.id == media_tag.c.tag_id)
             .join(Namespace, Namespace.id == Tag.namespace_id)
             .where(Namespace.name == ALBUM_NAMESPACE)
         )
-        return set(session.scalars(select(Image.id).where(Image.id.in_(album_images), hidden, visible_images)))
+        return set(session.scalars(select(Media.id).where(Media.id.in_(album_images), hidden, visible_images)))
 
     def _filtered(self, query: str, hidden_filters: tuple[str, ...]) -> FilteredQuery:
         namespace_names = self._namespace_names()
@@ -180,15 +180,15 @@ class SearchService:
         return apply_hidden_filters(query, tree, list(hidden_filters), namespace_names)
 
 
-def _of_media(media: Media) -> ColumnElement[bool]:
-    return true() if media == Media.ALL else Image.media_kind == media.value
+def _of_media(media: MediaKinds) -> ColumnElement[bool]:
+    return true() if media == MediaKinds.ALL else Media.media_kind == media.value
 
 
 def _album_links(album: str) -> Subquery:
     """The images of an album and when the album tag was put on each."""
     return (
-        select(image_tag.c.image_id, image_tag.c.added_at)
-        .join(Tag, Tag.id == image_tag.c.tag_id)
+        select(media_tag.c.media_id, media_tag.c.added_at)
+        .join(Tag, Tag.id == media_tag.c.tag_id)
         .join(Namespace, Namespace.id == Tag.namespace_id)
         .where(Namespace.name == ALBUM_NAMESPACE, Tag.name == normalized_tag_name(album))
         .subquery()
@@ -196,7 +196,7 @@ def _album_links(album: str) -> Subquery:
 
 
 def _in_album(statement: Select, links: Subquery | None) -> Select:
-    return statement if links is None else statement.join(links, links.c.image_id == Image.id)
+    return statement if links is None else statement.join(links, links.c.media_id == Media.id)
 
 
 def _sort_keys(sort: Sort, seed: int | None, links: Subquery | None) -> list[ColumnElement]:
@@ -205,26 +205,26 @@ def _sort_keys(sort: Sort, seed: int | None, links: Subquery | None) -> list[Col
         if links is None:
             raise _invalid("query.sort", "sort=album needs an album: the order is when images were added to it.")
 
-        return [links.c.added_at, Image.original_filename]
+        return [links.c.added_at, Media.original_filename]
 
     if sort == Sort.RANDOM:
         if seed is None:
             raise _invalid("query.seed", "Required for sort=random; the same seed gives the same order.")
 
-        return [func.shuffled_position(seed, Image.id)]  # registered on every database connection
+        return [func.shuffled_position(seed, Media.id)]  # registered on every database connection
 
-    return [Image.taken_at if sort == Sort.TAKEN_AT else Image.imported_at]
+    return [Media.taken_at if sort == Sort.TAKEN_AT else Media.imported_at]
 
 
 def _after(keys: list[ColumnElement], last: list[object], last_id: int, descending: bool) -> ColumnElement[bool]:
     if len(keys) > 1:  # compared as one row value; only ascending (album order)
-        return tuple_(*keys, Image.id) > tuple_(*[literal(value) for value in last], literal(last_id))
+        return tuple_(*keys, Media.id) > tuple_(*[literal(value) for value in last], literal(last_id))
 
     [key], [last_value] = keys, last
     if descending:
-        return or_(key < last_value, and_(key == last_value, Image.id < last_id))
+        return or_(key < last_value, and_(key == last_value, Media.id < last_id))
 
-    return or_(key > last_value, and_(key == last_value, Image.id > last_id))
+    return or_(key > last_value, and_(key == last_value, Media.id > last_id))
 
 
 def _encode_cursor(sort_values: list[object], image_id: int) -> str:

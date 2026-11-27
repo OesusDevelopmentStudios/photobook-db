@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from photobook_db.db import DATABASE_FILE_NAME, Database, open_database
 from photobook_db.db._connection import create_sqlite_engine
 from photobook_db.db._migrations import migrate as migrate_database
-from photobook_db.db.models import Base, Image, Namespace, Tag, image_tag
+from photobook_db.db.models import Base, Media, Namespace, Tag, media_tag
 
 
 @pytest.fixture
@@ -37,7 +38,7 @@ def add_image_with_tag(database: Database) -> int:
     with database.session() as session:
         general = session.scalars(select(Namespace).where(Namespace.name == "general")).one()
         tag = Tag(namespace_id=general.id, name="summer")
-        image = Image(
+        image = Media(
             sha256="ab" * 32,
             storage_path="photo/_unknown/2024/beach_abababab.jpg",
             original_filename="beach.jpg",
@@ -52,7 +53,7 @@ def add_image_with_tag(database: Database) -> int:
         )
         session.add_all([tag, image])
         session.flush()
-        session.execute(image_tag.insert().values(image_id=image.id, tag_id=tag.id))
+        session.execute(media_tag.insert().values(media_id=image.id, tag_id=tag.id))
         session.commit()
         return image.id
 
@@ -60,7 +61,7 @@ def add_image_with_tag(database: Database) -> int:
 def test_creates_tables_in_empty_database(database: Database) -> None:
     table_names = set(inspect(database.engine).get_table_names())
 
-    assert {"namespace", "tag", "image", "image_tag"} <= table_names
+    assert {"namespace", "tag", "media", "media_tag"} <= table_names
 
 
 def test_adds_builtin_namespaces(database: Database) -> None:
@@ -87,7 +88,7 @@ def test_opening_again_keeps_data(database_path: Path) -> None:
 
     second_opening = open_database(database_path)
     with second_opening.session() as session:
-        image_count = len(session.scalars(select(Image)).all())
+        image_count = len(session.scalars(select(Media)).all())
         namespace_count = len(session.scalars(select(Namespace)).all())
     second_opening.close()
 
@@ -104,10 +105,10 @@ def test_models_match_migrations(database: Database) -> None:
 
 def test_migrations_can_be_undone_and_redone(database: Database) -> None:
     migrate_database(database.engine, "base", downgrade=True)
-    assert "image" not in inspect(database.engine).get_table_names()
+    assert "media" not in inspect(database.engine).get_table_names()
 
     migrate_database(database.engine, "head")
-    assert "image" in inspect(database.engine).get_table_names()
+    assert "media" in inspect(database.engine).get_table_names()
 
 
 def migrate(database_path: Path, revision: str, downgrade: bool = False) -> None:
@@ -122,8 +123,8 @@ def tags_of(database: Database, image_id: int) -> set[str]:
         rows = session.execute(
             select(Namespace.name, Tag.name)
             .join(Tag, Tag.namespace_id == Namespace.id)
-            .join(image_tag, image_tag.c.tag_id == Tag.id)
-            .where(image_tag.c.image_id == image_id)
+            .join(media_tag, media_tag.c.tag_id == Tag.id)
+            .where(media_tag.c.media_id == image_id)
         )
         return {f"{namespace}:{name}" for namespace, name in rows}
 
@@ -161,7 +162,7 @@ def test_undoing_0002_removes_the_meta_tags_and_keeps_the_others(database_path: 
         tag = Tag(namespace_id=meta.id, name="hi_res")
         session.add(tag)
         session.flush()
-        session.execute(image_tag.insert().values(image_id=image_id, tag_id=tag.id))
+        session.execute(media_tag.insert().values(media_id=image_id, tag_id=tag.id))
         session.commit()
     database.close()
 
@@ -184,9 +185,9 @@ def test_deleting_image_removes_its_tag_links(database: Database) -> None:
     image_id = add_image_with_tag(database)
 
     with database.session() as session:
-        session.execute(delete(Image).where(Image.id == image_id))
+        session.execute(delete(Media).where(Media.id == image_id))
         session.commit()
-        remaining_links = session.execute(select(image_tag)).all()
+        remaining_links = session.execute(select(media_tag)).all()
 
     assert remaining_links == []
 
@@ -256,7 +257,7 @@ def test_undoing_0003_stores_the_ratings_again_and_drops_unused_tags(database_pa
     with database.session() as session:
         rating_tag = select(Tag).join(Namespace).where(Namespace.name == "rating", Tag.name == "public")
         public = session.scalars(rating_tag).one()
-        session.execute(image_tag.insert().values(image_id=image_id, tag_id=public.id))
+        session.execute(media_tag.insert().values(media_id=image_id, tag_id=public.id))
         session.commit()
     database.close()
 
@@ -289,7 +290,7 @@ def test_undoing_0004_keeps_only_the_categories_images_have(database_path: Path)
     with database.session() as session:
         photo_tag = select(Tag).join(Namespace).where(Namespace.name == "category", Tag.name == "photo")
         photo = session.scalars(photo_tag).one()
-        session.execute(image_tag.insert().values(image_id=image_id, tag_id=photo.id))
+        session.execute(media_tag.insert().values(media_id=image_id, tag_id=photo.id))
         session.commit()
     database.close()
 
@@ -396,7 +397,7 @@ def test_upgrade_to_0006_keeps_every_image_and_what_refers_to_it(database_path: 
 def test_0006_takes_videos_with_their_own_date(database: Database) -> None:
     image_id = add_image_with_tag(database)
     with database.session() as session:
-        video = session.get(Image, image_id)
+        video = session.get(Media, image_id)
         video.media_kind = "video"
         video.taken_at_source = "container"
         video.duration_ms = 222400
@@ -404,14 +405,14 @@ def test_0006_takes_videos_with_their_own_date(database: Database) -> None:
         session.commit()
 
     with database.session() as session:
-        stored = session.get(Image, image_id)
+        stored = session.get(Media, image_id)
         assert (stored.media_kind, stored.taken_at_source, stored.frame_rate) == ("video", "container", 29.97)
 
 
 def test_0006_refuses_an_unknown_kind(database: Database) -> None:
     image_id = add_image_with_tag(database)
     with database.session() as session, pytest.raises(IntegrityError):
-        session.get(Image, image_id).media_kind = "sound"
+        session.get(Media, image_id).media_kind = "sound"
         session.commit()
 
 
@@ -419,6 +420,7 @@ def test_undoing_0006_keeps_the_images_and_their_links(database_path: Path) -> N
     database = open_database(database_path)
     image_id = add_image_with_tag(database)
     database.close()
+    migrate(database_path, "0006", downgrade=True)  # the tables as 0006 named them
     add_file_move(database_path, image_id)
 
     migrate(database_path, "0005", downgrade=True)
@@ -437,11 +439,128 @@ def test_undoing_0006_refuses_while_videos_are_stored(database_path: Path) -> No
     database = open_database(database_path)
     image_id = add_image_with_tag(database)
     with database.session() as session:
-        session.get(Image, image_id).media_kind = "video"
+        session.get(Media, image_id).media_kind = "video"
         session.commit()
     database.close()
+    migrate(database_path, "0006", downgrade=True)
 
     with pytest.raises(RuntimeError, match="videos are stored"):
         migrate(database_path, "0005", downgrade=True)
 
     assert count_rows(database_path, "image") == 1
+
+
+# --- 0007: media instead of image
+
+def rows(database_path: Path, query: str) -> list[tuple[object, ...]]:
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        found = [tuple(row) for row in connection.execute(text(query))]
+    engine.dispose()
+    return found
+
+
+def schema(database_path: Path) -> list[tuple[str, str, str]]:
+    """(type, name, SQL) of every table and index."""
+    return [(kind, name, sql or "") for kind, name, sql in rows(  # type: ignore[misc]
+        database_path, "SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY name"
+    )]
+
+
+def add_0006_rows(database_path: Path) -> None:
+    """A user, a photo and a video, their tag links and a file move, as 0006 names the tables."""
+    engine = create_sqlite_engine(database_path)
+    with engine.begin() as connection:
+        connection.execute(text(
+            "INSERT INTO user (id, username, password_hash, role, created_at) "
+            "VALUES (5, 'sample_user', 'x', 'user', '2024-05-01 09:00:00')"
+        ))
+        connection.execute(text(
+            "INSERT INTO image (id, sha256, storage_path, original_filename, mime_type, width, height, file_size, "
+            "taken_at, taken_at_source, taken_at_utc_offset_minutes, imported_at, updated_at, imported_by_user_id, "
+            "revision, media_kind, duration_ms, video_codec, audio_codec, bitrate, frame_rate) VALUES "
+            "(3, :a, 'beach.jpg', 'beach.jpg', 'image/jpeg', 40, 30, 1234, '2024-05-01 10:00:00', 'exif', 120, "
+            "'2024-05-02 10:00:00', '2024-05-03 10:00:00', 5, 2, 'image', NULL, NULL, NULL, NULL, NULL), "
+            "(8, :b, 'waves.mp4', 'waves.mp4', 'video/mp4', 1920, 1080, 98765, '2024-06-01 10:00:00', 'container', "
+            "NULL, '2024-06-02 10:00:00', '2024-06-02 10:00:00', NULL, 0, 'video', 222400, 'h264', 'aac', 8120000, "
+            "29.97)"
+        ), {"a": "ab" * 32, "b": "cd" * 32})
+        connection.execute(text(
+            "INSERT INTO image_tag (image_id, tag_id, added_at) "
+            "SELECT 3, id, '2024-05-04 10:00:00' FROM tag WHERE name = 'photo' UNION ALL "
+            "SELECT 8, id, '2024-06-04 10:00:00' FROM tag WHERE name = 'photo'"
+        ))
+    engine.dispose()
+    add_file_move(database_path, 8)
+
+
+def comparable(found: list[tuple[str, str, str]]) -> list[tuple[str, str, list[str]]]:
+    """Without what SQLite writes differently for the same schema: a renamed table's quotes, the constraints' order."""
+    return [
+        (kind, name, sorted(line.strip() for line in sql.replace('"', "").replace(",", "").split("\n")))
+        for kind, name, sql in found
+    ]
+
+
+MEDIA_ROWS = "SELECT * FROM {table} ORDER BY id"
+LINK_ROWS = "SELECT {table}_id, tag_id, added_at FROM {table}_tag ORDER BY {table}_id"
+MOVE_ROWS = "SELECT id, {table}_id, from_path, to_path, created_at FROM file_move"
+
+
+def test_upgrade_to_0007_keeps_every_row_under_the_new_names(database_path: Path) -> None:
+    migrate(database_path, "0006")
+    add_0006_rows(database_path)
+    before = [rows(database_path, query.format(table="image")) for query in (MEDIA_ROWS, LINK_ROWS, MOVE_ROWS)]
+
+    migrate(database_path, "0007")
+
+    after = [rows(database_path, query.format(table="media")) for query in (MEDIA_ROWS, LINK_ROWS, MOVE_ROWS)]
+    assert after == before
+    assert [len(found) for found in after] == [2, 2, 1]
+    tables = {name for kind, name, _sql in schema(database_path) if kind == "table"}
+    assert {"media", "media_tag", "file_move"} <= tables and not {"image", "image_tag"} & tables
+
+
+def test_undoing_0007_keeps_every_row_under_the_old_names(database_path: Path) -> None:
+    migrate(database_path, "0006")
+    add_0006_rows(database_path)
+    before = [rows(database_path, query.format(table="image")) for query in (MEDIA_ROWS, LINK_ROWS, MOVE_ROWS)]
+    schema_before = schema(database_path)
+    migrate(database_path, "0007")
+
+    migrate(database_path, "0006", downgrade=True)
+
+    assert [rows(database_path, query.format(table="image")) for query in (MEDIA_ROWS, LINK_ROWS, MOVE_ROWS)] == before
+    # The same tables, indexes and constraints as 0006 made
+    assert comparable(schema(database_path)) == comparable(schema_before)
+
+
+def test_no_name_in_the_schema_says_image(database: Database, database_path: Path) -> None:
+    """Only the media kind 'image' itself: every table, column, index and constraint says media."""
+    for _kind, name, sql in schema(database_path):
+        without_values = re.sub(r"'[^']*'", "''", sql)
+        assert "image" not in name and "image" not in without_values, sql
+
+
+def test_constraints_are_named_as_the_models_name_them(database: Database, database_path: Path) -> None:
+    [media_sql] = [sql for kind, name, sql in schema(database_path) if name == "media"]
+
+    assert "CONSTRAINT ck_media_taken_at_source CHECK" in media_sql
+    assert "CONSTRAINT ck_media_media_kind CHECK" in media_sql
+
+
+def test_deleting_media_removes_what_refers_to_it(database: Database, database_path: Path) -> None:
+    media_id = add_image_with_tag(database)
+    engine = create_sqlite_engine(database_path)
+    with engine.begin() as connection:
+        connection.execute(text(
+            "INSERT INTO file_move (media_id, from_path, to_path, created_at) "
+            "VALUES (:media_id, 'a.jpg', 'b.jpg', '2025-01-01 00:00:00')"
+        ), {"media_id": media_id})
+    engine.dispose()
+
+    with database.session() as session:
+        session.execute(delete(Media).where(Media.id == media_id))
+        session.commit()
+
+    assert (count_rows(database_path, "media_tag"), count_rows(database_path, "file_move")) == (0, 0)

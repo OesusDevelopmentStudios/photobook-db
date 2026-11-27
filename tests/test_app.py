@@ -14,7 +14,7 @@ from sqlalchemy import select
 from photobook_db.app import create_app
 from photobook_db.config import Config
 from photobook_db.db import DATABASE_FILE_NAME, open_database
-from photobook_db.db.models import FileMove, Image, Namespace
+from photobook_db.db.models import FileMove, Media, Namespace
 from photobook_db.services.auth import Role
 
 
@@ -65,14 +65,14 @@ def test_finishes_interrupted_file_moves_when_it_starts(config: Config) -> None:
     moment = datetime(2026, 11, 12, 12, 0)
     database = open_database(config.data_dir / DATABASE_FILE_NAME)
     with database.session() as session:
-        image = Image(
+        image = Media(
             sha256="ab" * 32, storage_path="old/beach.jpg", original_filename="beach.jpg", mime_type="image/jpeg",
             width=1, height=1, file_size=1, taken_at=moment, taken_at_source="import_time",
             imported_at=moment, updated_at=moment,
         )
         session.add(image)
         session.flush()
-        session.add(FileMove(image_id=image.id, from_path="old/beach.jpg", to_path="new/beach.jpg", created_at=moment))
+        session.add(FileMove(media_id=image.id, from_path="old/beach.jpg", to_path="new/beach.jpg", created_at=moment))
         session.commit()
     database.close()
     (config.library_dir / "new").mkdir()
@@ -80,7 +80,7 @@ def test_finishes_interrupted_file_moves_when_it_starts(config: Config) -> None:
 
     with TestClient(create_app(config)) as client:
         with client.app.state.database.session() as session:
-            stored_path = session.scalars(select(Image.storage_path)).one()
+            stored_path = session.scalars(select(Media.storage_path)).one()
             leftover_moves = session.scalars(select(FileMove)).all()
 
     assert stored_path == "new/beach.jpg"
@@ -93,7 +93,7 @@ def test_gives_older_images_their_meta_tags_when_it_starts(config: Config) -> No
     (config.library_dir / "beach.png").write_bytes(_png_bytes())
     database = open_database(config.data_dir / DATABASE_FILE_NAME)
     with database.session() as session:
-        session.add(Image(
+        session.add(Media(
             sha256="cd" * 32, storage_path="beach.png", original_filename="beach.png", mime_type="image/png",
             width=8, height=8, file_size=1, taken_at=moment, taken_at_source="import_time",
             imported_at=moment, updated_at=moment,

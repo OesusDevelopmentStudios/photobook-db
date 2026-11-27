@@ -11,7 +11,7 @@ from sqlalchemy import and_, exists, func, or_, select, tuple_
 from sqlalchemy.exc import IntegrityError
 
 from photobook_db.db import Database
-from photobook_db.db.models import Namespace, Tag, image_tag
+from photobook_db.db.models import Namespace, Tag, media_tag
 from photobook_db.services.tags._names import (
     TagName,
     normalized_name_prefix,
@@ -131,10 +131,10 @@ class TagsService:
     def image_count(self, tag: TagName) -> int | None:
         """How many images have the tag, counting all of them; None if the tag does not exist."""
         query = (
-            select(func.count(image_tag.c.image_id))
+            select(func.count(media_tag.c.media_id))
             .select_from(Tag)
             .join(Namespace, Tag.namespace_id == Namespace.id)
-            .outerjoin(image_tag, image_tag.c.tag_id == Tag.id)
+            .outerjoin(media_tag, media_tag.c.tag_id == Tag.id)
             .where(Namespace.name == tag.namespace, Tag.name == tag.name)
             .group_by(Tag.id)
         )
@@ -153,10 +153,10 @@ class TagsService:
 
         wanted = or_(*(and_(Namespace.name == ns, Tag.name.in_(names)) for ns, names in names_by_namespace.items()))
         query = (
-            select(Namespace.name, Tag.name, func.count(image_tag.c.image_id))
+            select(Namespace.name, Tag.name, func.count(media_tag.c.media_id))
             .select_from(Tag)
             .join(Namespace, Tag.namespace_id == Namespace.id)
-            .outerjoin(image_tag, image_tag.c.tag_id == Tag.id)
+            .outerjoin(media_tag, media_tag.c.tag_id == Tag.id)
             .where(wanted)
             .group_by(Tag.id)
         )
@@ -217,11 +217,11 @@ class TagsService:
         if len(namespaces) > 1:
             return []  # the namespace filter and the prefix's namespace disagree
 
-        image_count = func.count(image_tag.c.image_id)
+        image_count = func.count(media_tag.c.media_id)
         query = (
             select(Namespace.name, Tag.name, image_count)
             .join(Namespace, Tag.namespace_id == Namespace.id)
-            .outerjoin(image_tag, image_tag.c.tag_id == Tag.id)
+            .outerjoin(media_tag, media_tag.c.tag_id == Tag.id)
             .group_by(Tag.id)
             .order_by(image_count.desc(), Namespace.name, Tag.name)
         )
@@ -331,7 +331,7 @@ class TagsService:
     def namespace_usage(self, name: str) -> tuple[int, int]:
         """How many tags the namespace has, and how many images have one of them."""
         tag_ids = select(Tag.id).join(Namespace, Tag.namespace_id == Namespace.id).where(Namespace.name == name)
-        image_count = select(func.count(image_tag.c.image_id.distinct())).where(image_tag.c.tag_id.in_(tag_ids))
+        image_count = select(func.count(media_tag.c.media_id.distinct())).where(media_tag.c.tag_id.in_(tag_ids))
         with self._database.session() as session:
             tag_count = session.scalar(select(func.count()).select_from(tag_ids.subquery())) or 0
             return tag_count, session.scalar(image_count) or 0

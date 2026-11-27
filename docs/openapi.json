@@ -501,7 +501,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/Media",
+              "$ref": "#/components/schemas/MediaKinds",
               "description": "image (the default, as clients from before videos expect), video, or all",
               "default": "image"
             },
@@ -724,7 +724,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/Media",
+              "$ref": "#/components/schemas/MediaKinds",
               "description": "image (the default, as clients from before videos expect), video, or all",
               "default": "image"
             },
@@ -3746,14 +3746,14 @@
         ],
         "title": "LoginRequest"
       },
-      "Media": {
+      "MediaKinds": {
         "type": "string",
         "enum": [
           "image",
           "video",
           "all"
         ],
-        "title": "Media"
+        "title": "MediaKinds"
       },
       "NamespaceDetails": {
         "properties": {
