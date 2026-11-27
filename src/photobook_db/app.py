@@ -27,9 +27,11 @@ from photobook_db.services.media_probe import MediaProbe
 from photobook_db.services.settings import SettingsService
 from photobook_db.services.storage import StorageService
 from photobook_db.services.storyboard import StoryboardService
+from photobook_db.services.stream import StreamService
 from photobook_db.services.tag_admin import TagAdmin
 from photobook_db.services.tags import TagsService
 from photobook_db.services.thumbnails import ThumbnailsService
+from photobook_db.utils.access_log import hide_signatures_in_access_log
 from photobook_db.utils.problems import install_problem_handlers
 
 _logger = logging.getLogger(__name__)
@@ -70,6 +72,8 @@ def _lifespan(config: Config) -> Callable[[FastAPI], AbstractAsyncContextManager
         app.state.storage.clean_incoming()  # uploads a restart interrupted
         app.state.thumbnails = ThumbnailsService(config.data_dir / "thumbnails")
         app.state.storyboards = StoryboardService(config.data_dir / "thumbnails" / "storyboard", app.state.media_probe)
+        app.state.streams = StreamService(settings)
+        hide_signatures_in_access_log()  # after Uvicorn has set up its logging
         app.state.images = ImagesService(database, app.state.tags, app.state.storage)
         app.state.rotation = RotationService(app.state.images, app.state.storage, app.state.thumbnails)
         app.state.search = SearchService(database, app.state.tags.namespace_names)

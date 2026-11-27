@@ -240,18 +240,27 @@ class AuthService:
 
     def authenticate(self, token: str) -> Authentication:
         """The user a token belongs to. Raises 401 for an unknown, revoked or expired token."""
-        now = self._now()
         with self._database.session() as session:
             api_token = session.scalars(
                 select(ApiToken).where(ApiToken.token_sha256 == token_sha256(token))
             ).one_or_none()
-            if api_token is None or (api_token.expires_at is not None and api_token.expires_at <= now):
-                raise not_authenticated()
+            return self._authenticated(session, api_token)
 
-            api_token.last_used_at = now
-            user = session.get_one(User, api_token.user_id)
-            session.commit()
-            return Authentication(user=_user_info(user), token_id=api_token.id)
+    def authenticate_token_id(self, token_id: int) -> Authentication:
+        """For a request that proves a login without the token itself, e.g. a signed stream URL. Raises 401 once
+        that login is revoked or expired."""
+        with self._database.session() as session:
+            return self._authenticated(session, session.get(ApiToken, token_id))
+
+    def _authenticated(self, session: Session, api_token: ApiToken | None) -> Authentication:
+        now = self._now()
+        if api_token is None or (api_token.expires_at is not None and api_token.expires_at <= now):
+            raise not_authenticated()
+
+        api_token.last_used_at = now
+        user = session.get_one(User, api_token.user_id)
+        session.commit()
+        return Authentication(user=_user_info(user), token_id=api_token.id)
 
     def list_tokens(self, user_id: int) -> list[TokenInfo]:
         with self._database.session() as session:

@@ -1154,7 +1154,7 @@
         "tags": [
           "images"
         ],
-        "summary": "The original image file; supports Range and If-None-Match",
+        "summary": "The original file; supports Range and If-None-Match. The token, or a URL from POST /images/{id}/stream",
         "operationId": "get_image_file_api_v1_images__image_id__file_get",
         "security": [
           {
@@ -1170,6 +1170,61 @@
               "type": "integer",
               "title": "Image Id"
             }
+          },
+          {
+            "name": "t",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "With exp and sig: a URL from POST /images/{id}/stream",
+              "title": "T"
+            },
+            "description": "With exp and sig: a URL from POST /images/{id}/stream"
+          },
+          {
+            "name": "exp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "When the stream URL expires, in Unix time",
+              "title": "Exp"
+            },
+            "description": "When the stream URL expires, in Unix time"
+          },
+          {
+            "name": "sig",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The stream URL's signature",
+              "title": "Sig"
+            },
+            "description": "The stream URL's signature"
           }
         ],
         "responses": {
@@ -1444,6 +1499,73 @@
             "description": "Problem details (RFC 9457)"
           },
           "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/images/{image_id}/stream": {
+      "post": {
+        "tags": [
+          "images"
+        ],
+        "summary": "A URL to stream a video from without the token, for a player that cannot send it",
+        "operationId": "create_stream_url_api_v1_images__image_id__stream_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Image Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamUrl"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemModel"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4176,6 +4298,30 @@
         ],
         "title": "Storyboard",
         "description": "Frames of a video at a fixed interval, in one sprite image filled row by row."
+      },
+      "StreamUrl": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "The video's file without the token: for players that cannot send it",
+            "examples": [
+              "/api/v1/images/1234/file?t=56&exp=1795000000&sig=\u2026"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At",
+            "description": "Also ends when this login ends, or the user may no longer see it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "title": "StreamUrl"
       },
       "TagChanges": {
         "properties": {

@@ -9,7 +9,9 @@ import io
 import json
 import shutil
 import subprocess
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,6 +21,7 @@ from sqlalchemy import update
 from photobook_db.db.models import Image as ImageModel
 from photobook_db.services.auth import Role
 from photobook_db.services.media_probe import MediaProbe
+from photobook_db.utils.time import utc_now
 
 PASSWORD = "correct horse battery"
 
@@ -138,6 +141,83 @@ def test_a_server_without_ffmpeg_has_no_storyboards(
     response = client.get(f"/api/v1/images/{coast['video']}/{path}", headers=headers)
 
     assert (response.status_code, response.json()["code"]) == (503, "storyboard_unavailable")
+
+
+# --- Stream URLs, for a player that cannot send the token
+
+def stream_url(client: TestClient, headers: dict[str, str], image_id: int) -> str:
+    response = client.post(f"/api/v1/images/{image_id}/stream", headers=headers)
+    assert response.status_code == 200, response.text
+    return response.json()["url"]
+
+
+def test_a_stream_url_needs_no_token(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
+    response = client.post(f"/api/v1/images/{coast['video']}/stream", headers=headers)
+
+    expires_in = datetime.fromisoformat(response.json()["expires_at"]) - datetime.now(UTC)
+    assert timedelta(hours=11, minutes=59) < expires_in <= timedelta(hours=12)
+    url = response.json()["url"]
+    assert url.startswith(f"/api/v1/images/{coast['video']}/file?t=")
+    streamed = client.get(url)
+    assert streamed.status_code == 200
+    assert streamed.content == client.get(f"/api/v1/images/{coast['video']}/file", headers=headers).content
+    seeked = client.get(url, headers={"Range": "bytes=0-9"})
+    assert (seeked.status_code, len(seeked.content)) == (206, 10)
+
+
+def test_only_videos_get_stream_urls(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
+    response = client.post(f"/api/v1/images/{coast['photo']}/stream", headers=headers)
+
+    assert (response.status_code, response.json()["code"]) == (404, "not_found")
+
+
+def test_a_stream_url_is_for_its_own_video_only(
+    client: TestClient, headers: dict[str, str], coast: dict[str, int]
+) -> None:
+    url = stream_url(client, headers, coast["video"])
+
+    response = client.get(url.replace(f"/images/{coast['video']}/", f"/images/{coast['photo']}/"))
+
+    assert (response.status_code, response.json()["code"]) == (401, "not_authenticated")
+
+
+@pytest.mark.parametrize("damage", ["changed", "missing"])
+def test_a_damaged_stream_url_is_refused(
+    client: TestClient, headers: dict[str, str], coast: dict[str, int], damage: str
+) -> None:
+    url = stream_url(client, headers, coast["video"])
+    base, signature = url.split("&sig=")
+    damaged = f"{base}&sig={signature[::-1]}" if damage == "changed" else base
+
+    assert client.get(damaged).status_code == 401
+
+
+def test_a_stream_url_ends_with_its_login(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
+    url = stream_url(client, headers, coast["video"])
+    token_id = parse_qs(urlsplit(url).query)["t"][0]
+
+    assert client.delete(f"/api/v1/auth/tokens/{token_id}", headers=headers).status_code == 204  # logged out
+
+    assert client.get(url).status_code == 401
+
+
+def test_a_stream_url_ends_when_the_video_becomes_restricted(
+    client: TestClient, headers: dict[str, str], coast: dict[str, int]
+) -> None:
+    url = stream_url(client, headers, coast["video"])
+    [user] = [user for user in client.app.state.auth.list_users() if user.username == "restricted_user"]
+
+    client.app.state.access.set_restricted_terms(user.id, ["general:coast"])
+
+    assert client.get(url).status_code == 404
+
+
+def test_a_stream_url_expires(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
+    url = stream_url(client, headers, coast["video"])
+
+    client.app.state.streams._now = lambda: utc_now() + timedelta(hours=12, seconds=1)
+
+    assert client.get(url).status_code == 401
 
 
 def test_an_image_has_no_video_fields(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:

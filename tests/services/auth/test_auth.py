@@ -203,6 +203,20 @@ def test_revoked_token_no_longer_authenticates(auth: AuthService) -> None:
     assert raised_problem(lambda: auth.authenticate(new_token.token)).status == 401
 
 
+def test_a_login_is_found_by_its_id_while_it_lasts(auth: AuthService, clock: TestClock) -> None:
+    auth.create_user("restricted_user", PASSWORD, Role.USER)
+    device = auth.create_token("restricted_user", PASSWORD, "laptop")
+    web_login = auth.create_token("restricted_user", PASSWORD, "Web admin", lifetime=timedelta(hours=1))
+
+    assert auth.authenticate_token_id(device.info.id).user == device.user
+    auth.revoke_token(device.user.id, device.info.id)
+    clock.advance(timedelta(hours=1))
+
+    assert raised_problem(lambda: auth.authenticate_token_id(device.info.id)).status == 401  # revoked
+    assert raised_problem(lambda: auth.authenticate_token_id(web_login.info.id)).status == 401  # expired
+    assert raised_problem(lambda: auth.authenticate_token_id(9999)).status == 401  # never existed
+
+
 def test_cannot_revoke_another_users_token(auth: AuthService) -> None:
     auth.create_user("restricted_user", PASSWORD, Role.USER)
     admin = auth.create_user("admin_user", PASSWORD, Role.ADMIN)

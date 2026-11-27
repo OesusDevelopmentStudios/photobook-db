@@ -218,7 +218,7 @@ def check_albums_leave_it_out(client: TestClient, setup: Setup) -> None:
     assert albums == [("album:trip", 1, setup.safe_id)]
 
 
-def expect_video_not_found(path: str) -> Callable[[TestClient, Setup], None]:
+def expect_video_not_found(path: str, method: str = "GET") -> Callable[[TestClient, Setup], None]:
     """For a route only videos have: the private image is made a video first, so a 404 means it is hidden."""
 
     def check(client: TestClient, setup: Setup) -> None:
@@ -229,8 +229,8 @@ def expect_video_not_found(path: str) -> Callable[[TestClient, Setup], None]:
             session.commit()
 
         url = path.format(image_id=setup.private_id)
-        assert client.get(url, headers=setup.admin).status_code != 404  # 200, or 503 without FFmpeg
-        assert client.get(url, headers=setup.restricted_user).status_code == 404
+        assert client.request(method, url, headers=setup.admin).status_code != 404  # 200, or 503 without FFmpeg
+        assert client.request(method, url, headers=setup.restricted_user).status_code == 404
 
     return check
 
@@ -256,6 +256,7 @@ ACCESS_RULES = {
     ("GET", "/api/v1/images/{image_id}/storyboard/sprite"): expect_video_not_found(
         "/api/v1/images/{image_id}/storyboard/sprite"
     ),
+    ("POST", "/api/v1/images/{image_id}/stream"): expect_video_not_found("/api/v1/images/{image_id}/stream", "POST"),
     ("POST", "/api/v1/images/{image_id}/rotation"): expect_not_found("POST", "/api/v1/images/{image_id}/rotation"),
     ("GET", "/api/v1/tags"): check_autocomplete_hides,
     ("POST", "/api/v1/tags"): check_creating_is_for_admins,

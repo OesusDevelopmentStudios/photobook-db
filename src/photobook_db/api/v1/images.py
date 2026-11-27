@@ -15,6 +15,7 @@ from photobook_db.api.v1._upload_receiver import METADATA_PART, receive_upload
 from photobook_db.api.v1.dependencies import (
     CurrentAuthentication,
     CurrentRestrictions,
+    FileRestrictions,
     ImagesServiceDependency,
     ImporterServiceDependency,
     PreferencesServiceDependency,
@@ -22,6 +23,7 @@ from photobook_db.api.v1.dependencies import (
     SearchServiceDependency,
     StorageServiceDependency,
     StoryboardServiceDependency,
+    StreamServiceDependency,
     TagsServiceDependency,
     ThumbnailsServiceDependency,
 )
@@ -110,6 +112,14 @@ class Storyboard(BaseModel):
     sprite: str = Field(
         description="The sprite's URL: a WebP image", examples=["/api/v1/images/1234/storyboard/sprite"]
     )
+
+
+class StreamUrl(BaseModel):
+    url: str = Field(
+        description="The video's file without the token: for players that cannot send it",
+        examples=["/api/v1/images/1234/file?t=56&exp=1795000000&sig=…"],
+    )
+    expires_at: datetime = Field(description="Also ends when this login ends, or the user may no longer see it")
 
 
 class TagCountItem(BaseModel):
@@ -323,14 +333,14 @@ def get_tag_counts(
 
 @router.get(
     "/{image_id}/file",
-    summary="The original image file; supports Range and If-None-Match",
+    summary="The original file; supports Range and If-None-Match. The token, or a URL from POST /images/{id}/stream",
     response_class=FileResponse,
     responses={200: {"content": {"image/*": {}}}, 304: {"description": "Not modified"}, **problem_responses(401, 404)},
 )
 def get_image_file(
     image_id: int,
     request: Request,
-    restrictions: CurrentRestrictions,
+    restrictions: FileRestrictions,
     images: ImagesServiceDependency,
     storage: StorageServiceDependency,
 ) -> Response:
@@ -444,10 +454,27 @@ def get_storyboard_sprite(
     return FileResponse(storyboards.sprite_path(record.sha256), media_type="image/webp", headers=headers)
 
 
+@router.post(
+    "/{image_id}/stream",
+    summary="A URL to stream a video from without the token, for a player that cannot send it",
+    responses=problem_responses(401, 404),
+)
+def create_stream_url(
+    image_id: int,
+    authentication: CurrentAuthentication,
+    restrictions: CurrentRestrictions,
+    images: ImagesServiceDependency,
+    streams: StreamServiceDependency,
+) -> StreamUrl:
+    record = _visible_video(image_id, restrictions, images)
+    grant = streams.grant(record.id, authentication.token_id)
+    return StreamUrl(url=f"/api/v1/images/{record.id}/file?{grant.query()}", expires_at=grant.expires_at)
+
+
 def _visible_video(image_id: int, restrictions: Restrictions, images: ImagesService) -> ImageRecord:
     record = images.get_visible_image(image_id, restrictions)
     if record.media_kind != "video":
-        raise Problem(404, "not_found", "Not a video", "Only videos have a storyboard.")
+        raise Problem(404, "not_found", "Not a video", "This is an image; only videos have this.")
 
     return record
 
