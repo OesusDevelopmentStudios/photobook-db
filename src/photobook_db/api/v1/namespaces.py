@@ -20,7 +20,7 @@ router = APIRouter(prefix="/namespaces", tags=["namespaces"])
 
 class NamespaceDetails(BaseModel):
     name: str
-    single_value: bool = Field(description="An image has at most one tag in this namespace")
+    single_value: bool = Field(description="A photo or video has at most one tag in this namespace")
     is_builtin: bool = Field(description="Built-in namespaces cannot be deleted")
     in_path_template: bool = Field(description="Its tags form folder names in the library")
     user_editable: bool = Field(description="False: the server alone sets its tags (meta); users cannot change them")
@@ -60,8 +60,9 @@ def create_namespace(
     "/{name}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a custom namespace and its tags",
-    description="Its tags come off every image and are deleted; restricted tags and hidden filters lose the terms "
-    "that name them. Built-in namespaces and those in the path template cannot be deleted (409 namespace_in_use).",
+    description="Its tags come off every photo and video and are deleted; restricted tags and hidden filters lose the "
+    "terms that name them. Built-in namespaces and those in the path template cannot be deleted "
+    "(409 namespace_in_use).",
     responses=problem_responses(401, 403, 404, 409),
 )
 def delete_namespace(name: str, _admin: CurrentAdmin, tag_admin: TagAdminDependency) -> None:

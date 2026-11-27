@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""/albums: the albums (album: tags) with their image counts and covers, for the app's Albums tab."""
+"""/albums: the albums (album: tags) with their size and cover, for the app's Albums tab."""
 
 from datetime import datetime
 from typing import Annotated
@@ -22,15 +22,15 @@ router = APIRouter(prefix="/albums", tags=["albums"])
 
 
 class AlbumCover(BaseModel):
-    id: int = Field(description="The album's first image, in the order images were added to it")
-    revision: int = Field(description="For the thumbnail's URL (rev=), as in the image object")
+    id: int = Field(description="The album's first photo or video, in the order they were added to it")
+    revision: int = Field(description="For the thumbnail's URL (rev=), as in the media object")
 
 
 class Album(BaseModel):
     tag: str = Field(examples=["album:vacation_2015"])
-    image_count: int = Field(description="The images you may see")
+    media_count: int = Field(description="The photos and videos you may see")
     cover: AlbumCover
-    last_changed_at: datetime = Field(description="When an image was last added to it")
+    last_changed_at: datetime = Field(description="When a photo or video was last added to it")
 
 
 class AlbumList(BaseModel):
@@ -44,7 +44,7 @@ def list_albums(
     search: SearchServiceDependency,
     preferences: PreferencesServiceDependency,
     include_hidden: Annotated[
-        bool, Query(description="Also albums with images that your hidden-by-default filters match")
+        bool, Query(description="Also albums with photos or videos that your hidden-by-default filters match")
     ] = False,
 ) -> AlbumList:
     hidden_filters = () if include_hidden else tuple(preferences.hidden_filters(authentication.user.id))
@@ -53,7 +53,7 @@ def list_albums(
         items=[
             Album(
                 tag=f"album:{album.name}",
-                image_count=album.media_count,
+                media_count=album.media_count,
                 cover=AlbumCover(id=album.cover_id, revision=album.cover_revision),
                 last_changed_at=as_utc(album.last_changed_at),
             )

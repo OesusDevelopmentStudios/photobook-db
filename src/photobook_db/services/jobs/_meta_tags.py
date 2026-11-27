@@ -40,7 +40,7 @@ class MetaTagging:
                 tagged += 1
             except Exception:
                 _logger.exception("Could not read the file of media %s for its meta tags", media_id)
-                failed.append({"image_id": media_id, "code": "unreadable"})  # it stays without them
+                failed.append({"media_id": media_id, "code": "unreadable"})  # it stays without them
 
             context.report_progress(done, len(media_ids))
 

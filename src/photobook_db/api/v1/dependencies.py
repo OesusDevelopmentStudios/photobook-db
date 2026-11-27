@@ -118,26 +118,26 @@ def current_restrictions(
     authentication: Annotated[Authentication, Depends(current_authentication)],
     access: Annotated[AccessService, Depends(access_service)],
 ) -> Restrictions:
-    """What the logged-in user may see and use; none for admins. Every image endpoint needs it."""
+    """What the logged-in user may see and use; none for admins. Every media endpoint needs it."""
     return access.restrictions_for(authentication.user)
 
 
 def file_restrictions(
-    image_id: int,
+    media_id: int,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_token)],
     auth: Annotated[AuthService, Depends(auth_service)],
     access: Annotated[AccessService, Depends(access_service)],
     streams: Annotated[StreamService, Depends(stream_service)],
-    t: Annotated[int | None, Query(description="With exp and sig: a URL from POST /images/{id}/stream")] = None,
+    t: Annotated[int | None, Query(description="With exp and sig: a URL from POST /media/{id}/stream")] = None,
     exp: Annotated[int | None, Query(description="When the stream URL expires, in Unix time")] = None,
     sig: Annotated[str | None, Query(max_length=100, description="The stream URL's signature")] = None,
 ) -> Restrictions:
-    """Like current_restrictions, for an image's file: a player that cannot send the token uses a signed stream URL
+    """Like current_restrictions, for a media item's file: a player that cannot send the token uses a signed stream URL
     for that one file instead. Its login must still exist, and the user must still see the file."""
     if credentials is not None:
         authentication = auth.authenticate(credentials.credentials)
     elif t is not None and exp is not None and sig is not None:
-        streams.check(image_id, t, exp, sig)
+        streams.check(media_id, t, exp, sig)
         authentication = auth.authenticate_token_id(t)
     else:
         raise not_authenticated()

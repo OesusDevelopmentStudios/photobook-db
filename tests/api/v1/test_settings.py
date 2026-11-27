@@ -36,7 +36,7 @@ def upload(client: TestClient, headers: dict[str, str], tags: list[str], colour:
     Image.new("RGB", (8, 8), colour).save(buffer, format="JPEG")
     metadata = json.dumps({"original_filename": "beach.jpg", "tags": tags})
     files = {"file": ("beach.jpg", buffer.getvalue())}
-    return client.post("/api/v1/images", headers=headers, files=files, data={"metadata": metadata})
+    return client.post("/api/v1/media", headers=headers, files=files, data={"metadata": metadata})
 
 
 def wait_for_job(client: TestClient, headers: dict[str, str], job_id: int) -> dict[str, Any]:
@@ -74,14 +74,14 @@ def test_only_admins_see_and_change_settings(client: TestClient) -> None:
 
 
 def test_new_path_template_moves_the_files(client: TestClient, admin: dict[str, str]) -> None:
-    image_id = upload(client, admin, ["category:photo"]).json()["id"]
+    media_id = upload(client, admin, ["category:photo"]).json()["id"]
 
     response = client.patch("/api/v1/admin/settings", json={"path_template": "{category}"}, headers=admin)
 
     assert (response.status_code, response.json()["path_template"]) == (200, "{category}")
     job = wait_for_job(client, admin, response.json()["job_id"])
     assert (job["kind"], job["result"]["moved"]) == ("relayout", 1)
-    storage_path = client.get(f"/api/v1/images/{image_id}", headers=admin).json()["storage_path"]
+    storage_path = client.get(f"/api/v1/media/{media_id}", headers=admin).json()["storage_path"]
     assert storage_path.startswith("photo/") and storage_path.count("/") == 1
 
 
@@ -144,16 +144,16 @@ def test_changes_the_accent_colour_of_the_web_pages(client: TestClient, admin: d
 
 
 def test_ratings_are_the_rating_tags(client: TestClient, admin: dict[str, str]) -> None:
-    image_id = upload(client, admin, ["rating:private"]).json()["id"]
+    media_id = upload(client, admin, ["rating:private"]).json()["id"]
     refused = upload(client, admin, ["rating:secret"], colour="red")
     assert (refused.status_code, refused.json()["code"]) == (422, "invalid_tag")
 
     assert client.post("/api/v1/tags", json={"tag": "rating:secret"}, headers=admin).status_code == 201
-    response = client.patch(f"/api/v1/images/{image_id}", json={"add_tags": ["rating:secret"]}, headers=admin)
+    response = client.patch(f"/api/v1/media/{media_id}", json={"add_tags": ["rating:secret"]}, headers=admin)
     assert user_tags(response.json()["tags"]) == ["rating:secret"]
 
     client.delete("/api/v1/tags/rating/secret", headers=admin)  # taken off the image, and no longer allowed
-    assert user_tags(client.get(f"/api/v1/images/{image_id}", headers=admin).json()["tags"]) == []
+    assert user_tags(client.get(f"/api/v1/media/{media_id}", headers=admin).json()["tags"]) == []
     refused = upload(client, admin, ["rating:secret"], colour="red")
     assert (refused.status_code, refused.json()["code"]) == (422, "invalid_tag")
 

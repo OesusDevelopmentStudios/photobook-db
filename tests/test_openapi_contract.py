@@ -12,6 +12,22 @@ from photobook_db.config import Config
 SCHEMA_PATH = Path(__file__).parent.parent / "docs" / "openapi.json"
 
 
+def test_the_api_calls_them_media(config: Config) -> None:
+    """Paths, parameters, operations, tags, schemas and fields; an image is only a media kind or a content type."""
+    schema = create_app(config).openapi()
+    operations = [operation for path_item in schema["paths"].values() for operation in path_item.values()]
+    names = [
+        *schema["paths"],
+        *(operation["operationId"] for operation in operations),
+        *(tag for operation in operations for tag in operation.get("tags", [])),
+        *(parameter["name"] for operation in operations for parameter in operation.get("parameters", [])),
+        *schema["components"]["schemas"],
+        *(field for model in schema["components"]["schemas"].values() for field in model.get("properties", {})),
+    ]
+
+    assert [name for name in names if "image" in name.lower()] == []
+
+
 def test_api_matches_committed_schema(config: Config) -> None:
     committed_schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 

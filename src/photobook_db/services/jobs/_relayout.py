@@ -20,11 +20,12 @@ class Relayout:
 
     def start(self, user_id: int | None, media_ids: list[int] | None = None) -> JobInfo:
         """None: all media."""
-        params = {} if media_ids is None else {"image_ids": media_ids}
+        params = {} if media_ids is None else {"media_ids": media_ids}
         return self._jobs.submit(JobKind.RELAYOUT, params, user_id)
 
     def run(self, context: JobContext) -> dict[str, Any]:
-        media_ids = context.params.get("image_ids")
+        # "image_ids": a job queued before the server called them media
+        media_ids = context.params.get("media_ids", context.params.get("image_ids"))
         if media_ids is None:
             media_ids = self._media.all_media_ids()
 
@@ -36,7 +37,7 @@ class Relayout:
                 moved += self._media.move_file_to_layout(media_id)
             except Exception:
                 _logger.exception("Could not move the file of media %s to the new layout", media_id)
-                failed.append({"image_id": media_id, "code": "move_failed"})  # it stays where it was
+                failed.append({"media_id": media_id, "code": "move_failed"})  # it stays where it was
 
             context.report_progress(done, len(media_ids))
 

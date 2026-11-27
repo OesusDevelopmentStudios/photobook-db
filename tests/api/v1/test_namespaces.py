@@ -105,14 +105,14 @@ def test_deleting_a_namespace_takes_its_tags_off_the_images(
     Image.new("RGB", (8, 8), "teal").save(buffer, format="JPEG")
     metadata = json.dumps({"original_filename": "beach.jpg", "tags": ["weather:sunny", "summer"]})
     image = client.post(
-        "/api/v1/images", headers=admin_headers, files={"file": ("beach.jpg", buffer.getvalue())},
+        "/api/v1/media", headers=admin_headers, files={"file": ("beach.jpg", buffer.getvalue())},
         data={"metadata": metadata},
     ).json()
 
     response = client.delete("/api/v1/namespaces/weather", headers=admin_headers)
 
     assert response.status_code == 204
-    tags = client.get(f"/api/v1/images/{image['id']}", headers=admin_headers).json()["tags"]
+    tags = client.get(f"/api/v1/media/{image['id']}", headers=admin_headers).json()["tags"]
     assert "general:summer" in tags and not [tag for tag in tags if tag.startswith("weather:")]
 
 

@@ -201,8 +201,8 @@ def test_refuses_a_duplicate_and_keeps_the_existing_image(library: Library) -> N
         lambda: library.import_media(again, UploadMetadata("b.jpg", tags=("summer",)), user_id=None)
     )
 
-    assert (problem.status, problem.code) == (409, "duplicate_image")
-    assert problem.extra["existing_image_id"] == first.id
+    assert (problem.status, problem.code) == (409, "duplicate_media")
+    assert problem.extra["existing_media_id"] == first.id
     assert not again.exists()
     assert library.library_files() == [first.storage_path]
     assert library.thumbnails.thumbnail_path(first.sha256, 256).exists()
@@ -276,7 +276,7 @@ def test_copy_of_a_duplicate_is_refused_before_copying(
 
     problem = refused(lambda: library.importer.import_copy(source, UploadMetadata("b.jpg"), None, NO_RESTRICTIONS))
 
-    assert (problem.code, problem.extra["existing_image_id"]) == ("duplicate_image", first.id)
+    assert (problem.code, problem.extra["existing_media_id"]) == ("duplicate_media", first.id)
     assert source.exists()
 
 

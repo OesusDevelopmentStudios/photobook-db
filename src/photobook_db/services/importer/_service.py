@@ -103,7 +103,7 @@ class ImporterService:
     def import_media(
         self, incoming: Path, metadata: UploadMetadata, user_id: int | None, restrictions: Restrictions
     ) -> MediaRecord:
-        """Takes over `incoming`: it ends up in the library or is deleted. Raises 409 duplicate_image,
+        """Takes over `incoming`: it ends up in the library or is deleted. Raises 409 duplicate_media,
         403 tag_restricted, 413 file_too_large (over the limit for images or for videos), 415 unsupported_media_type,
         422 checksum_mismatch or 422 invalid_tag; nothing is stored then. The server adds the file's meta tags; meta
         tags in the metadata raise 422 tag_read_only."""
@@ -221,11 +221,11 @@ class ImporterService:
             raise file_too_large(limit, kind)
 
     def _check_not_duplicate(self, sha256: str, restrictions: Restrictions) -> None:
-        existing_image_id = self._media.find_id_by_sha256(sha256)
-        if existing_image_id is not None:
+        existing_media_id = self._media.find_id_by_sha256(sha256)
+        if existing_media_id is not None:
             # The user has the file already; confirming a copy exists reveals little, but not which one.
-            visible = self._media.is_visible(existing_image_id, restrictions)
-            raise duplicate_media(sha256, existing_image_id if visible else None)
+            visible = self._media.is_visible(existing_media_id, restrictions)
+            raise duplicate_media(sha256, existing_media_id if visible else None)
 
     def _new_media(
         self,

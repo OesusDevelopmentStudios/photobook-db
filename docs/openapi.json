@@ -368,13 +368,13 @@
         }
       }
     },
-    "/api/v1/images": {
+    "/api/v1/media": {
       "get": {
         "tags": [
-          "images"
+          "media"
         ],
-        "summary": "Search and list images",
-        "operationId": "search_images_api_v1_images_get",
+        "summary": "Search and list photos and videos",
+        "operationId": "search_media_api_v1_media_get",
         "security": [
           {
             "HTTPBearer": []
@@ -400,10 +400,10 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/Sort",
-              "description": "album: the order images were added to `album`; needs it",
+              "description": "album: the order media were added to `album`; needs it",
               "default": "taken_at"
             },
-            "description": "album: the order images were added to `album`; needs it"
+            "description": "album: the order media were added to `album`; needs it"
           },
           {
             "name": "order",
@@ -491,10 +491,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only this album's images: the name of an album: tag, e.g. trip",
+              "description": "Only this album's media: the name of an album: tag, e.g. trip",
               "title": "Album"
             },
-            "description": "Only this album's images: the name of an album: tag, e.g. trip"
+            "description": "Only this album's media: the name of an album: tag, e.g. trip"
           },
           {
             "name": "media",
@@ -502,10 +502,10 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/MediaKinds",
-              "description": "image (the default, as clients from before videos expect), video, or all",
-              "default": "image"
+              "description": "image, video, or all (the default)",
+              "default": "all"
             },
-            "description": "image (the default, as clients from before videos expect), video, or all"
+            "description": "image, video, or all (the default)"
           }
         ],
         "responses": {
@@ -514,7 +514,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImageList"
+                  "$ref": "#/components/schemas/MediaList"
                 }
               }
             }
@@ -553,10 +553,10 @@
       },
       "post": {
         "tags": [
-          "images"
+          "media"
         ],
-        "summary": "Upload one image",
-        "operationId": "upload_image_api_v1_images_post",
+        "summary": "Upload one photo or video",
+        "operationId": "upload_media_api_v1_media_post",
         "security": [
           {
             "HTTPBearer": []
@@ -568,7 +568,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImageObject"
+                  "$ref": "#/components/schemas/MediaObject"
                 }
               }
             }
@@ -648,7 +648,7 @@
                   "file": {
                     "type": "string",
                     "format": "binary",
-                    "description": "The image"
+                    "description": "The photo or video"
                   },
                   "metadata": {
                     "type": "string",
@@ -662,13 +662,13 @@
         }
       }
     },
-    "/api/v1/images/count": {
+    "/api/v1/media/count": {
       "get": {
         "tags": [
-          "images"
+          "media"
         ],
-        "summary": "How many images a search finds",
-        "operationId": "count_images_api_v1_images_count_get",
+        "summary": "How many photos and videos a search finds",
+        "operationId": "count_media_api_v1_media_count_get",
         "security": [
           {
             "HTTPBearer": []
@@ -714,10 +714,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only this album's images: the name of an album: tag, e.g. trip",
+              "description": "Only this album's media: the name of an album: tag, e.g. trip",
               "title": "Album"
             },
-            "description": "Only this album's images: the name of an album: tag, e.g. trip"
+            "description": "Only this album's media: the name of an album: tag, e.g. trip"
           },
           {
             "name": "media",
@@ -725,10 +725,10 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/MediaKinds",
-              "description": "image (the default, as clients from before videos expect), video, or all",
-              "default": "image"
+              "description": "image, video, or all (the default)",
+              "default": "all"
             },
-            "description": "image (the default, as clients from before videos expect), video, or all"
+            "description": "image, video, or all (the default)"
           }
         ],
         "responses": {
@@ -737,7 +737,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImageCount"
+                  "$ref": "#/components/schemas/MediaCount"
                 }
               }
             }
@@ -775,13 +775,13 @@
         }
       }
     },
-    "/api/v1/images/bulk-tags": {
+    "/api/v1/media/bulk-tags": {
       "post": {
         "tags": [
-          "images"
+          "media"
         ],
-        "summary": "Change the tags of many images; all or nothing",
-        "operationId": "change_tags_of_many_api_v1_images_bulk_tags_post",
+        "summary": "Change the tags of many photos and videos; all or nothing",
+        "operationId": "change_tags_of_many_api_v1_media_bulk_tags_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -851,13 +851,13 @@
         ]
       }
     },
-    "/api/v1/images/{image_id}": {
+    "/api/v1/media/{media_id}": {
       "patch": {
         "tags": [
-          "images"
+          "media"
         ],
-        "summary": "Change an image's tags; a change to a folder-forming tag moves the file",
-        "operationId": "change_tags_api_v1_images__image_id__patch",
+        "summary": "Change the tags of a photo or video; a change to a folder-forming tag moves the file",
+        "operationId": "change_tags_api_v1_media__media_id__patch",
         "security": [
           {
             "HTTPBearer": []
@@ -865,12 +865,12 @@
         ],
         "parameters": [
           {
-            "name": "image_id",
+            "name": "media_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Image Id"
+              "title": "Media Id"
             }
           }
         ],
@@ -890,7 +890,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImageObject"
+                  "$ref": "#/components/schemas/MediaObject"
                 }
               }
             }
@@ -939,10 +939,10 @@
       },
       "get": {
         "tags": [
-          "images"
+          "media"
         ],
-        "summary": "One image",
-        "operationId": "get_image_api_v1_images__image_id__get",
+        "summary": "One photo or video",
+        "operationId": "get_media_api_v1_media__media_id__get",
         "security": [
           {
             "HTTPBearer": []
@@ -950,12 +950,12 @@
         ],
         "parameters": [
           {
-            "name": "image_id",
+            "name": "media_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Image Id"
+              "title": "Media Id"
             }
           }
         ],
@@ -965,7 +965,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImageObject"
+                  "$ref": "#/components/schemas/MediaObject"
                 }
               }
             }
@@ -1003,14 +1003,14 @@
         }
       }
     },
-    "/api/v1/images/{image_id}/rotation": {
+    "/api/v1/media/{media_id}/rotation": {
       "post": {
         "tags": [
-          "images"
+          "media"
         ],
         "summary": "Turn an image, saved into its file without losing quality",
         "description": "JPEG and TIFF get a new EXIF orientation; PNG and BMP have their pixels turned. Other types: 422 rotation_not_supported. The response has the new size and the next `revision`; `sha256` stays the uploaded file's.",
-        "operationId": "rotate_image_api_v1_images__image_id__rotation_post",
+        "operationId": "rotate_media_api_v1_media__media_id__rotation_post",
         "security": [
           {
             "HTTPBearer": []
@@ -1018,12 +1018,12 @@
         ],
         "parameters": [
           {
-            "name": "image_id",
+            "name": "media_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Image Id"
+              "title": "Media Id"
             }
           }
         ],
@@ -1043,7 +1043,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImageObject"
+                  "$ref": "#/components/schemas/MediaObject"
                 }
               }
             }
@@ -1081,14 +1081,14 @@
         }
       }
     },
-    "/api/v1/images/{image_id}/tag-counts": {
+    "/api/v1/media/{media_id}/tag-counts": {
       "get": {
         "tags": [
-          "images"
+          "media"
         ],
-        "summary": "How many images have each of the image's tags",
-        "description": "For the viewer's tag pane. The counts are over all images, also ones you cannot see, as in autocomplete.",
-        "operationId": "get_tag_counts_api_v1_images__image_id__tag_counts_get",
+        "summary": "How many photos and videos have each of this one's tags",
+        "description": "For the viewer's tag pane. The counts are over all media, also ones you cannot see, as in autocomplete.",
+        "operationId": "get_tag_counts_api_v1_media__media_id__tag_counts_get",
         "security": [
           {
             "HTTPBearer": []
@@ -1096,12 +1096,12 @@
         ],
         "parameters": [
           {
-            "name": "image_id",
+            "name": "media_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Image Id"
+              "title": "Media Id"
             }
           }
         ],
@@ -1149,13 +1149,13 @@
         }
       }
     },
-    "/api/v1/images/{image_id}/file": {
+    "/api/v1/media/{media_id}/file": {
       "get": {
         "tags": [
-          "images"
+          "media"
         ],
-        "summary": "The original file; supports Range and If-None-Match. The token, or a URL from POST /images/{id}/stream",
-        "operationId": "get_image_file_api_v1_images__image_id__file_get",
+        "summary": "The original file; supports Range and If-None-Match. The token, or a URL from POST /media/{id}/stream",
+        "operationId": "get_media_file_api_v1_media__media_id__file_get",
         "security": [
           {
             "HTTPBearer": []
@@ -1163,12 +1163,12 @@
         ],
         "parameters": [
           {
-            "name": "image_id",
+            "name": "media_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Image Id"
+              "title": "Media Id"
             }
           },
           {
@@ -1184,10 +1184,10 @@
                   "type": "null"
                 }
               ],
-              "description": "With exp and sig: a URL from POST /images/{id}/stream",
+              "description": "With exp and sig: a URL from POST /media/{id}/stream",
               "title": "T"
             },
-            "description": "With exp and sig: a URL from POST /images/{id}/stream"
+            "description": "With exp and sig: a URL from POST /media/{id}/stream"
           },
           {
             "name": "exp",
@@ -1270,13 +1270,13 @@
         }
       }
     },
-    "/api/v1/images/{image_id}/thumbnail": {
+    "/api/v1/media/{media_id}/thumbnail": {
       "get": {
         "tags": [
-          "images"
+          "media"
         ],
         "summary": "A WebP thumbnail; the longest side is at most `size` pixels",
-        "operationId": "get_image_thumbnail_api_v1_images__image_id__thumbnail_get",
+        "operationId": "get_media_thumbnail_api_v1_media__media_id__thumbnail_get",
         "security": [
           {
             "HTTPBearer": []
@@ -1284,12 +1284,12 @@
         ],
         "parameters": [
           {
-            "name": "image_id",
+            "name": "media_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Image Id"
+              "title": "Media Id"
             }
           },
           {
@@ -1319,10 +1319,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The image's `revision`: a new URL after the file changed, so caches fetch it anew",
+              "description": "Its `revision`: a new URL after the file changed, so caches fetch it anew",
               "title": "Rev"
             },
-            "description": "The image's `revision`: a new URL after the file changed, so caches fetch it anew"
+            "description": "Its `revision`: a new URL after the file changed, so caches fetch it anew"
           }
         ],
         "responses": {
@@ -1368,13 +1368,13 @@
         }
       }
     },
-    "/api/v1/images/{image_id}/storyboard": {
+    "/api/v1/media/{media_id}/storyboard": {
       "get": {
         "tags": [
-          "images"
+          "media"
         ],
         "summary": "A video's frames for previews while scrubbing; the first request makes them and may take seconds",
-        "operationId": "get_storyboard_api_v1_images__image_id__storyboard_get",
+        "operationId": "get_storyboard_api_v1_media__media_id__storyboard_get",
         "security": [
           {
             "HTTPBearer": []
@@ -1382,12 +1382,12 @@
         ],
         "parameters": [
           {
-            "name": "image_id",
+            "name": "media_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Image Id"
+              "title": "Media Id"
             }
           }
         ],
@@ -1445,13 +1445,13 @@
         }
       }
     },
-    "/api/v1/images/{image_id}/storyboard/sprite": {
+    "/api/v1/media/{media_id}/storyboard/sprite": {
       "get": {
         "tags": [
-          "images"
+          "media"
         ],
         "summary": "The storyboard's frames as one WebP image",
-        "operationId": "get_storyboard_sprite_api_v1_images__image_id__storyboard_sprite_get",
+        "operationId": "get_storyboard_sprite_api_v1_media__media_id__storyboard_sprite_get",
         "security": [
           {
             "HTTPBearer": []
@@ -1459,12 +1459,12 @@
         ],
         "parameters": [
           {
-            "name": "image_id",
+            "name": "media_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Image Id"
+              "title": "Media Id"
             }
           }
         ],
@@ -1521,13 +1521,13 @@
         }
       }
     },
-    "/api/v1/images/{image_id}/stream": {
+    "/api/v1/media/{media_id}/stream": {
       "post": {
         "tags": [
-          "images"
+          "media"
         ],
         "summary": "A URL to stream a video from without the token, for a player that cannot send it",
-        "operationId": "create_stream_url_api_v1_images__image_id__stream_post",
+        "operationId": "create_stream_url_api_v1_media__media_id__stream_post",
         "security": [
           {
             "HTTPBearer": []
@@ -1535,12 +1535,12 @@
         ],
         "parameters": [
           {
-            "name": "image_id",
+            "name": "media_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Image Id"
+              "title": "Media Id"
             }
           }
         ],
@@ -1702,7 +1702,7 @@
         "tags": [
           "tags"
         ],
-        "summary": "Add a tag that no image has yet, so that it is suggested",
+        "summary": "Add a tag that nothing has yet, so that it is suggested",
         "operationId": "create_tag_api_v1_tags_post",
         "security": [
           {
@@ -1778,7 +1778,7 @@
         "tags": [
           "tags"
         ],
-        "summary": "Rename a tag, or merge it into an existing one, on every image",
+        "summary": "Rename a tag, or merge it into an existing one, on every photo and video",
         "operationId": "rename_tag_api_v1_tags__namespace___name__patch",
         "security": [
           {
@@ -1872,7 +1872,7 @@
         "tags": [
           "tags"
         ],
-        "summary": "Remove a tag from every image and delete it",
+        "summary": "Remove a tag from every photo and video and delete it",
         "operationId": "delete_tag_api_v1_tags__namespace___name__delete",
         "security": [
           {
@@ -1972,11 +1972,11 @@
             "required": false,
             "schema": {
               "type": "boolean",
-              "description": "Also albums with images that your hidden-by-default filters match",
+              "description": "Also albums with photos or videos that your hidden-by-default filters match",
               "default": false,
               "title": "Include Hidden"
             },
-            "description": "Also albums with images that your hidden-by-default filters match"
+            "description": "Also albums with photos or videos that your hidden-by-default filters match"
           }
         ],
         "responses": {
@@ -2129,7 +2129,7 @@
           "namespaces"
         ],
         "summary": "Delete a custom namespace and its tags",
-        "description": "Its tags come off every image and are deleted; restricted tags and hidden filters lose the terms that name them. Built-in namespaces and those in the path template cannot be deleted (409 namespace_in_use).",
+        "description": "Its tags come off every photo and video and are deleted; restricted tags and hidden filters lose the terms that name them. Built-in namespaces and those in the path template cannot be deleted (409 namespace_in_use).",
         "operationId": "delete_namespace_api_v1_namespaces__name__delete",
         "security": [
           {
@@ -2970,10 +2970,10 @@
               "album:vacation_2015"
             ]
           },
-          "image_count": {
+          "media_count": {
             "type": "integer",
-            "title": "Image Count",
-            "description": "The images you may see"
+            "title": "Media Count",
+            "description": "The photos and videos you may see"
           },
           "cover": {
             "$ref": "#/components/schemas/AlbumCover"
@@ -2982,13 +2982,13 @@
             "type": "string",
             "format": "date-time",
             "title": "Last Changed At",
-            "description": "When an image was last added to it"
+            "description": "When a photo or video was last added to it"
           }
         },
         "type": "object",
         "required": [
           "tag",
-          "image_count",
+          "media_count",
           "cover",
           "last_changed_at"
         ],
@@ -2999,12 +2999,12 @@
           "id": {
             "type": "integer",
             "title": "Id",
-            "description": "The album's first image, in the order images were added to it"
+            "description": "The album's first photo or video, in the order they were added to it"
           },
           "revision": {
             "type": "integer",
             "title": "Revision",
-            "description": "For the thumbnail's URL (rev=), as in the image object"
+            "description": "For the thumbnail's URL (rev=), as in the media object"
           }
         },
         "type": "object",
@@ -3060,19 +3060,19 @@
               ]
             ]
           },
-          "image_ids": {
+          "media_ids": {
             "items": {
               "type": "integer"
             },
             "type": "array",
             "maxItems": 1000,
             "minItems": 1,
-            "title": "Image Ids"
+            "title": "Media Ids"
           }
         },
         "type": "object",
         "required": [
-          "image_ids"
+          "media_ids"
         ],
         "title": "BulkTagChanges"
       },
@@ -3094,7 +3094,7 @@
           "path_template": {
             "type": "string",
             "title": "Path Template",
-            "description": "Where images are stored in the library: folders named by {namespace} placeholders and {year} and {month}",
+            "description": "Where photos and videos are stored in the library: folders named by {namespace} placeholders and {year} and {month}",
             "examples": [
               "{category}/{author}/{year}"
             ]
@@ -3315,232 +3315,6 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "ImageCount": {
-        "properties": {
-          "count": {
-            "type": "integer",
-            "title": "Count",
-            "description": "All images the search finds, over all its pages"
-          },
-          "effective_query": {
-            "type": "string",
-            "title": "Effective Query",
-            "description": "The query with the hidden-by-default filters that were added"
-          }
-        },
-        "type": "object",
-        "required": [
-          "count",
-          "effective_query"
-        ],
-        "title": "ImageCount"
-      },
-      "ImageLinks": {
-        "properties": {
-          "self": {
-            "type": "string",
-            "title": "Self"
-          },
-          "file": {
-            "type": "string",
-            "title": "File"
-          },
-          "thumbnail": {
-            "type": "string",
-            "title": "Thumbnail"
-          },
-          "storyboard": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Storyboard",
-            "description": "Videos only"
-          }
-        },
-        "type": "object",
-        "required": [
-          "self",
-          "file",
-          "thumbnail"
-        ],
-        "title": "ImageLinks"
-      },
-      "ImageList": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ImageObject"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor",
-            "description": "Pass as `cursor` for the next page; null on the last page"
-          },
-          "effective_query": {
-            "type": "string",
-            "title": "Effective Query",
-            "description": "The query with the hidden-by-default filters that were added"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items",
-          "next_cursor",
-          "effective_query"
-        ],
-        "title": "ImageList"
-      },
-      "ImageObject": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "sha256": {
-            "type": "string",
-            "title": "Sha256"
-          },
-          "original_filename": {
-            "type": "string",
-            "title": "Original Filename"
-          },
-          "storage_path": {
-            "type": "string",
-            "title": "Storage Path",
-            "description": "Relative to the library folder"
-          },
-          "mime_type": {
-            "type": "string",
-            "title": "Mime Type"
-          },
-          "width": {
-            "type": "integer",
-            "title": "Width",
-            "description": "As the image is shown, after its EXIF orientation"
-          },
-          "height": {
-            "type": "integer",
-            "title": "Height"
-          },
-          "file_size": {
-            "type": "integer",
-            "title": "File Size"
-          },
-          "taken_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Taken At",
-            "description": "Local wall-clock time, without a time zone"
-          },
-          "taken_at_source": {
-            "type": "string",
-            "enum": [
-              "exif",
-              "file_mtime",
-              "import_time",
-              "container"
-            ],
-            "title": "Taken At Source",
-            "description": "container: a video's own recording time"
-          },
-          "imported_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Imported At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "revision": {
-            "type": "integer",
-            "title": "Revision",
-            "description": "Grows when the file changes, e.g. a saved rotation; put it into thumbnail URLs as `rev`"
-          },
-          "tags": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Tags",
-            "description": "Sorted by namespace, then name",
-            "examples": [
-              [
-                "category:photo",
-                "general:summer"
-              ]
-            ]
-          },
-          "links": {
-            "$ref": "#/components/schemas/ImageLinks"
-          },
-          "media_kind": {
-            "type": "string",
-            "enum": [
-              "image",
-              "video"
-            ],
-            "title": "Media Kind"
-          },
-          "duration_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Duration Ms"
-          },
-          "video": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VideoDetails"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "sha256",
-          "original_filename",
-          "storage_path",
-          "mime_type",
-          "width",
-          "height",
-          "file_size",
-          "taken_at",
-          "taken_at_source",
-          "imported_at",
-          "updated_at",
-          "revision",
-          "tags",
-          "links",
-          "media_kind"
-        ],
-        "title": "ImageObject"
-      },
       "ImportRequest": {
         "properties": {
           "source_subdir": {
@@ -3565,7 +3339,7 @@
             "type": "array",
             "maxItems": 200,
             "title": "Tags",
-            "description": "Given to every imported image",
+            "description": "Given to every imported photo and video",
             "default": []
           }
         },
@@ -3704,7 +3478,7 @@
           "library_dir": {
             "type": "string",
             "title": "Library Dir",
-            "description": "The library folder on this computer; an image's file is there at its storage_path",
+            "description": "The library folder on this computer; a photo's or video's file is there at its storage_path",
             "examples": [
               "/home/restricted_user/Pictures/photobook-library"
             ]
@@ -3746,6 +3520,26 @@
         ],
         "title": "LoginRequest"
       },
+      "MediaCount": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "All media the search finds, over all its pages"
+          },
+          "effective_query": {
+            "type": "string",
+            "title": "Effective Query",
+            "description": "The query with the hidden-by-default filters that were added"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "effective_query"
+        ],
+        "title": "MediaCount"
+      },
       "MediaKinds": {
         "type": "string",
         "enum": [
@@ -3754,6 +3548,212 @@
           "all"
         ],
         "title": "MediaKinds"
+      },
+      "MediaLinks": {
+        "properties": {
+          "self": {
+            "type": "string",
+            "title": "Self"
+          },
+          "file": {
+            "type": "string",
+            "title": "File"
+          },
+          "thumbnail": {
+            "type": "string",
+            "title": "Thumbnail"
+          },
+          "storyboard": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storyboard",
+            "description": "Videos only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "self",
+          "file",
+          "thumbnail"
+        ],
+        "title": "MediaLinks"
+      },
+      "MediaList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MediaObject"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` for the next page; null on the last page"
+          },
+          "effective_query": {
+            "type": "string",
+            "title": "Effective Query",
+            "description": "The query with the hidden-by-default filters that were added"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "effective_query"
+        ],
+        "title": "MediaList"
+      },
+      "MediaObject": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename"
+          },
+          "storage_path": {
+            "type": "string",
+            "title": "Storage Path",
+            "description": "Relative to the library folder"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "description": "As it is shown: after an image's EXIF orientation or a video's rotation"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size"
+          },
+          "taken_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Taken At",
+            "description": "Local wall-clock time, without a time zone"
+          },
+          "taken_at_source": {
+            "type": "string",
+            "enum": [
+              "exif",
+              "file_mtime",
+              "import_time",
+              "container"
+            ],
+            "title": "Taken At Source",
+            "description": "container: a video's own recording time"
+          },
+          "imported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Imported At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Grows when the file changes, e.g. a saved rotation; put it into thumbnail URLs as `rev`"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Sorted by namespace, then name",
+            "examples": [
+              [
+                "category:photo",
+                "general:summer"
+              ]
+            ]
+          },
+          "links": {
+            "$ref": "#/components/schemas/MediaLinks"
+          },
+          "media_kind": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video"
+            ],
+            "title": "Media Kind"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "video": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VideoDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sha256",
+          "original_filename",
+          "storage_path",
+          "mime_type",
+          "width",
+          "height",
+          "file_size",
+          "taken_at",
+          "taken_at_source",
+          "imported_at",
+          "updated_at",
+          "revision",
+          "tags",
+          "links",
+          "media_kind"
+        ],
+        "title": "MediaObject"
       },
       "NamespaceDetails": {
         "properties": {
@@ -3764,7 +3764,7 @@
           "single_value": {
             "type": "boolean",
             "title": "Single Value",
-            "description": "An image has at most one tag in this namespace"
+            "description": "A photo or video has at most one tag in this namespace"
           },
           "is_builtin": {
             "type": "boolean",
@@ -4104,7 +4104,7 @@
           "path_template": {
             "type": "string",
             "title": "Path Template",
-            "description": "Where images are stored in the library: folders named by {namespace} placeholders and {year} and {month}",
+            "description": "Where photos and videos are stored in the library: folders named by {namespace} placeholders and {year} and {month}",
             "examples": [
               "{category}/{author}/{year}"
             ]
@@ -4283,7 +4283,7 @@
             "title": "Sprite",
             "description": "The sprite's URL: a WebP image",
             "examples": [
-              "/api/v1/images/1234/storyboard/sprite"
+              "/api/v1/media/1234/storyboard/sprite"
             ]
           }
         },
@@ -4306,7 +4306,7 @@
             "title": "Url",
             "description": "The video's file without the token: for players that cannot send it",
             "examples": [
-              "/api/v1/images/1234/file?t=56&exp=1795000000&sig=\u2026"
+              "/api/v1/media/1234/file?t=56&exp=1795000000&sig=\u2026"
             ]
           },
           "expires_at": {
@@ -4366,15 +4366,15 @@
               "general:beach"
             ]
           },
-          "image_count": {
+          "media_count": {
             "type": "integer",
-            "title": "Image Count"
+            "title": "Media Count"
           }
         },
         "type": "object",
         "required": [
           "tag",
-          "image_count"
+          "media_count"
         ],
         "title": "TagCountItem"
       },
@@ -4386,7 +4386,7 @@
             },
             "type": "array",
             "title": "Items",
-            "description": "Every tag of the image, in the image object's order"
+            "description": "Every tag of the media item, in its object's order"
           }
         },
         "type": "object",
@@ -4450,16 +4450,16 @@
               "author:sample_artist"
             ]
           },
-          "image_count": {
+          "media_count": {
             "type": "integer",
-            "title": "Image Count",
-            "description": "All images with this tag, also ones the user cannot see"
+            "title": "Media Count",
+            "description": "All photos and videos with this tag, also ones the user cannot see"
           }
         },
         "type": "object",
         "required": [
           "tag",
-          "image_count"
+          "media_count"
         ],
         "title": "TagWithCount"
       },

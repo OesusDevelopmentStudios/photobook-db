@@ -29,7 +29,7 @@ def library(admin_browser: TestClient) -> None:
         Image.new("RGB", (8, 8), colour).save(buffer, format="JPEG")
         metadata = json.dumps({"original_filename": "beach.jpg", "tags": [f"author:{author}", "summer", "q&a?#1"]})
         response = admin_browser.post(
-            "/api/v1/images",
+            "/api/v1/media",
             headers={"Authorization": f"Bearer {token}"},
             files={"file": ("beach.jpg", buffer.getvalue())},
             data={"metadata": metadata},
@@ -54,6 +54,14 @@ def test_needs_a_login(client: TestClient) -> None:
 
 # --- Each row's buttons
 
+def test_each_tag_shows_how_many_have_it(admin_browser: TestClient, library: None) -> None:
+    page = admin_browser.get("/admin/namespaces/author/tags").text
+
+    assert "<th>Photos and videos</th>" in page
+    assert "<td>2</td>" in rows(page)["sample_artist"]
+    assert "<td>1</td>" in rows(page)["sam_other"]
+
+
 def test_each_tag_has_a_rename_field_and_a_delete_button(admin_browser: TestClient, library: None) -> None:
     row = rows(admin_browser.get("/admin/namespaces/author/tags").text)["sam_other"]
 
@@ -67,7 +75,8 @@ def test_tags_with_special_characters_get_working_addresses(admin_browser: TestC
     row = rows(admin_browser.get("/admin/namespaces/general/tags").text)["q&amp;a?#1"]
 
     assert 'href="/admin/namespaces/general/tags/q%26a%3F%231/delete"' in row
-    assert "taken off 3 images" in admin_browser.get("/admin/namespaces/general/tags/q%26a%3F%231/delete").text
+    question = admin_browser.get("/admin/namespaces/general/tags/q%26a%3F%231/delete").text
+    assert "taken off 3 photos and videos" in question
 
 
 def test_tags_the_server_sets_have_no_buttons(admin_browser: TestClient, library: None) -> None:
@@ -92,7 +101,7 @@ def test_renames_a_tag(admin_browser: TestClient, tags: TagsService, library: No
     assert tags.media_count(TagName("general", "summer")) is None
     assert tags.media_count(TagName("general", "summer_holiday")) == 3
     page = admin_browser.get(location).text
-    assert "The images now have <code>general:summer_holiday</code> instead of the old tag." in page
+    assert "The photos and videos now have <code>general:summer_holiday</code> instead of the old tag." in page
     assert list(rows(page)) == ["summer_holiday"]
 
 
@@ -154,7 +163,7 @@ def test_a_refused_rename_keeps_its_row_open_with_what_was_typed(
 
 def test_deletes_a_tag_after_asking(admin_browser: TestClient, tags: TagsService, library: None) -> None:
     question = admin_browser.get("/admin/namespaces/general/tags/summer/delete").text
-    assert "The tag is taken off 3 images" in question
+    assert "The tag is taken off 3 photos and videos" in question
     assert '<a class="button secondary" href="/admin/namespaces/general/tags">Cancel</a>' in question
 
     response = post(admin_browser, "/admin/namespaces/general/tags/summer/delete")

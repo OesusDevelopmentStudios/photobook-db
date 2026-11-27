@@ -37,7 +37,7 @@ to import from, then restart it.</p>
         imported with its subfolders. Rescan after adding a folder.</span>
     <fieldset class="tag-fields">
         <legend>Tags</legend>
-        <span class="hint">Every imported image gets them. Separate several tags with commas or line breaks, e.g.
+        <span class="hint">Every imported photo and video gets them. Separate several tags with commas or line breaks, e.g.
             <code>sample_artist, other_artist</code>. Drag a box's corner to make it bigger.</span>
         <div class="tag-grid">
             {% for field in tag_fields %}
@@ -67,7 +67,7 @@ to import from, then restart it.</p>
         Remove the originals
     </label>
     <span class="hint">Deletes each file from the import folder once it is in the library, or was there already.
-        Files that are not images or fail to import stay.</span>
+        Files that are not photos or videos, or fail to import, stay.</span>
     <button type="submit">Start import</button>
 </form>
 {% endif %}

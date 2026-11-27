@@ -38,7 +38,7 @@ def test_returns_items_with_tag_and_count(client: TestClient, user_headers: dict
     response = client.get("/api/v1/tags", params={"prefix": "sum"}, headers=user_headers)
 
     assert response.status_code == 200
-    assert response.json() == {"items": [{"tag": "general:summer", "image_count": 0}], "next_cursor": None}
+    assert response.json() == {"items": [{"tag": "general:summer", "media_count": 0}], "next_cursor": None}
 
 
 @pytest.mark.parametrize("limit", [0, 101])
@@ -56,7 +56,7 @@ def general_tag_pages(client: TestClient, headers: dict[str, str], limit: int) -
     while len(pages) < 10:
         params = {"namespace": "general", "limit": limit} | ({} if cursor is None else {"cursor": cursor})
         body = client.get("/api/v1/tags", params=params, headers=headers).json()
-        pages.append([(item["tag"], item["image_count"]) for item in body["items"]])
+        pages.append([(item["tag"], item["media_count"]) for item in body["items"]])
         cursor = body["next_cursor"]
         if cursor is None:
             break
@@ -100,7 +100,7 @@ def upload(client: TestClient, headers: dict[str, str], tags: list[str], colour:
     Image.new("RGB", (8, 8), colour).save(buffer, format="JPEG")
     metadata = json.dumps({"original_filename": "beach.jpg", "tags": tags})
     files = {"file": ("beach.jpg", buffer.getvalue())}
-    return client.post("/api/v1/images", headers=headers, files=files, data={"metadata": metadata}).json()["id"]
+    return client.post("/api/v1/media", headers=headers, files=files, data={"metadata": metadata}).json()["id"]
 
 
 def test_admin_adds_a_tag_that_is_then_suggested(
@@ -110,9 +110,9 @@ def test_admin_adds_a_tag_that_is_then_suggested(
 
     response = client.post("/api/v1/tags", json={"tag": "Location:Old Harbour"}, headers=admin_headers)
 
-    assert (response.status_code, response.json()) == (201, {"tag": "location:old_harbour", "image_count": 0})
+    assert (response.status_code, response.json()) == (201, {"tag": "location:old_harbour", "media_count": 0})
     suggested = client.get("/api/v1/tags", params={"prefix": "location:old"}, headers=user_headers).json()["items"]
-    assert suggested == [{"tag": "location:old_harbour", "image_count": 0}]
+    assert suggested == [{"tag": "location:old_harbour", "media_count": 0}]
 
 
 @pytest.mark.parametrize(
@@ -156,7 +156,7 @@ def test_users_cannot_add_tags(client: TestClient, user_headers: dict[str, str])
 
 
 def test_admin_renames_a_folder_tag(client: TestClient, admin_headers: dict[str, str]) -> None:
-    image_id = upload(client, admin_headers, ["author:anon_one"])
+    media_id = upload(client, admin_headers, ["author:anon_one"])
 
     response = client.patch("/api/v1/tags/author/anon_one", json={"new_tag": "Author:Anon Two"}, headers=admin_headers)
 
@@ -167,18 +167,18 @@ def test_admin_renames_a_folder_tag(client: TestClient, admin_headers: dict[str,
         assert time.monotonic() < deadline, "the relayout did not finish in time"
         time.sleep(0.01)
 
-    image = client.get(f"/api/v1/images/{image_id}", headers=admin_headers).json()
+    image = client.get(f"/api/v1/media/{media_id}", headers=admin_headers).json()
     assert user_tags(image["tags"]) == ["author:anon_two"]
     assert "/anon_two/" in image["storage_path"]
 
 
 def test_admin_deletes_a_tag(client: TestClient, admin_headers: dict[str, str]) -> None:
-    image_id = upload(client, admin_headers, ["summer", "beach"])
+    media_id = upload(client, admin_headers, ["summer", "beach"])
 
     response = client.delete("/api/v1/tags/general/summer", headers=admin_headers)
 
     assert response.json() == {"job_id": None}
-    assert user_tags(client.get(f"/api/v1/images/{image_id}", headers=admin_headers).json()["tags"]) == [
+    assert user_tags(client.get(f"/api/v1/media/{media_id}", headers=admin_headers).json()["tags"]) == [
         "general:beach"
     ]
 

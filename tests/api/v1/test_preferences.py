@@ -25,7 +25,7 @@ def upload(client: TestClient, headers: dict[str, str], colour: str, tags: list[
     Image.new("RGB", (8, 8), colour).save(buffer, format="JPEG")
     metadata = json.dumps({"original_filename": f"{colour}.jpg", "tags": tags})
     response = client.post(
-        "/api/v1/images", headers=headers, files={"file": ("a.jpg", buffer.getvalue())}, data={"metadata": metadata}
+        "/api/v1/media", headers=headers, files={"file": ("a.jpg", buffer.getvalue())}, data={"metadata": metadata}
     )
     return response.json()["id"]
 
@@ -57,7 +57,7 @@ def test_search_hides_filtered_images_by_default(client: TestClient, headers: di
     client.put("/api/v1/preferences", json={"hidden_filters": ["rating:private"]}, headers=headers)
 
     def found(params: dict[str, object]) -> tuple[set[int], str]:
-        body = client.get("/api/v1/images", params=params, headers=headers).json()
+        body = client.get("/api/v1/media", params=params, headers=headers).json()
         return {item["id"] for item in body["items"]}, body["effective_query"]
 
     assert found({}) == ({shown}, "-rating:private")

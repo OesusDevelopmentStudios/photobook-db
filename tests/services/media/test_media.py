@@ -79,8 +79,8 @@ def test_same_sha256_is_a_duplicate(images: MediaService) -> None:
     with pytest.raises(Problem) as raised:
         images.create_media(replace(BEACH, storage_path="elsewhere.jpg"), [TagName("general", "new_tag")])
 
-    assert (raised.value.status, raised.value.code) == (409, "duplicate_image")
-    assert raised.value.extra == {"sha256": BEACH.sha256, "existing_image_id": first.id}
+    assert (raised.value.status, raised.value.code) == (409, "duplicate_media")
+    assert raised.value.extra == {"sha256": BEACH.sha256, "existing_media_id": first.id}
     assert images.get_media(first.id).tags == []  # tags are not merged into the existing image
 
 

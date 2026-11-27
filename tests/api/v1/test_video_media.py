@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Videos are rows of the image table, found only when a client asks for them: a client from before videos never
-receives a file it cannot show. The search tests make a video in the database; the upload tests send a real one,
-made by FFmpeg (skipped without it)."""
+"""Photos and videos side by side under /media: searches find both unless a client asks for one kind. The search
+tests make a video in the database; the upload tests send a real one, made by FFmpeg (skipped without it)."""
 
 import io
 import json
@@ -38,7 +37,7 @@ def upload(client: TestClient, headers: dict[str, str], file_name: str, colour: 
     Image.new("RGB", (40, 30), colour).save(buffer, format="JPEG")
     metadata = {"original_filename": file_name, "tags": ["general:coast"]}
     response = client.post(
-        "/api/v1/images",
+        "/api/v1/media",
         headers=headers,
         files={"file": (file_name, buffer.getvalue(), "image/jpeg")},
         data={"metadata": json.dumps(metadata)},
@@ -72,39 +71,41 @@ def coast(client: TestClient, headers: dict[str, str]) -> dict[str, int]:
 
 
 def found(client: TestClient, headers: dict[str, str], **params: object) -> list[int]:
-    response = client.get("/api/v1/images", headers=headers, params={"q": "general:coast", **params})
+    response = client.get("/api/v1/media", headers=headers, params={"q": "general:coast", **params})
     assert response.status_code == 200, response.text
     return sorted(image["id"] for image in response.json()["items"])
 
 
 def counted(client: TestClient, headers: dict[str, str], **params: object) -> int:
-    response = client.get("/api/v1/images/count", headers=headers, params={"q": "general:coast", **params})
+    response = client.get("/api/v1/media/count", headers=headers, params={"q": "general:coast", **params})
     assert response.status_code == 200, response.text
     return response.json()["count"]
 
 
 # As a client from before videos searches: without the parameter
-def test_finds_images_only_unless_asked(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
-    assert found(client, headers) == [coast["photo"]]
-    assert counted(client, headers) == 1
+def test_finds_photos_and_videos_unless_asked(
+    client: TestClient, headers: dict[str, str], coast: dict[str, int]
+) -> None:
+    assert found(client, headers) == sorted(coast.values())
+    assert counted(client, headers) == 2
 
 
-def test_finds_videos_or_both_when_asked(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
+def test_finds_one_kind_when_asked(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
+    assert found(client, headers, media="image") == [coast["photo"]]
     assert found(client, headers, media="video") == [coast["video"]]
-    assert found(client, headers, media="all") == sorted(coast.values())
+    assert counted(client, headers, media="image") == 1
     assert counted(client, headers, media="video") == 1
-    assert counted(client, headers, media="all") == 2
 
 
 def test_refuses_an_unknown_kind(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
-    response = client.get("/api/v1/images", headers=headers, params={"media": "sound"})
+    response = client.get("/api/v1/media", headers=headers, params={"media": "sound"})
 
     assert response.status_code == 422
     assert response.json()["code"] == "validation_error"
 
 
 def test_a_video_has_its_details(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
-    video = client.get(f"/api/v1/images/{coast['video']}", headers=headers).json()
+    video = client.get(f"/api/v1/media/{coast['video']}", headers=headers).json()
 
     assert video["media_kind"] == "video"
     assert video["taken_at_source"] == "container"
@@ -116,10 +117,10 @@ def test_a_video_has_its_details(client: TestClient, headers: dict[str, str], co
 def test_only_a_video_links_to_a_storyboard(
     client: TestClient, headers: dict[str, str], coast: dict[str, int]
 ) -> None:
-    video = client.get(f"/api/v1/images/{coast['video']}", headers=headers).json()
-    photo = client.get(f"/api/v1/images/{coast['photo']}", headers=headers).json()
+    video = client.get(f"/api/v1/media/{coast['video']}", headers=headers).json()
+    photo = client.get(f"/api/v1/media/{coast['photo']}", headers=headers).json()
 
-    assert video["links"]["storyboard"] == f"/api/v1/images/{coast['video']}/storyboard"
+    assert video["links"]["storyboard"] == f"/api/v1/media/{coast['video']}/storyboard"
     assert "storyboard" not in photo["links"]
 
 
@@ -127,7 +128,7 @@ def test_only_a_video_links_to_a_storyboard(
 def test_an_image_has_no_storyboard(
     client: TestClient, headers: dict[str, str], coast: dict[str, int], path: str
 ) -> None:
-    response = client.get(f"/api/v1/images/{coast['photo']}/{path}", headers=headers)
+    response = client.get(f"/api/v1/media/{coast['photo']}/{path}", headers=headers)
 
     assert (response.status_code, response.json()["code"]) == (404, "not_found")
 
@@ -138,35 +139,35 @@ def test_a_server_without_ffmpeg_has_no_storyboards(
 ) -> None:
     client.app.state.storyboards._media_probe = MediaProbe(ffprobe="no-such-ffprobe", ffmpeg="no-such-ffmpeg")
 
-    response = client.get(f"/api/v1/images/{coast['video']}/{path}", headers=headers)
+    response = client.get(f"/api/v1/media/{coast['video']}/{path}", headers=headers)
 
     assert (response.status_code, response.json()["code"]) == (503, "storyboard_unavailable")
 
 
 # --- Stream URLs, for a player that cannot send the token
 
-def stream_url(client: TestClient, headers: dict[str, str], image_id: int) -> str:
-    response = client.post(f"/api/v1/images/{image_id}/stream", headers=headers)
+def stream_url(client: TestClient, headers: dict[str, str], media_id: int) -> str:
+    response = client.post(f"/api/v1/media/{media_id}/stream", headers=headers)
     assert response.status_code == 200, response.text
     return response.json()["url"]
 
 
 def test_a_stream_url_needs_no_token(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
-    response = client.post(f"/api/v1/images/{coast['video']}/stream", headers=headers)
+    response = client.post(f"/api/v1/media/{coast['video']}/stream", headers=headers)
 
     expires_in = datetime.fromisoformat(response.json()["expires_at"]) - datetime.now(UTC)
     assert timedelta(hours=11, minutes=59) < expires_in <= timedelta(hours=12)
     url = response.json()["url"]
-    assert url.startswith(f"/api/v1/images/{coast['video']}/file?t=")
+    assert url.startswith(f"/api/v1/media/{coast['video']}/file?t=")
     streamed = client.get(url)
     assert streamed.status_code == 200
-    assert streamed.content == client.get(f"/api/v1/images/{coast['video']}/file", headers=headers).content
+    assert streamed.content == client.get(f"/api/v1/media/{coast['video']}/file", headers=headers).content
     seeked = client.get(url, headers={"Range": "bytes=0-9"})
     assert (seeked.status_code, len(seeked.content)) == (206, 10)
 
 
 def test_only_videos_get_stream_urls(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
-    response = client.post(f"/api/v1/images/{coast['photo']}/stream", headers=headers)
+    response = client.post(f"/api/v1/media/{coast['photo']}/stream", headers=headers)
 
     assert (response.status_code, response.json()["code"]) == (404, "not_found")
 
@@ -176,7 +177,7 @@ def test_a_stream_url_is_for_its_own_video_only(
 ) -> None:
     url = stream_url(client, headers, coast["video"])
 
-    response = client.get(url.replace(f"/images/{coast['video']}/", f"/images/{coast['photo']}/"))
+    response = client.get(url.replace(f"/media/{coast['video']}/", f"/media/{coast['photo']}/"))
 
     assert (response.status_code, response.json()["code"]) == (401, "not_authenticated")
 
@@ -221,7 +222,7 @@ def test_a_stream_url_expires(client: TestClient, headers: dict[str, str], coast
 
 
 def test_an_image_has_no_video_fields(client: TestClient, headers: dict[str, str], coast: dict[str, int]) -> None:
-    photo = client.get(f"/api/v1/images/{coast['photo']}", headers=headers).json()
+    photo = client.get(f"/api/v1/media/{coast['photo']}", headers=headers).json()
 
     assert photo["media_kind"] == "image"
     assert "duration_ms" not in photo
@@ -245,7 +246,7 @@ def video_bytes(tmp_path: Path) -> bytes:
 
 def upload_video(client: TestClient, headers: dict[str, str], content: bytes):  # -> httpx Response
     return client.post(
-        "/api/v1/images",
+        "/api/v1/media",
         headers=headers,
         files={"file": ("waves.mp4", content, "video/mp4")},
         data={"metadata": json.dumps({"original_filename": "waves.mp4", "tags": ["general:coast"]})},
@@ -270,7 +271,7 @@ def test_makes_a_videos_thumbnail_again(client: TestClient, headers: dict[str, s
     video = upload_video(client, headers, video_bytes(tmp_path)).json()
     client.app.state.thumbnails.delete_thumbnails(video["sha256"])
 
-    response = client.get(f"/api/v1/images/{video['id']}/thumbnail", headers=headers)
+    response = client.get(f"/api/v1/media/{video['id']}/thumbnail", headers=headers)
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/webp"
@@ -283,7 +284,7 @@ def test_a_videos_storyboard(client: TestClient, headers: dict[str, str], tmp_pa
     response = client.get(video["links"]["storyboard"], headers=headers)
 
     assert response.status_code == 200
-    sprite_url = f"/api/v1/images/{video['id']}/storyboard/sprite"
+    sprite_url = f"/api/v1/media/{video['id']}/storyboard/sprite"
     assert response.json() == {
         "interval_ms": 1000, "frame_count": 1, "frame_width": 160, "frame_height": 120, "columns": 1,
         "sprite": sprite_url,
@@ -301,7 +302,7 @@ def test_a_videos_storyboard(client: TestClient, headers: dict[str, str], tmp_pa
 def test_asking_for_the_sprite_first_makes_it(client: TestClient, headers: dict[str, str], tmp_path: Path) -> None:
     video = upload_video(client, headers, video_bytes(tmp_path)).json()
 
-    sprite = client.get(f"/api/v1/images/{video['id']}/storyboard/sprite", headers=headers)
+    sprite = client.get(f"/api/v1/media/{video['id']}/storyboard/sprite", headers=headers)
 
     assert (sprite.status_code, sprite.headers["content-type"]) == (200, "image/webp")
 

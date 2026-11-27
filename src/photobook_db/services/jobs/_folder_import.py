@@ -123,7 +123,7 @@ class FolderImport:
                 counts.too_large += 1
                 return
 
-            if problem.code != "duplicate_image":
+            if problem.code != "duplicate_media":
                 counts.fail(shown_path, problem.code)
                 return
 

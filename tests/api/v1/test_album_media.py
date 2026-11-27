@@ -31,19 +31,19 @@ def upload(client: TestClient, headers: dict[str, str], file_name: str, colour: 
     Image.new("RGB", (8, 8), colour).save(buffer, format="JPEG")
     metadata = json.dumps({"original_filename": file_name, "tags": tags})
     response = client.post(
-        "/api/v1/images", headers=headers, files={"file": (file_name, buffer.getvalue())}, data={"metadata": metadata}
+        "/api/v1/media", headers=headers, files={"file": (file_name, buffer.getvalue())}, data={"metadata": metadata}
     )
     assert response.status_code == 201
     return response.json()["id"]
 
 
-def added_to_album(client: TestClient, image_id: int, album: str, when: datetime) -> None:
+def added_to_album(client: TestClient, media_id: int, album: str, when: datetime) -> None:
     """As if the image had been added to the album at `when`."""
     album_tag = select(Tag.id).join(Namespace).where(Namespace.name == "album", Tag.name == album)
     with client.app.state.database.session() as session:
         session.execute(
             update(media_tag)
-            .where(media_tag.c.media_id == image_id, media_tag.c.tag_id == album_tag.scalar_subquery())
+            .where(media_tag.c.media_id == media_id, media_tag.c.tag_id == album_tag.scalar_subquery())
             .values(added_at=when)
         )
         session.commit()
@@ -65,7 +65,7 @@ def trip(client: TestClient, headers: dict[str, str]) -> dict[str, int]:
 
 
 def found(client: TestClient, headers: dict[str, str], **params: object) -> list[int]:
-    return [item["id"] for item in client.get("/api/v1/images", params=params, headers=headers).json()["items"]]
+    return [item["id"] for item in client.get("/api/v1/media", params=params, headers=headers).json()["items"]]
 
 
 def test_finds_only_the_albums_images(client: TestClient, headers: dict[str, str], trip: dict[str, int]) -> None:
@@ -75,7 +75,7 @@ def test_finds_only_the_albums_images(client: TestClient, headers: dict[str, str
 
 
 def test_counts_the_albums_images(client: TestClient, headers: dict[str, str], trip: dict[str, int]) -> None:
-    response = client.get("/api/v1/images/count", params={"album": "trip", "q": "summer"}, headers=headers)
+    response = client.get("/api/v1/media/count", params={"album": "trip", "q": "summer"}, headers=headers)
 
     assert response.json()["count"] == 2
 
@@ -94,7 +94,7 @@ def test_pages_through_an_album_in_its_order(client: TestClient, headers: dict[s
     cursor = None
     while len(pages) < 10:  # a cursor that never ends fails instead of hanging
         params = {"album": "trip", "sort": "album", "limit": 1} | ({} if cursor is None else {"cursor": cursor})
-        body = client.get("/api/v1/images", params=params, headers=headers).json()
+        body = client.get("/api/v1/media", params=params, headers=headers).json()
         pages.append([item["id"] for item in body["items"]])
         cursor = body["next_cursor"]
         if cursor is None:
@@ -111,7 +111,7 @@ def test_pages_through_an_album_in_its_order(client: TestClient, headers: dict[s
 def test_album_order_needs_an_album_and_its_own_cursor(
     client: TestClient, headers: dict[str, str], trip: dict[str, int], params: dict[str, str], field: str
 ) -> None:
-    response = client.get("/api/v1/images", params=params, headers=headers)
+    response = client.get("/api/v1/media", params=params, headers=headers)
 
     assert (response.status_code, response.json()["errors"][0]["field"]) == (422, field)
 
@@ -132,7 +132,7 @@ def test_a_restricted_image_stays_out_of_its_album(
 
 def albums(client: TestClient, headers: dict[str, str], **params: object) -> list[tuple[str, int, int, str]]:
     items = client.get("/api/v1/albums", params=params, headers=headers).json()["items"]
-    return [(item["tag"], item["image_count"], item["cover"]["id"], item["last_changed_at"]) for item in items]
+    return [(item["tag"], item["media_count"], item["cover"]["id"], item["last_changed_at"]) for item in items]
 
 
 def test_needs_a_login(client: TestClient) -> None:

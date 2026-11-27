@@ -34,7 +34,7 @@ class Sort(StrEnum):
 
 
 class MediaKinds(StrEnum):
-    IMAGE = "image"  # images only: what clients from before videos expect, so it is the default
+    IMAGE = "image"
     VIDEO = "video"
     ALL = "all"
 
@@ -54,7 +54,7 @@ class SearchRequest:
     cursor: str | None = None  # next_cursor of the previous page
     hidden_filters: tuple[str, ...] = ()
     album: str | None = None  # only this album's media, e.g. "vacation_2015"
-    media: MediaKinds = MediaKinds.IMAGE
+    media: MediaKinds = MediaKinds.ALL
 
 
 @dataclass(frozen=True)
@@ -118,7 +118,7 @@ class SearchService:
         hidden_filters: tuple[str, ...],
         visible_media: ColumnElement[bool],
         album: str | None = None,
-        media: MediaKinds = MediaKinds.IMAGE,
+        media: MediaKinds = MediaKinds.ALL,
     ) -> SearchCount:
         """How many media search() finds over all its pages. Raises 400 invalid_query or 422 invalid_tag."""
         filtered = self._filtered(query, hidden_filters)
@@ -203,7 +203,7 @@ def _sort_keys(sort: Sort, seed: int | None, links: Subquery | None) -> list[Col
     """What the media are ordered by, before their id."""
     if sort == Sort.ALBUM:
         if links is None:
-            raise _invalid("query.sort", "sort=album needs an album: the order is when images were added to it.")
+            raise _invalid("query.sort", "sort=album needs an album: the order is when its media were added to it.")
 
         return [links.c.added_at, Media.original_filename]
 

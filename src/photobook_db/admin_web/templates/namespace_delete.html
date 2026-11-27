@@ -8,8 +8,8 @@
 {% block content %}
 {% if tag_count %}
 <p class="error" role="alert">This will remove {{ tag_count }} tag{% if tag_count != 1 %}s{% endif %} and affect
-{{ image_count }} image{% if image_count != 1 %}s{% endif %}.</p>
-<p>The images stay in the library. Restricted tags and hidden filters lose the terms that name the namespace's
+{{ media_count }} {{ "photo or video" if media_count == 1 else "photos and videos" }}.</p>
+<p>The photos and videos stay in the library. Restricted tags and hidden filters lose the terms that name the namespace's
 tags.</p>
 {% else %}
 <p>The namespace has no tags, so nothing else changes.</p>

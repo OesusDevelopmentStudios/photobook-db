@@ -22,7 +22,7 @@ router = APIRouter(prefix="/tags", tags=["tags"])
 
 class TagWithCount(BaseModel):
     tag: str = Field(examples=["author:sample_artist"])
-    image_count: int = Field(description="All images with this tag, also ones the user cannot see")
+    media_count: int = Field(description="All photos and videos with this tag, also ones the user cannot see")
 
 
 class TagList(BaseModel):
@@ -45,18 +45,18 @@ def list_tags(
 ) -> TagList:
     is_hidden = restrictions.is_tag_hidden if restrictions.active else None  # restricted tags are never suggested
     page = tags.tag_page(prefix, namespace, limit, is_hidden, cursor)
-    items = [TagWithCount(tag=str(match.tag), image_count=match.media_count) for match in page.items]
+    items = [TagWithCount(tag=str(match.tag), media_count=match.media_count) for match in page.items]
     return TagList(items=items, next_cursor=page.next_cursor)
 
 
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
-    summary="Add a tag that no image has yet, so that it is suggested",
+    summary="Add a tag that nothing has yet, so that it is suggested",
     responses=problem_responses(401, 403, 409, 422),
 )
 def create_tag(new_tag: NewTag, _admin: CurrentAdmin, tag_admin: TagAdminDependency) -> TagWithCount:
-    return TagWithCount(tag=str(tag_admin.create_tag(new_tag.tag)), image_count=0)
+    return TagWithCount(tag=str(tag_admin.create_tag(new_tag.tag)), media_count=0)
 
 
 class TagRename(BaseModel):
@@ -74,7 +74,7 @@ class DeletedTag(BaseModel):
 
 @router.patch(
     "/{namespace}/{name}",
-    summary="Rename a tag, or merge it into an existing one, on every image",
+    summary="Rename a tag, or merge it into an existing one, on every photo and video",
     responses=problem_responses(401, 403, 404, 422),
 )
 def rename_tag(
@@ -86,7 +86,7 @@ def rename_tag(
 
 @router.delete(
     "/{namespace}/{name}",
-    summary="Remove a tag from every image and delete it",
+    summary="Remove a tag from every photo and video and delete it",
     responses=problem_responses(401, 403, 404, 422),
 )
 def delete_tag(namespace: str, name: str, admin: CurrentAdmin, tag_admin: TagAdminDependency) -> DeletedTag:

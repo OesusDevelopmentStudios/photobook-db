@@ -242,7 +242,7 @@ def test_unknown_id_changes_none_of_the_images(library: Library) -> None:
         lambda: library.change_tags_of_many([image.id, 999], add_tags=["album:trip"], remove_tags=[])
     )
 
-    assert (problem.status, problem.detail) == (404, "One of the images does not exist.")
+    assert (problem.status, problem.detail) == (404, "One of the photos or videos does not exist.")
     assert library.images.get_media(image.id) == image
 
 

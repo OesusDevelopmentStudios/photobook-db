@@ -19,13 +19,13 @@ def access_line(path: str) -> str:
 
 
 def test_hides_the_signature_of_a_stream_url() -> None:
-    line = access_line("/api/v1/images/12/file?t=3&exp=1795000000&sig=AbC-123_x")
+    line = access_line("/api/v1/media/12/file?t=3&exp=1795000000&sig=AbC-123_x")
 
-    assert line == '127.0.0.1:50000 - "GET /api/v1/images/12/file?t=3&exp=1795000000&sig=(hidden) HTTP/1.1" 206'
+    assert line == '127.0.0.1:50000 - "GET /api/v1/media/12/file?t=3&exp=1795000000&sig=(hidden) HTTP/1.1" 206'
 
 
 def test_leaves_other_requests_alone() -> None:
-    assert "?q=signature&limit=5" in access_line("/api/v1/images?q=signature&limit=5")
+    assert "?q=signature&limit=5" in access_line("/api/v1/media?q=signature&limit=5")
 
 
 def test_the_server_hides_them_from_its_start(client: TestClient) -> None:

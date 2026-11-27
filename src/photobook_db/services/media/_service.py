@@ -85,14 +85,14 @@ class MediaService:
         with self._database.session() as session:
             media = session.get(Media, media_id)
             if media is None:
-                raise Problem(404, "not_found", "Image not found")
+                raise Problem(404, "not_found", "Not found")
 
             return _record(session, media)
 
     def get_visible_media(self, media_id: int, restrictions: Restrictions) -> MediaRecord:
         """404 not_found also for a media item the user is restricted from: it behaves as if it did not exist."""
         if not self.is_visible(media_id, restrictions):
-            raise Problem(404, "not_found", "Image not found")
+            raise Problem(404, "not_found", "Not found")
 
         return self.get_media(media_id)
 
@@ -137,7 +137,7 @@ class MediaService:
                 select(Media).where(Media.id.in_(unique_ids), restrictions.visible_media_filter())
             ).all()
             if len(media_rows) != len(unique_ids):
-                raise Problem(404, "not_found", "Image not found", "One of the images does not exist.")
+                raise Problem(404, "not_found", "Not found", "One of the photos or videos does not exist.")
 
             def check(_old_tags: list[TagName], new_tags: list[TagName], taken_at: datetime) -> None:
                 restrictions.check_tags_allowed(new_tags, taken_at)
@@ -154,7 +154,7 @@ class MediaService:
         with self._database.session() as session:
             media = session.get(Media, media_id)
             if media is None:
-                raise Problem(404, "not_found", "Image not found")
+                raise Problem(404, "not_found", "Not found")
 
             current = _tags_of(session, [media_id]).get(media_id, [])
             outdated = {tag for tag in current if tag.namespace == META_NAMESPACE and tag not in meta_tags}
@@ -267,7 +267,7 @@ class MediaService:
             return session.scalar(select(Media.id).where(Media.sha256 == sha256))
 
     def create_media(self, new_media: NewMedia, tags: list[TagName]) -> MediaRecord:
-        """The media item, its new tags and their links in one transaction. Raises 409 duplicate_image if a
+        """The media item, its new tags and their links in one transaction. Raises 409 duplicate_media if a
         media item with the same SHA-256 exists, also when another upload was a moment faster."""
         now = utc_now()
         media = Media(**vars(new_media), imported_at=now, updated_at=now)
@@ -277,11 +277,11 @@ class MediaService:
                 session.flush()
             except IntegrityError:
                 session.rollback()
-                existing_image_id = self.find_id_by_sha256(new_media.sha256)
-                if existing_image_id is None:
+                existing_media_id = self.find_id_by_sha256(new_media.sha256)
+                if existing_media_id is None:
                     raise  # not a duplicate media item: the storage path is taken, a mistake of the caller
 
-                raise duplicate_media(new_media.sha256, existing_image_id) from None
+                raise duplicate_media(new_media.sha256, existing_media_id) from None
 
             for tag_id in _tag_ids(session, tags):
                 session.execute(media_tag.insert().values(media_id=media.id, tag_id=tag_id))
@@ -325,13 +325,13 @@ class MediaService:
                 _logger.error("Could not move the file of media %s after a tag change: %s", media_id, error)
 
 
-def duplicate_media(sha256: str, existing_image_id: int | None) -> Problem:
+def duplicate_media(sha256: str, existing_media_id: int | None) -> Problem:
     extra: dict[str, object] = {"sha256": sha256}
-    if existing_image_id is not None:
-        extra["existing_image_id"] = existing_image_id
+    if existing_media_id is not None:
+        extra["existing_media_id"] = existing_media_id
 
     return Problem(
-        409, "duplicate_image", "Image already exists", "An image with this SHA-256 is already in the library.",
+        409, "duplicate_media", "Already in the library", "A file with this SHA-256 is already in the library.",
         **extra,
     )
 

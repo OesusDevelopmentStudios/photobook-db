@@ -59,7 +59,7 @@ def confirm_deletion(request: Request, session: AdminPage, name: str) -> HTMLRes
         return _list_page(request, session, error=problem_message(problem), status_code=problem.status)
 
     tag_count, media_count = _tags(request).namespace_usage(name)
-    context = {"session": session, "name": name, "tag_count": tag_count, "image_count": media_count}
+    context = {"session": session, "name": name, "tag_count": tag_count, "media_count": media_count}
     return templates.TemplateResponse(request, "namespace_delete.html", context)
 
 

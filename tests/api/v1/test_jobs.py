@@ -138,7 +138,7 @@ def test_admin_imports_a_folder(importing_client: TestClient) -> None:
     assert (job["kind"], job["status"]) == ("folder_import", "done")
     assert job["params"] == {"source_subdir": "trip", "remove_originals": False, "tags": ["album:trip"]}
     assert job["result"] == {"imported": 1, "duplicates": 0, "unsupported": 0, "too_large": 0, "failed": []}
-    images = importing_client.get("/api/v1/images", params={"q": "album:trip"}, headers=headers).json()["items"]
+    images = importing_client.get("/api/v1/media", params={"q": "album:trip"}, headers=headers).json()["items"]
     assert len(images) == 1
 
 

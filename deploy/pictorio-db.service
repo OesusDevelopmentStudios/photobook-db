@@ -10,7 +10,7 @@
 # To start it at boot without logging in: loginctl enable-linger $USER
 
 [Unit]
-Description=photobook-db image library server
+Description=photobook-db photo and video library server
 After=network-online.target
 Wants=network-online.target
 
@@ -21,7 +21,7 @@ ExecStart=%h/.local/bin/photobook-db serve
 # (deploy/Caddyfile.example), remove this line: the server then listens on 127.0.0.1 only.
 Environment=PHOTOBOOK_HOST=0.0.0.0
 
-# The defaults: the database in ~/.local/share/photobook-db, the images in ~/Pictures/photobook-library.
+# The defaults: the database in ~/.local/share/photobook-db, the photos and videos in ~/Pictures/photobook-library.
 #Environment=PHOTOBOOK_LIBRARY_DIR=/srv/photobook-library
 # Optional: a folder that admins can import from.
 #Environment=PHOTOBOOK_IMPORT_DIR=/srv/photos-inbox

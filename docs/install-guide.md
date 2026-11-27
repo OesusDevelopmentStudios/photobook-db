@@ -4,7 +4,7 @@ This guide sets up photobook-db on the computer where you use the photobook desk
 server then runs in the background as a service of your user, never as root. For a server on a NAS or a
 Raspberry Pi, see [Install](../README.md#install) in the README instead.
 
-With the server on the same computer, the desktop app can also show an image's file in its folder
+With the server on the same computer, the desktop app can also show a photo's or video's file in its folder
 ("Open Containing Folder").
 
 The install script does all of this for you. It asks where things go, each with a default, and needs no
@@ -20,7 +20,7 @@ hand instead, follow the steps below.
 ## What you need
 
 - **Podman 4.4 or newer**, with systemd. Fedora, Ubuntu 24.04 and Debian 13 have it.
-- About 230 MB for the container image (with FFmpeg, for videos), and room for your images.
+- About 230 MB for the container image (with FFmpeg, for videos), and room for your photos and videos.
 
 ## 1. Install Podman
 
@@ -41,7 +41,7 @@ sudo pacman -S podman
 
 ## 2. Make the folders
 
-The images go into a library folder; the database and the thumbnails go into `.photobook` inside it, so
+The photos and videos go into a library folder; the database and the thumbnails go into `.photobook` inside it, so
 one folder holds everything to back up:
 
 ```sh
@@ -57,7 +57,7 @@ The unit file tells systemd how to run the server's container. Copy all of this 
 ```sh
 cat > ~/.config/containers/systemd/photobook-db.container <<'EOF'
 [Unit]
-Description=photobook-db image library server
+Description=photobook-db photo and video library server
 
 [Container]
 Image=ghcr.io/oesusdevelopmentstudios/photobook-db:latest
@@ -66,7 +66,7 @@ ContainerName=photobook-db
 # Only this computer can connect. For other devices too: PublishPort=8737:8737
 PublishPort=127.0.0.1:8737:8737
 
-# The images, and the database with the thumbnails
+# The photos and videos, and the database with the thumbnails
 Volume=%h/Pictures/photobook-library:/library:Z
 Volume=%h/Pictures/photobook-library/.photobook:/data:Z
 
@@ -97,7 +97,7 @@ EOF
 - **Other devices too**, e.g. the app on a laptop: `PublishPort=8737:8737`. If the computer has a firewall,
   open the port, e.g. on Fedora:
   `sudo firewall-cmd --add-port=8737/tcp --permanent && sudo firewall-cmd --reload`.
-- **A folder to import from**, with images that are already on this computer:
+- **A folder to import from**, with photos and videos that are already on this computer:
   `Volume=%h/Pictures/inbox:/import:ro,Z`. Without `ro`, an import can remove the originals.
 
 ## 4. Start it

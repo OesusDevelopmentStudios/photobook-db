@@ -29,11 +29,11 @@ class Library:
         settings = SettingsService(database)
         tags = TagsService(database, lambda: self.storage.path_template_namespaces())
         self.storage = StorageService(database, settings, self.library_dir, tags.namespace_names)
-        self.images = MediaService(database, tags, self.storage)
+        self.media = MediaService(database, tags, self.storage)
         thumbnails = ThumbnailsService(tmp_path / "thumbnails")
-        self.importer = ImporterService(self.images, tags, self.storage, thumbnails, settings, MediaProbe())
+        self.importer = ImporterService(self.media, tags, self.storage, thumbnails, settings, MediaProbe())
         self.jobs = JobsService(database)
-        self.relayout = Relayout(self.jobs, self.images)
+        self.relayout = Relayout(self.jobs, self.media)
         self.jobs.register(JobKind.RELAYOUT, self.relayout.run)
         self.admin = AuthService(database).create_user("admin_user", "correct horse battery", Role.ADMIN)
 
@@ -46,7 +46,9 @@ class Library:
         return self.importer.import_media(incoming, UploadMetadata(f"{colour}.jpg", tags=tags), None, Restrictions([]))
 
     def run_relayout(self) -> JobInfo:
-        job = self.relayout.start(self.admin.id)
+        return self.wait_for(self.relayout.start(self.admin.id))
+
+    def wait_for(self, job: JobInfo) -> JobInfo:
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             job = self.jobs.get_job(job.id, self.admin)
@@ -61,7 +63,7 @@ class Library:
         return sorted(str(PurePosixPath(record.storage_path).parent) for record in self.all_media())
 
     def all_media(self) -> list[MediaRecord]:
-        return self.images.get_media_list(self.images.all_media_ids())
+        return self.media.get_media_list(self.media.all_media_ids())
 
 
 @pytest.fixture
@@ -70,6 +72,17 @@ def library(database: Database, tmp_path: Path) -> Iterator[Library]:
     started.jobs.start()
     yield started
     started.jobs.stop()
+
+
+# A server of the version before stored the list under this name; a job it queued runs after the upgrade.
+def test_a_job_queued_with_image_ids_still_moves_those(library: Library) -> None:
+    listed = library.add_media("red", ("category:photo",))
+    library.add_media("teal", ("category:photo",))
+    library.storage.set_path_template("{year}")
+
+    job = library.wait_for(library.jobs.submit(JobKind.RELAYOUT, {"image_ids": [listed.id]}, library.admin.id))
+
+    assert job.result == {"moved": 1, "unchanged": 0, "failed": []}
 
 
 def test_moves_every_file_to_the_new_layout(library: Library) -> None:
@@ -112,7 +125,7 @@ def test_failed_move_is_reported_and_the_rest_moves(
     library.storage.set_path_template("{year}")
     job = library.run_relayout()
 
-    assert job.result == {"moved": 1, "unchanged": 0, "failed": [{"image_id": stuck.id, "code": "move_failed"}]}
-    assert library.images.get_media(stuck.id).storage_path == stuck.storage_path
+    assert job.result == {"moved": 1, "unchanged": 0, "failed": [{"media_id": stuck.id, "code": "move_failed"}]}
+    assert library.media.get_media(stuck.id).storage_path == stuck.storage_path
     assert (library.library_dir / stuck.storage_path).is_file()
     assert "Could not move the file of media" in caplog.text

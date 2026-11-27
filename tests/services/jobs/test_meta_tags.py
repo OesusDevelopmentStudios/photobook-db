@@ -118,7 +118,7 @@ def test_an_unreadable_file_is_reported_and_the_rest_tagged(library: Library, wo
 
     job = library.finished(library.meta_tagging.start_if_needed())  # type: ignore[arg-type]
 
-    assert job.result == {"tagged": 1, "failed": [{"image_id": missing.id, "code": "unreadable"}]}
+    assert job.result == {"tagged": 1, "failed": [{"media_id": missing.id, "code": "unreadable"}]}
     assert "meta:gif" in library.tags_of(found)
     assert library.tags_of(missing) == ["general:summer"]
 

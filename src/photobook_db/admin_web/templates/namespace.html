@@ -6,23 +6,23 @@
 {% block heading %}Namespace <code>{{ namespace.name }}:</code>{% endblock %}
 {% block back %}{{ back_button("/admin/namespaces", "Back to all namespaces") }}{% endblock %}
 {% block content %}
-{# Fixed values, e.g. the ratings: the tags are the only values an image may have. #}
+{# Fixed values, e.g. the ratings: the tags are the only values a photo or video may have. #}
 {% set fixed = namespace.allowed_values is not none %}
 {% set kind = "value" if fixed else "tag" %}
 <dl>
-    <dt>Tags per image</dt><dd>{% if namespace.single_value %}one{% else %}any number{% endif %}</dd>
+    <dt>Tags per photo or video</dt><dd>{% if namespace.single_value %}one{% else %}any number{% endif %}</dd>
     <dt>Kind</dt><dd>{% if namespace.is_builtin %}built-in{% else %}custom{% endif %}</dd>
     <dt>Folders</dt><dd>{% if namespace.in_path_template %}in the path template{% else %}no{% endif %}</dd>
-    {% if fixed %}<dt>Values</dt><dd>fixed: images may have only the values listed here</dd>{% endif %}
+    {% if fixed %}<dt>Values</dt><dd>fixed: photos and videos may have only the values listed here</dd>{% endif %}
 </dl>
 
 {% if notes.error %}
 <p class="error" role="alert">{{ notes.error }}</p>
 {% elif notes.added %}
 <p class="success" role="status">The {{ kind }} <code>{{ namespace.name }}:{{ notes.added }}</code> has been added.
-{% if fixed %}Images may have it now.{% else %}Users get it as a suggestion.{% endif %}</p>
+{% if fixed %}Photos and videos may have it now.{% else %}Users get it as a suggestion.{% endif %}</p>
 {% elif notes.renamed %}
-<p class="success" role="status">The images now have <code>{{ notes.renamed }}</code> instead of the old tag.
+<p class="success" role="status">The photos and videos now have <code>{{ notes.renamed }}</code> instead of the old tag.
 {% if notes.relayout_job is not none %}
 <a href="/admin/import/{{ notes.relayout_job }}">Job {{ notes.relayout_job }}</a> moves the affected files to their
 new folders.{% endif %}</p>
@@ -37,8 +37,8 @@ new folders.{% endif %}</p>
 <h2>Add a {{ kind }}</h2>
 <form method="post" action="{{ tags_path }}" class="field-with-button">
     <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
-    {% set placeholder = "A new value that images may have" if fixed
-                         else "A tag no image has yet, so that users get it as a suggestion" %}
+    {% set placeholder = "A new value that photos and videos may have" if fixed
+                         else "A tag nothing has yet, so that users get it as a suggestion" %}
     <input name="tag_name" required autocomplete="off" spellcheck="false" value="{{ new_tag_name }}"
            aria-label="New {{ kind }}" placeholder="{{ placeholder }}">
     <button type="submit">Add {{ kind | capitalize }}</button>
@@ -59,12 +59,12 @@ so they cannot be added, renamed or deleted here.</p>
 
 {% if tags %}
 <table>
-    <tr><th>{{ kind | capitalize }}</th><th>Images</th>{% if namespace.user_editable %}<th></th>{% endif %}</tr>
+    <tr><th>{{ kind | capitalize }}</th><th>Photos and videos</th>{% if namespace.user_editable %}<th></th>{% endif %}</tr>
     {% for match, tag_path in tags %}
     {% set refused = renaming is not none and renaming.tag_name == match.tag.name %}
     <tr>
         <td><code>{{ match.tag.name }}</code></td>
-        <td>{{ match.image_count }}</td>
+        <td>{{ match.media_count }}</td>
         {% if namespace.user_editable %}
         <td class="row-actions">
             {# Opens a field in the row; clicking the pencil again closes it. #}
@@ -93,9 +93,9 @@ so they cannot be added, renamed or deleted here.</p>
 {% endif %}
 
 <p class="hint">Most used first.
-{% if fixed %}Renaming a value renames it on every image; deleting one takes it off every image.
+{% if fixed %}Renaming a value renames it on every photo and video; deleting one takes it off all of them.
 {% elif namespace.user_editable %}Renaming to an existing tag merges the two. Another namespace's prefix, e.g.
-<code>album:</code>, moves the tag there; in a one-tag-per-image namespace it replaces an image's current tag.
+<code>album:</code>, moves the tag there; in a one-tag-per-item namespace it replaces the current tag.
 Restricted tags and hidden filters follow.{% endif %}
 </p>
 {% if next_cursor or cursor %}

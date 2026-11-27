@@ -63,7 +63,7 @@ def test_failed_login_says_why(client: TestClient, username: str, password: str,
     assert "set-cookie" not in response.headers
 
 
-@pytest.mark.parametrize("next", ["https://example.org/", "//example.org/admin", "/api/v1/images"])
+@pytest.mark.parametrize("next", ["https://example.org/", "//example.org/admin", "/api/v1/media"])
 def test_login_never_returns_to_another_site(client: TestClient, admin: None, next: str) -> None:
     assert log_in(client, "admin_user", next=next).headers["location"] == "/admin"
 

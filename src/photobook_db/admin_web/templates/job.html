@@ -54,9 +54,10 @@
     <tr><td><code>{{ failure.path }}</code></td><td><code>{{ failure.code }}</code></td></tr>
     {% endfor %}
     {% else %}
-    <tr><th>Image</th><th>Problem</th></tr>
+    <tr><th>Photo or video</th><th>Problem</th></tr>
     {% for failure in job.result.failed %}
-    <tr><td>{{ failure.image_id }}</td><td><code>{{ failure.code }}</code></td></tr>
+    {# image_id: a job from before the server called them media #}
+    <tr><td>{{ failure.media_id | default(failure.image_id) }}</td><td><code>{{ failure.code }}</code></td></tr>
     {% endfor %}
     {% endif %}
 </table>

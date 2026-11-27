@@ -24,7 +24,7 @@ old_urls = APIRouter(prefix="/jobs")  # where these pages were before 0.2.0; boo
 REFRESH_SECONDS = 2  # the worker writes progress about once a second
 UNFINISHED = (JobStatus.QUEUED, JobStatus.RUNNING)
 TAG_FIELD_PREFIX = "tag_"  # the import form has a field per namespace: tag_author, tag_rating…
-SUGGESTIONS = 100  # values offered for a one-tag-per-image namespace
+SUGGESTIONS = 100  # values offered for a one-tag-per-item namespace
 
 
 @dataclass(frozen=True)
@@ -135,7 +135,7 @@ def _tags(request: Request) -> TagsService:
 
 def _tag_texts(entered: dict[str, str], namespaces: list[NamespaceInfo]) -> list[str]:
     """"sample_artist, other_artist" in the author field → author:sample_artist, author:other_artist. Commas and
-    line breaks can be no part of a tag, so they separate tags; a one-tag-per-image field takes its text whole."""
+    line breaks can be no part of a tag, so they separate tags; a one-tag-per-item field takes its text whole."""
     texts = []
     for namespace in namespaces:
         if not namespace.user_editable:
@@ -144,7 +144,7 @@ def _tag_texts(entered: dict[str, str], namespaces: list[NamespaceInfo]) -> list
         text = entered.get(namespace.name, "")
         if namespace.single_value and "," in text:
             raise Problem(
-                422, "validation_error", "Invalid tag", f"An image has one {namespace.name} tag, so give one."
+                422, "validation_error", "Invalid tag", f"A photo or video has one {namespace.name} tag, so give one."
             )
 
         names = [text] if namespace.single_value else re.split(r"[,\n]", text)

@@ -32,7 +32,7 @@ These environment variables are read when the server starts.
 | `PHOTOBOOK_HOST` | `127.0.0.1` | Address to listen on. `0.0.0.0` makes the server reachable from other computers |
 | `PHOTOBOOK_PORT` | `8737` | Port to listen on |
 | `PHOTOBOOK_DATA_DIR` | `~/.local/share/photobook-db` | Folder for the database. Created if missing |
-| `PHOTOBOOK_LIBRARY_DIR` | `~/Pictures/photobook-library` | Folder for the images, arranged by their tags. Created if missing |
+| `PHOTOBOOK_LIBRARY_DIR` | `~/Pictures/photobook-library` | Folder for the photos and videos, arranged by their tags. Created if missing |
 | `PHOTOBOOK_IMPORT_DIR` | not set | Folder that admins can import from with an import job, e.g. a NAS share. Unset: no folder imports |
 | `PHOTOBOOK_TRUSTED_PROXIES` | `127.0.0.1` | Addresses (or networks, comma-separated, or `*`) of a reverse proxy whose `X-Forwarded-*` headers are believed. See [deploy/Caddyfile.example](deploy/Caddyfile.example) |
 | `PHOTOBOOK_HOST_MACHINE_ID_FILE` | `/etc/machine-id` | The machine ID of the computer the server runs on. A desktop app that proves it runs there gets the library folder's path, to open an image's folder in the file manager. The container image reads `/run/host/machine-id`: mount the host's `/etc/machine-id` there, read-only, as [deploy/photobook-db.container](deploy/photobook-db.container) does |

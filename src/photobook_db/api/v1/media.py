@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""/images: uploading images, and reading them back with their files and thumbnails."""
+"""/media: uploading photos and videos, and reading them back with their files and thumbnails."""
 
 from datetime import datetime
 from typing import Annotated, Literal
@@ -37,23 +37,23 @@ from photobook_db.services.thumbnails import THUMBNAIL_SIZES
 from photobook_db.utils.problems import Problem, problem_responses
 from photobook_db.utils.time import as_utc
 
-router = APIRouter(prefix="/images", tags=["images"])
+router = APIRouter(prefix="/media", tags=["media"])
 
 # A thumbnail never changes for a given SHA-256 and revision, so clients may keep it for good.
 THUMBNAIL_CACHE_CONTROL = "private, max-age=31536000, immutable"
 
-# The parameters that choose which images a search finds, shared by the search and its count
+# The parameters that choose which media a search finds, shared by the search and its count
 SearchText = Annotated[str, Query(max_length=2000, description="Search query, e.g. category:artwork -rating:private")]
 ApplyHiddenFilters = Annotated[bool, Query(description="false skips your hidden-by-default filters")]
 AlbumName = Annotated[
-    str | None, Query(max_length=200, description="Only this album's images: the name of an album: tag, e.g. trip")
+    str | None, Query(max_length=200, description="Only this album's media: the name of an album: tag, e.g. trip")
 ]
 MediaChoice = Annotated[
-    MediaKinds, Query(description="image (the default, as clients from before videos expect), video, or all")
+    MediaKinds, Query(description="image, video, or all (the default)")
 ]
 
 
-class ImageLinks(BaseModel):
+class MediaLinks(BaseModel):
     self: str
     file: str
     thumbnail: str
@@ -67,13 +67,13 @@ class VideoDetails(BaseModel):
     frame_rate: float | None
 
 
-class ImageObject(BaseModel):
+class MediaObject(BaseModel):
     id: int
     sha256: str
     original_filename: str
     storage_path: str = Field(description="Relative to the library folder")
     mime_type: str
-    width: int = Field(description="As the image is shown, after its EXIF orientation")
+    width: int = Field(description="As it is shown: after an image's EXIF orientation or a video's rotation")
     height: int
     file_size: int
     taken_at: datetime = Field(description="Local wall-clock time, without a time zone")
@@ -88,15 +88,15 @@ class ImageObject(BaseModel):
     tags: list[str] = Field(
         description="Sorted by namespace, then name", examples=[["category:photo", "general:summer"]]
     )
-    links: ImageLinks
+    links: MediaLinks
     media_kind: Literal["image", "video"]
-    # Only for videos: an image's object has neither, so clients from before videos see nothing new.
+    # Only for videos; an image's object has neither.
     duration_ms: int | None = Field(default=None, exclude_if=lambda value: value is None)
     video: VideoDetails | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
-class ImageList(BaseModel):
-    items: list[ImageObject]
+class MediaList(BaseModel):
+    items: list[MediaObject]
     next_cursor: str | None = Field(description="Pass as `cursor` for the next page; null on the last page")
     effective_query: str = Field(description="The query with the hidden-by-default filters that were added")
 
@@ -110,29 +110,29 @@ class Storyboard(BaseModel):
     frame_height: int = Field(examples=[90])
     columns: int = Field(description="Frames per row of the sprite", examples=[10])
     sprite: str = Field(
-        description="The sprite's URL: a WebP image", examples=["/api/v1/images/1234/storyboard/sprite"]
+        description="The sprite's URL: a WebP image", examples=["/api/v1/media/1234/storyboard/sprite"]
     )
 
 
 class StreamUrl(BaseModel):
     url: str = Field(
         description="The video's file without the token: for players that cannot send it",
-        examples=["/api/v1/images/1234/file?t=56&exp=1795000000&sig=…"],
+        examples=["/api/v1/media/1234/file?t=56&exp=1795000000&sig=…"],
     )
     expires_at: datetime = Field(description="Also ends when this login ends, or the user may no longer see it")
 
 
 class TagCountItem(BaseModel):
     tag: str = Field(examples=["general:beach"])
-    image_count: int
+    media_count: int
 
 
 class TagCountList(BaseModel):
-    items: list[TagCountItem] = Field(description="Every tag of the image, in the image object's order")
+    items: list[TagCountItem] = Field(description="Every tag of the media item, in its object's order")
 
 
-class ImageCount(BaseModel):
-    count: int = Field(description="All images the search finds, over all its pages")
+class MediaCount(BaseModel):
+    count: int = Field(description="All media the search finds, over all its pages")
     effective_query: str = Field(description="The query with the hidden-by-default filters that were added")
 
 
@@ -142,7 +142,7 @@ class TagChanges(BaseModel):
 
 
 class BulkTagChanges(TagChanges):
-    image_ids: list[int] = Field(min_length=1, max_length=1000)
+    media_ids: list[int] = Field(min_length=1, max_length=1000)
 
 
 class BulkTagResult(BaseModel):
@@ -168,7 +168,7 @@ _UPLOAD_REQUEST_BODY = {
                 "type": "object",
                 "required": ["file", "metadata"],
                 "properties": {
-                    "file": {"type": "string", "format": "binary", "description": "The image"},
+                    "file": {"type": "string", "format": "binary", "description": "The photo or video"},
                     "metadata": {
                         "type": "string",
                         "description": "JSON: original_filename, file_mtime?, client_sha256?, tags?",
@@ -181,23 +181,23 @@ _UPLOAD_REQUEST_BODY = {
 }
 
 
-@router.get("", summary="Search and list images", responses=problem_responses(400, 401, 422))
-def search_images(
+@router.get("", summary="Search and list photos and videos", responses=problem_responses(400, 401, 422))
+def search_media(
     authentication: CurrentAuthentication,
     restrictions: CurrentRestrictions,
     search: SearchServiceDependency,
     media_service: MediaServiceDependency,
     preferences: PreferencesServiceDependency,
     q: SearchText = "",
-    sort: Annotated[Sort, Query(description="album: the order images were added to `album`; needs it")] = Sort.TAKEN_AT,
+    sort: Annotated[Sort, Query(description="album: the order media were added to `album`; needs it")] = Sort.TAKEN_AT,
     order: Annotated[Order, Query(description="Ignored for sort=random and sort=album")] = Order.DESC,
     seed: Annotated[int | None, Query(description="Required for sort=random: same seed, same order")] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
     cursor: Annotated[str | None, Query(max_length=500, description="next_cursor of the previous page")] = None,
     apply_hidden_filters: ApplyHiddenFilters = True,
     album: AlbumName = None,
-    media: MediaChoice = MediaKinds.IMAGE,
-) -> ImageList:
+    media: MediaChoice = MediaKinds.ALL,
+) -> MediaList:
     hidden_filters = preferences.hidden_filters(authentication.user.id) if apply_hidden_filters else []
     request = SearchRequest(
         query=q,
@@ -211,16 +211,16 @@ def search_images(
         media=media,
     )
     page = search.search(request, restrictions.visible_media_filter())
-    return ImageList(
-        items=[_image_object(record) for record in media_service.get_media_list(page.media_ids)],
+    return MediaList(
+        items=[_media_object(record) for record in media_service.get_media_list(page.media_ids)],
         next_cursor=page.next_cursor,
         effective_query=page.effective_query,
     )
 
 
-# Before /{image_id}, so that "count" is never read as an image id.
-@router.get("/count", summary="How many images a search finds", responses=problem_responses(400, 401, 422))
-def count_images(
+# Before /{media_id}, so that "count" is never read as an id.
+@router.get("/count", summary="How many photos and videos a search finds", responses=problem_responses(400, 401, 422))
+def count_media(
     authentication: CurrentAuthentication,
     restrictions: CurrentRestrictions,
     search: SearchServiceDependency,
@@ -228,27 +228,27 @@ def count_images(
     q: SearchText = "",
     apply_hidden_filters: ApplyHiddenFilters = True,
     album: AlbumName = None,
-    media: MediaChoice = MediaKinds.IMAGE,
-) -> ImageCount:
+    media: MediaChoice = MediaKinds.ALL,
+) -> MediaCount:
     hidden_filters = preferences.hidden_filters(authentication.user.id) if apply_hidden_filters else []
     found = search.count(q, tuple(hidden_filters), restrictions.visible_media_filter(), album, media)
-    return ImageCount(count=found.count, effective_query=found.effective_query)
+    return MediaCount(count=found.count, effective_query=found.effective_query)
 
 
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
-    summary="Upload one image",
+    summary="Upload one photo or video",
     responses=problem_responses(401, 403, 409, 413, 415, 422),
     openapi_extra={"requestBody": _UPLOAD_REQUEST_BODY},
 )
-async def upload_image(
+async def upload_media(
     request: Request,
     response: Response,
     authentication: CurrentAuthentication,
     restrictions: CurrentRestrictions,
     importer: ImporterServiceDependency,
-) -> ImageObject:
+) -> MediaObject:
     incoming = importer.new_incoming_path()
     # The importer checks the limit for the kind of file once it knows what the file is.
     metadata_json = await receive_upload(request, incoming, importer.largest_upload_bytes())
@@ -262,40 +262,40 @@ async def upload_image(
     record = await run_in_threadpool(
         importer.import_media, incoming, metadata, authentication.user.id, restrictions
     )
-    response.headers["Location"] = f"/api/v1/images/{record.id}"
-    return _image_object(record)
+    response.headers["Location"] = f"/api/v1/media/{record.id}"
+    return _media_object(record)
 
 
 @router.post(
     "/bulk-tags",
-    summary="Change the tags of many images; all or nothing",
+    summary="Change the tags of many photos and videos; all or nothing",
     responses=problem_responses(401, 403, 404, 422),
 )
 async def change_tags_of_many(
     changes: BulkTagChanges, restrictions: CurrentRestrictions, media_service: MediaServiceDependency
 ) -> BulkTagResult:
     updated = await run_in_threadpool(
-        media_service.change_tags_of_many, changes.image_ids, changes.add_tags, changes.remove_tags, restrictions
+        media_service.change_tags_of_many, changes.media_ids, changes.add_tags, changes.remove_tags, restrictions
     )
     return BulkTagResult(updated=updated)
 
 
 @router.patch(
-    "/{image_id}",
-    summary="Change an image's tags; a change to a folder-forming tag moves the file",
+    "/{media_id}",
+    summary="Change the tags of a photo or video; a change to a folder-forming tag moves the file",
     responses=problem_responses(401, 403, 404, 422),
 )
 async def change_tags(
-    image_id: int, changes: TagChanges, restrictions: CurrentRestrictions, media_service: MediaServiceDependency
-) -> ImageObject:
+    media_id: int, changes: TagChanges, restrictions: CurrentRestrictions, media_service: MediaServiceDependency
+) -> MediaObject:
     record = await run_in_threadpool(
-        media_service.change_tags, image_id, changes.add_tags, changes.remove_tags, restrictions
+        media_service.change_tags, media_id, changes.add_tags, changes.remove_tags, restrictions
     )
-    return _image_object(record)
+    return _media_object(record)
 
 
 @router.post(
-    "/{image_id}/rotation",
+    "/{media_id}/rotation",
     summary="Turn an image, saved into its file without losing quality",
     description=(
         "JPEG and TIFF get a new EXIF orientation; PNG and BMP have their pixels turned. Other types: "
@@ -304,47 +304,47 @@ async def change_tags(
     ),
     responses=problem_responses(401, 404, 422),
 )
-async def rotate_image(
-    image_id: int, rotation: Rotation, restrictions: CurrentRestrictions, rotations: RotationServiceDependency
-) -> ImageObject:
-    record = await run_in_threadpool(rotations.rotate, image_id, rotation.degrees, restrictions)
-    return _image_object(record)
+async def rotate_media(
+    media_id: int, rotation: Rotation, restrictions: CurrentRestrictions, rotations: RotationServiceDependency
+) -> MediaObject:
+    record = await run_in_threadpool(rotations.rotate, media_id, rotation.degrees, restrictions)
+    return _media_object(record)
 
 
-@router.get("/{image_id}", summary="One image", responses=problem_responses(401, 404, 422))
-def get_image(image_id: int, restrictions: CurrentRestrictions, media_service: MediaServiceDependency) -> ImageObject:
-    return _image_object(media_service.get_visible_media(image_id, restrictions))
+@router.get("/{media_id}", summary="One photo or video", responses=problem_responses(401, 404, 422))
+def get_media(media_id: int, restrictions: CurrentRestrictions, media_service: MediaServiceDependency) -> MediaObject:
+    return _media_object(media_service.get_visible_media(media_id, restrictions))
 
 
 @router.get(
-    "/{image_id}/tag-counts",
-    summary="How many images have each of the image's tags",
-    description="For the viewer's tag pane. The counts are over all images, also ones you cannot see, as in "
+    "/{media_id}/tag-counts",
+    summary="How many photos and videos have each of this one's tags",
+    description="For the viewer's tag pane. The counts are over all media, also ones you cannot see, as in "
     "autocomplete.",
     responses=problem_responses(401, 404, 422),
 )
 def get_tag_counts(
-    image_id: int, restrictions: CurrentRestrictions, media_service: MediaServiceDependency, tags: TagsServiceDependency
+    media_id: int, restrictions: CurrentRestrictions, media_service: MediaServiceDependency, tags: TagsServiceDependency
 ) -> TagCountList:
-    image = media_service.get_visible_media(image_id, restrictions)
-    counts = tags.media_counts(list(image.tags))
-    return TagCountList(items=[TagCountItem(tag=str(count.tag), image_count=count.media_count) for count in counts])
+    media = media_service.get_visible_media(media_id, restrictions)
+    counts = tags.media_counts(list(media.tags))
+    return TagCountList(items=[TagCountItem(tag=str(count.tag), media_count=count.media_count) for count in counts])
 
 
 @router.get(
-    "/{image_id}/file",
-    summary="The original file; supports Range and If-None-Match. The token, or a URL from POST /images/{id}/stream",
+    "/{media_id}/file",
+    summary="The original file; supports Range and If-None-Match. The token, or a URL from POST /media/{id}/stream",
     response_class=FileResponse,
     responses={200: {"content": {"image/*": {}}}, 304: {"description": "Not modified"}, **problem_responses(401, 404)},
 )
-def get_image_file(
-    image_id: int,
+def get_media_file(
+    media_id: int,
     request: Request,
     restrictions: FileRestrictions,
     media_service: MediaServiceDependency,
     storage: StorageServiceDependency,
 ) -> Response:
-    record = media_service.get_visible_media(image_id, restrictions)
+    record = media_service.get_visible_media(media_id, restrictions)
     etag = f'"{record.sha256}-{record.revision}"'
     if _client_has(request, etag):
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers={"ETag": etag})
@@ -359,7 +359,7 @@ def get_image_file(
 
 
 @router.get(
-    "/{image_id}/thumbnail",
+    "/{media_id}/thumbnail",
     summary="A WebP thumbnail; the longest side is at most `size` pixels",
     response_class=FileResponse,
     responses={
@@ -368,8 +368,8 @@ def get_image_file(
         **problem_responses(401, 404, 422),
     },
 )
-def get_image_thumbnail(
-    image_id: int,
+def get_media_thumbnail(
+    media_id: int,
     request: Request,
     restrictions: CurrentRestrictions,
     media_service: MediaServiceDependency,
@@ -379,7 +379,7 @@ def get_image_thumbnail(
     size: Annotated[int, Query(json_schema_extra={"enum": list(THUMBNAIL_SIZES)})] = 256,
     rev: Annotated[
         int | None,
-        Query(description="The image's `revision`: a new URL after the file changed, so caches fetch it anew"),
+        Query(description="Its `revision`: a new URL after the file changed, so caches fetch it anew"),
     ] = None,
 ) -> Response:
     if size not in THUMBNAIL_SIZES:  # query values arrive as text, so a Literal type would refuse every size
@@ -391,7 +391,7 @@ def get_image_thumbnail(
             errors=[{"field": "query.size", "message": f"One of {list(THUMBNAIL_SIZES)}"}],
         )
 
-    record = media_service.get_visible_media(image_id, restrictions)
+    record = media_service.get_visible_media(media_id, restrictions)
     etag = f'"{record.sha256}-{record.revision}-{size}"'
     headers = {"ETag": etag, "Cache-Control": THUMBNAIL_CACHE_CONTROL}
     if _client_has(request, etag):
@@ -410,24 +410,24 @@ def get_image_thumbnail(
 
 
 @router.get(
-    "/{image_id}/storyboard",
+    "/{media_id}/storyboard",
     summary="A video's frames for previews while scrubbing; the first request makes them and may take seconds",
     responses=problem_responses(401, 404, 503),
 )
 def get_storyboard(
-    image_id: int,
+    media_id: int,
     restrictions: CurrentRestrictions,
     media_service: MediaServiceDependency,
     storage: StorageServiceDependency,
     storyboards: StoryboardServiceDependency,
 ) -> Storyboard:
-    record = _visible_video(image_id, restrictions, media_service)
+    record = _visible_video(media_id, restrictions, media_service)
     layout = _storyboard_of(record, storage, storyboards)
-    return Storyboard(**layout.to_json(), sprite=f"/api/v1/images/{record.id}/storyboard/sprite")
+    return Storyboard(**layout.to_json(), sprite=f"/api/v1/media/{record.id}/storyboard/sprite")
 
 
 @router.get(
-    "/{image_id}/storyboard/sprite",
+    "/{media_id}/storyboard/sprite",
     summary="The storyboard's frames as one WebP image",
     response_class=FileResponse,
     responses={
@@ -437,14 +437,14 @@ def get_storyboard(
     },
 )
 def get_storyboard_sprite(
-    image_id: int,
+    media_id: int,
     request: Request,
     restrictions: CurrentRestrictions,
     media_service: MediaServiceDependency,
     storage: StorageServiceDependency,
     storyboards: StoryboardServiceDependency,
 ) -> Response:
-    record = _visible_video(image_id, restrictions, media_service)
+    record = _visible_video(media_id, restrictions, media_service)
     etag = f'"{record.sha256}-storyboard"'
     headers = {"ETag": etag, "Cache-Control": THUMBNAIL_CACHE_CONTROL}  # a video's file never changes
     if _client_has(request, etag):
@@ -455,24 +455,24 @@ def get_storyboard_sprite(
 
 
 @router.post(
-    "/{image_id}/stream",
+    "/{media_id}/stream",
     summary="A URL to stream a video from without the token, for a player that cannot send it",
     responses=problem_responses(401, 404),
 )
 def create_stream_url(
-    image_id: int,
+    media_id: int,
     authentication: CurrentAuthentication,
     restrictions: CurrentRestrictions,
     media_service: MediaServiceDependency,
     streams: StreamServiceDependency,
 ) -> StreamUrl:
-    record = _visible_video(image_id, restrictions, media_service)
+    record = _visible_video(media_id, restrictions, media_service)
     grant = streams.grant(record.id, authentication.token_id)
-    return StreamUrl(url=f"/api/v1/images/{record.id}/file?{grant.query()}", expires_at=grant.expires_at)
+    return StreamUrl(url=f"/api/v1/media/{record.id}/file?{grant.query()}", expires_at=grant.expires_at)
 
 
-def _visible_video(image_id: int, restrictions: Restrictions, media_service: MediaService) -> MediaRecord:
-    record = media_service.get_visible_media(image_id, restrictions)
+def _visible_video(media_id: int, restrictions: Restrictions, media_service: MediaService) -> MediaRecord:
+    record = media_service.get_visible_media(media_id, restrictions)
     if record.media_kind != "video":
         raise Problem(404, "not_found", "Not a video", "This is an image; only videos have this.")
 
@@ -514,9 +514,9 @@ def _client_has(request: Request, etag: str) -> bool:
     return etag in (tag.strip() for tag in if_none_match.split(",")) or if_none_match.strip() == "*"
 
 
-def _image_object(record: MediaRecord) -> ImageObject:
-    base = f"/api/v1/images/{record.id}"
-    return ImageObject(
+def _media_object(record: MediaRecord) -> MediaObject:
+    base = f"/api/v1/media/{record.id}"
+    return MediaObject(
         id=record.id,
         sha256=record.sha256,
         original_filename=record.original_filename,
@@ -531,7 +531,7 @@ def _image_object(record: MediaRecord) -> ImageObject:
         updated_at=as_utc(record.updated_at),
         revision=record.revision,
         tags=[str(tag) for tag in record.tags],
-        links=ImageLinks(
+        links=MediaLinks(
             self=base,
             file=f"{base}/file",
             thumbnail=f"{base}/thumbnail",

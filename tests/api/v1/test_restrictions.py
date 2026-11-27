@@ -41,7 +41,7 @@ def jpeg(colour: str) -> bytes:
 def upload(client: TestClient, headers: dict[str, str], content: bytes, tags: list[str]):  # -> httpx Response
     metadata = json.dumps({"original_filename": "a.jpg", "tags": tags})
     files = {"file": ("a.jpg", content)}
-    return client.post("/api/v1/images", headers=headers, files=files, data={"metadata": metadata})
+    return client.post("/api/v1/media", headers=headers, files=files, data={"metadata": metadata})
 
 
 def log_in(client: TestClient, username: str, role: Role) -> tuple[dict[str, str], int]:
@@ -63,12 +63,12 @@ def setup(client: TestClient) -> Setup:
 
 
 def found(client: TestClient, headers: dict[str, str], params: dict[str, object]) -> tuple[set[int], str]:
-    body = client.get("/api/v1/images", params=params, headers=headers).json()
+    body = client.get("/api/v1/media", params=params, headers=headers).json()
     return {item["id"] for item in body["items"]}, body["effective_query"]
 
 
-def tags_of(client: TestClient, setup: Setup, image_id: int) -> list[str]:
-    return client.get(f"/api/v1/images/{image_id}", headers=setup.admin).json()["tags"]
+def tags_of(client: TestClient, setup: Setup, media_id: int) -> list[str]:
+    return client.get(f"/api/v1/media/{media_id}", headers=setup.admin).json()["tags"]
 
 
 # --- Seeing and finding
@@ -91,9 +91,9 @@ def test_admin_sees_everything(client: TestClient, setup: Setup) -> None:
 
 @pytest.mark.parametrize("suffix", ["", "/file", "/thumbnail"])
 def test_restricted_image_does_not_exist_for_the_user(client: TestClient, setup: Setup, suffix: str) -> None:
-    assert client.get(f"/api/v1/images/{setup.private_id}{suffix}", headers=setup.restricted_user).status_code == 404
-    assert client.get(f"/api/v1/images/{setup.private_id}{suffix}", headers=setup.admin).status_code == 200
-    assert client.get(f"/api/v1/images/{setup.safe_id}{suffix}", headers=setup.restricted_user).status_code == 200
+    assert client.get(f"/api/v1/media/{setup.private_id}{suffix}", headers=setup.restricted_user).status_code == 404
+    assert client.get(f"/api/v1/media/{setup.private_id}{suffix}", headers=setup.admin).status_code == 200
+    assert client.get(f"/api/v1/media/{setup.safe_id}{suffix}", headers=setup.restricted_user).status_code == 200
 
 
 def test_restricted_tags_are_never_suggested(client: TestClient, setup: Setup) -> None:
@@ -126,13 +126,13 @@ def test_duplicate_of_a_restricted_image_does_not_say_which(client: TestClient, 
     response = upload(client, setup.restricted_user, setup.private_bytes, ["summer"])
 
     assert response.status_code == 409
-    assert "existing_image_id" not in response.json()
+    assert "existing_media_id" not in response.json()
     assert "sha256" in response.json()
 
 
 def test_adding_a_restricted_tag_is_refused(client: TestClient, setup: Setup) -> None:
     response = client.patch(
-        f"/api/v1/images/{setup.safe_id}", json={"add_tags": ["rating:private"]}, headers=setup.restricted_user
+        f"/api/v1/media/{setup.safe_id}", json={"add_tags": ["rating:private"]}, headers=setup.restricted_user
     )
 
     assert (response.status_code, response.json()["code"]) == (403, "tag_restricted")
@@ -141,7 +141,7 @@ def test_adding_a_restricted_tag_is_refused(client: TestClient, setup: Setup) ->
 
 def test_restricted_image_cannot_be_tagged(client: TestClient, setup: Setup) -> None:
     response = client.patch(
-        f"/api/v1/images/{setup.private_id}", json={"add_tags": ["beach"]}, headers=setup.restricted_user
+        f"/api/v1/media/{setup.private_id}", json={"add_tags": ["beach"]}, headers=setup.restricted_user
     )
 
     assert response.status_code == 404
@@ -149,9 +149,9 @@ def test_restricted_image_cannot_be_tagged(client: TestClient, setup: Setup) -> 
 
 
 def test_bulk_change_with_a_restricted_image_changes_nothing(client: TestClient, setup: Setup) -> None:
-    body = {"image_ids": [setup.safe_id, setup.private_id], "add_tags": ["album:trip"]}
+    body = {"media_ids": [setup.safe_id, setup.private_id], "add_tags": ["album:trip"]}
 
-    response = client.post("/api/v1/images/bulk-tags", json=body, headers=setup.restricted_user)
+    response = client.post("/api/v1/media/bulk-tags", json=body, headers=setup.restricted_user)
 
     assert response.status_code == 404
     assert "album:trip" not in tags_of(client, setup, setup.safe_id)
@@ -163,7 +163,7 @@ def expect_not_found(method: str, path: str) -> Callable[[TestClient, Setup], No
     def check(client: TestClient, setup: Setup) -> None:
         body = {"add_tags": ["beach"]} if method == "PATCH" else {"degrees": 90} if method == "POST" else None
         response = client.request(
-            method, path.format(image_id=setup.private_id), json=body, headers=setup.restricted_user
+            method, path.format(media_id=setup.private_id), json=body, headers=setup.restricted_user
         )
         assert response.status_code == 404
 
@@ -178,19 +178,19 @@ def check_search_excludes(client: TestClient, setup: Setup) -> None:
 
 def check_count_excludes(client: TestClient, setup: Setup) -> None:
     params = {"q": "summer", "apply_hidden_filters": False}
-    assert client.get("/api/v1/images/count", params=params, headers=setup.restricted_user).json()["count"] == 1
-    assert client.get("/api/v1/images/count", params=params, headers=setup.admin).json()["count"] == 2
+    assert client.get("/api/v1/media/count", params=params, headers=setup.restricted_user).json()["count"] == 1
+    assert client.get("/api/v1/media/count", params=params, headers=setup.admin).json()["count"] == 2
 
 
 def check_upload_refuses(client: TestClient, setup: Setup) -> None:
     assert upload(client, setup.restricted_user, jpeg("blue"), ["rating:private"]).status_code == 403
     duplicate = upload(client, setup.restricted_user, setup.private_bytes, [])
-    assert duplicate.status_code == 409 and "existing_image_id" not in duplicate.json()
+    assert duplicate.status_code == 409 and "existing_media_id" not in duplicate.json()
 
 
 def check_bulk_refuses(client: TestClient, setup: Setup) -> None:
-    body = {"image_ids": [setup.private_id], "add_tags": ["beach"]}
-    assert client.post("/api/v1/images/bulk-tags", json=body, headers=setup.restricted_user).status_code == 404
+    body = {"media_ids": [setup.private_id], "add_tags": ["beach"]}
+    assert client.post("/api/v1/media/bulk-tags", json=body, headers=setup.restricted_user).status_code == 404
 
 
 def check_autocomplete_hides(client: TestClient, setup: Setup) -> None:
@@ -209,12 +209,12 @@ def expect_admins_only(method: str) -> Callable[[TestClient, Setup], None]:
 
 
 def check_albums_leave_it_out(client: TestClient, setup: Setup) -> None:
-    for image_id in (setup.private_id, setup.safe_id):  # the private one first: for an admin, the cover
-        client.patch(f"/api/v1/images/{image_id}", json={"add_tags": ["album:trip"]}, headers=setup.admin)
+    for media_id in (setup.private_id, setup.safe_id):  # the private one first: for an admin, the cover
+        client.patch(f"/api/v1/media/{media_id}", json={"add_tags": ["album:trip"]}, headers=setup.admin)
 
     response = client.get("/api/v1/albums", params={"include_hidden": True}, headers=setup.restricted_user)
 
-    albums = [(album["tag"], album["image_count"], album["cover"]["id"]) for album in response.json()["items"]]
+    albums = [(album["tag"], album["media_count"], album["cover"]["id"]) for album in response.json()["items"]]
     assert albums == [("album:trip", 1, setup.safe_id)]
 
 
@@ -228,7 +228,7 @@ def expect_video_not_found(path: str, method: str = "GET") -> Callable[[TestClie
             )
             session.commit()
 
-        url = path.format(image_id=setup.private_id)
+        url = path.format(media_id=setup.private_id)
         assert client.request(method, url, headers=setup.admin).status_code != 404  # 200, or 503 without FFmpeg
         assert client.request(method, url, headers=setup.restricted_user).status_code == 404
 
@@ -243,21 +243,21 @@ def check_creating_is_for_admins(client: TestClient, setup: Setup) -> None:
 # Every route that reads or changes images, and how it must treat a restricted image. A new image route
 # must be added here; test_every_image_route_is_checked fails until it is.
 ACCESS_RULES = {
-    ("GET", "/api/v1/images"): check_search_excludes,
-    ("GET", "/api/v1/images/count"): check_count_excludes,
-    ("POST", "/api/v1/images"): check_upload_refuses,
-    ("POST", "/api/v1/images/bulk-tags"): check_bulk_refuses,
-    ("GET", "/api/v1/images/{image_id}"): expect_not_found("GET", "/api/v1/images/{image_id}"),
-    ("GET", "/api/v1/images/{image_id}/tag-counts"): expect_not_found("GET", "/api/v1/images/{image_id}/tag-counts"),
-    ("PATCH", "/api/v1/images/{image_id}"): expect_not_found("PATCH", "/api/v1/images/{image_id}"),
-    ("GET", "/api/v1/images/{image_id}/file"): expect_not_found("GET", "/api/v1/images/{image_id}/file"),
-    ("GET", "/api/v1/images/{image_id}/thumbnail"): expect_not_found("GET", "/api/v1/images/{image_id}/thumbnail"),
-    ("GET", "/api/v1/images/{image_id}/storyboard"): expect_video_not_found("/api/v1/images/{image_id}/storyboard"),
-    ("GET", "/api/v1/images/{image_id}/storyboard/sprite"): expect_video_not_found(
-        "/api/v1/images/{image_id}/storyboard/sprite"
+    ("GET", "/api/v1/media"): check_search_excludes,
+    ("GET", "/api/v1/media/count"): check_count_excludes,
+    ("POST", "/api/v1/media"): check_upload_refuses,
+    ("POST", "/api/v1/media/bulk-tags"): check_bulk_refuses,
+    ("GET", "/api/v1/media/{media_id}"): expect_not_found("GET", "/api/v1/media/{media_id}"),
+    ("GET", "/api/v1/media/{media_id}/tag-counts"): expect_not_found("GET", "/api/v1/media/{media_id}/tag-counts"),
+    ("PATCH", "/api/v1/media/{media_id}"): expect_not_found("PATCH", "/api/v1/media/{media_id}"),
+    ("GET", "/api/v1/media/{media_id}/file"): expect_not_found("GET", "/api/v1/media/{media_id}/file"),
+    ("GET", "/api/v1/media/{media_id}/thumbnail"): expect_not_found("GET", "/api/v1/media/{media_id}/thumbnail"),
+    ("GET", "/api/v1/media/{media_id}/storyboard"): expect_video_not_found("/api/v1/media/{media_id}/storyboard"),
+    ("GET", "/api/v1/media/{media_id}/storyboard/sprite"): expect_video_not_found(
+        "/api/v1/media/{media_id}/storyboard/sprite"
     ),
-    ("POST", "/api/v1/images/{image_id}/stream"): expect_video_not_found("/api/v1/images/{image_id}/stream", "POST"),
-    ("POST", "/api/v1/images/{image_id}/rotation"): expect_not_found("POST", "/api/v1/images/{image_id}/rotation"),
+    ("POST", "/api/v1/media/{media_id}/stream"): expect_video_not_found("/api/v1/media/{media_id}/stream", "POST"),
+    ("POST", "/api/v1/media/{media_id}/rotation"): expect_not_found("POST", "/api/v1/media/{media_id}/rotation"),
     ("GET", "/api/v1/tags"): check_autocomplete_hides,
     ("POST", "/api/v1/tags"): check_creating_is_for_admins,
     ("GET", "/api/v1/albums"): check_albums_leave_it_out,
@@ -278,7 +278,7 @@ def test_every_image_route_is_checked(client: TestClient) -> None:
     image_routes = {
         (method.upper(), path)
         for path, operations in client.app.openapi()["paths"].items()
-        if path.startswith(("/api/v1/images", "/api/v1/tags", "/api/v1/albums"))
+        if path.startswith(("/api/v1/media", "/api/v1/tags", "/api/v1/albums"))
         for method in operations
     }
 

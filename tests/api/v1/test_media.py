@@ -55,7 +55,7 @@ def upload(
     default_metadata = {"original_filename": "beach.jpg"}
     metadata_text = metadata if isinstance(metadata, str) else json.dumps(metadata or default_metadata)
     return client.post(
-        "/api/v1/images",
+        "/api/v1/media",
         headers=headers,
         files={"file": ("beach.jpg", content, "image/jpeg")},
         data={"metadata": metadata_text},
@@ -91,16 +91,16 @@ def test_upload_returns_the_image_object(client: TestClient, headers: dict[str, 
 
     assert response.status_code == 201
     image = response.json()
-    assert response.headers["location"] == f"/api/v1/images/{image['id']}"
+    assert response.headers["location"] == f"/api/v1/media/{image['id']}"
     assert image["sha256"] == hashlib.sha256(content).hexdigest()
     assert (image["mime_type"], image["width"], image["height"]) == ("image/jpeg", 40, 30)
     assert (image["taken_at"], image["taken_at_source"]) == ("2018-07-14T16:02:11", "file_mtime")
     assert user_tags(image["tags"]) == ["category:photo", "general:summer"]
     assert image["imported_at"].endswith("Z")
     assert image["links"] == {
-        "self": f"/api/v1/images/{image['id']}",
-        "file": f"/api/v1/images/{image['id']}/file",
-        "thumbnail": f"/api/v1/images/{image['id']}/thumbnail",
+        "self": f"/api/v1/media/{image['id']}",
+        "file": f"/api/v1/media/{image['id']}/file",
+        "thumbnail": f"/api/v1/media/{image['id']}/thumbnail",
     }
 
 
@@ -133,7 +133,7 @@ def test_duplicate_upload_names_the_existing_image(
     response = upload(client, headers, uploaded["content"])
 
     assert response.status_code == 409
-    assert response.json()["existing_image_id"] == uploaded["id"]
+    assert response.json()["existing_media_id"] == uploaded["id"]
 
 
 @pytest.mark.parametrize(
@@ -179,7 +179,7 @@ def test_invalid_metadata_names_the_field(
 
 def test_missing_part_is_named(client: TestClient, headers: dict[str, str]) -> None:
     response = client.post(
-        "/api/v1/images",
+        "/api/v1/media",
         headers=headers,
         data={"metadata": '{"original_filename": "a.jpg"}'},
         files={"other": ("x", b"x")},
@@ -190,7 +190,7 @@ def test_missing_part_is_named(client: TestClient, headers: dict[str, str]) -> N
 
 
 def test_body_must_be_multipart(client: TestClient, headers: dict[str, str]) -> None:
-    response = client.post("/api/v1/images", headers=headers, json={"original_filename": "a.jpg"})
+    response = client.post("/api/v1/media", headers=headers, json={"original_filename": "a.jpg"})
 
     assert response.status_code == 422
     assert response.json()["errors"][0]["field"] == "body"
@@ -241,19 +241,19 @@ def test_image_over_the_image_limit_is_refused_when_videos_may_be_larger(
 # --- Reading images back
 
 def test_get_image_returns_the_same_object(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
-    response = client.get(f"/api/v1/images/{uploaded['id']}", headers=headers)
+    response = client.get(f"/api/v1/media/{uploaded['id']}", headers=headers)
 
     assert response.status_code == 200
     assert response.json() == {key: value for key, value in uploaded.items() if key != "content"}
 
 
 def test_unknown_image_is_not_found(client: TestClient, headers: dict[str, str]) -> None:
-    for path in ("/api/v1/images/999", "/api/v1/images/999/file", "/api/v1/images/999/thumbnail"):
+    for path in ("/api/v1/media/999", "/api/v1/media/999/file", "/api/v1/media/999/thumbnail"):
         assert client.get(path, headers=headers).status_code == 404
 
 
 def test_file_is_the_original(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
-    response = client.get(f"/api/v1/images/{uploaded['id']}/file", headers=headers)
+    response = client.get(f"/api/v1/media/{uploaded['id']}/file", headers=headers)
 
     assert response.status_code == 200
     assert response.content == uploaded["content"]
@@ -266,7 +266,7 @@ def test_file_unchanged_since_last_time_is_304(
     client: TestClient, headers: dict[str, str], uploaded: dict
 ) -> None:
     response = client.get(
-        f"/api/v1/images/{uploaded['id']}/file", headers=headers | {"If-None-Match": f'"{uploaded["sha256"]}-0"'}
+        f"/api/v1/media/{uploaded['id']}/file", headers=headers | {"If-None-Match": f'"{uploaded["sha256"]}-0"'}
     )
 
     assert response.status_code == 304
@@ -274,7 +274,7 @@ def test_file_unchanged_since_last_time_is_304(
 
 
 def test_file_supports_ranges(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
-    response = client.get(f"/api/v1/images/{uploaded['id']}/file", headers=headers | {"Range": "bytes=0-9"})
+    response = client.get(f"/api/v1/media/{uploaded['id']}/file", headers=headers | {"Range": "bytes=0-9"})
 
     assert response.status_code == 206
     assert response.content == uploaded["content"][:10]
@@ -282,7 +282,7 @@ def test_file_supports_ranges(client: TestClient, headers: dict[str, str], uploa
 
 @pytest.mark.parametrize("size", [256, 1024])
 def test_thumbnail_is_cacheable_webp(client: TestClient, headers: dict[str, str], uploaded: dict, size: int) -> None:
-    response = client.get(f"/api/v1/images/{uploaded['id']}/thumbnail", params={"size": size}, headers=headers)
+    response = client.get(f"/api/v1/media/{uploaded['id']}/thumbnail", params={"size": size}, headers=headers)
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/webp"
@@ -292,7 +292,7 @@ def test_thumbnail_is_cacheable_webp(client: TestClient, headers: dict[str, str]
 
 
 def test_thumbnail_size_must_be_256_or_1024(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
-    response = client.get(f"/api/v1/images/{uploaded['id']}/thumbnail", params={"size": 512}, headers=headers)
+    response = client.get(f"/api/v1/media/{uploaded['id']}/thumbnail", params={"size": 512}, headers=headers)
 
     assert response.status_code == 422
 
@@ -302,7 +302,7 @@ def test_thumbnail_unchanged_since_last_time_is_304(
 ) -> None:
     etag = f'"{uploaded["sha256"]}-0-256"'
 
-    response = client.get(f"/api/v1/images/{uploaded['id']}/thumbnail", headers=headers | {"If-None-Match": etag})
+    response = client.get(f"/api/v1/media/{uploaded['id']}/thumbnail", headers=headers | {"If-None-Match": etag})
 
     assert response.status_code == 304
 
@@ -310,7 +310,7 @@ def test_thumbnail_unchanged_since_last_time_is_304(
 def test_missing_thumbnail_is_made_again(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
     client.app.state.thumbnails.delete_thumbnails(uploaded["sha256"])
 
-    response = client.get(f"/api/v1/images/{uploaded['id']}/thumbnail", headers=headers)
+    response = client.get(f"/api/v1/media/{uploaded['id']}/thumbnail", headers=headers)
 
     assert response.status_code == 200
     assert client.app.state.thumbnails.thumbnail_path(uploaded["sha256"], 256).exists()
@@ -325,9 +325,9 @@ def test_a_new_revision_has_new_etags_and_thumbnails(
         session.execute(update(MediaModel).where(MediaModel.id == uploaded["id"]).values(revision=1))
         session.commit()
 
-    image = client.get(f"/api/v1/images/{uploaded['id']}", headers=headers).json()
-    file = client.get(f"/api/v1/images/{uploaded['id']}/file", headers=headers)
-    thumbnail = client.get(f"/api/v1/images/{uploaded['id']}/thumbnail", params={"rev": 1}, headers=headers)
+    image = client.get(f"/api/v1/media/{uploaded['id']}", headers=headers).json()
+    file = client.get(f"/api/v1/media/{uploaded['id']}/file", headers=headers)
+    thumbnail = client.get(f"/api/v1/media/{uploaded['id']}/thumbnail", params={"rev": 1}, headers=headers)
 
     assert image["revision"] == 1
     assert file.headers["etag"] == f'"{uploaded["sha256"]}-1"'
@@ -338,12 +338,12 @@ def test_a_new_revision_has_new_etags_and_thumbnails(
 # --- Turning images
 
 
-def rotate(client: TestClient, headers: dict[str, str], image_id: int, degrees: int):  # -> httpx Response
-    return client.post(f"/api/v1/images/{image_id}/rotation", json={"degrees": degrees}, headers=headers)
+def rotate(client: TestClient, headers: dict[str, str], media_id: int, degrees: int):  # -> httpx Response
+    return client.post(f"/api/v1/media/{media_id}/rotation", json={"degrees": degrees}, headers=headers)
 
 
-def image_file(client: TestClient, headers: dict[str, str], image_id: int) -> bytes:
-    return client.get(f"/api/v1/images/{image_id}/file", headers=headers).content
+def image_file(client: TestClient, headers: dict[str, str], media_id: int) -> bytes:
+    return client.get(f"/api/v1/media/{media_id}/file", headers=headers).content
 
 
 def jpeg_image_data(content: bytes) -> bytes:
@@ -371,7 +371,7 @@ def test_makes_new_thumbnails_after_a_turn(client: TestClient, headers: dict[str
 
     rotate(client, headers, uploaded["id"], 90)
 
-    response = client.get(f"/api/v1/images/{uploaded['id']}/thumbnail", params={"rev": 1}, headers=headers)
+    response = client.get(f"/api/v1/media/{uploaded['id']}/thumbnail", params={"rev": 1}, headers=headers)
     assert Image.open(io.BytesIO(response.content)).size == (30, 40)
     assert thumbnails.thumbnail_path(uploaded["sha256"], 256, revision=1).exists()
     assert not thumbnails.thumbnail_path(uploaded["sha256"], 256).exists()  # the old ones are gone
@@ -435,7 +435,7 @@ def test_refuses_to_turn_a_webp(client: TestClient, headers: dict[str, str]) -> 
     assert response.status_code == 422
     assert response.json()["code"] == "rotation_not_supported"
     assert image_file(client, headers, uploaded["id"]) == buffer.getvalue()
-    assert client.get(f"/api/v1/images/{uploaded['id']}", headers=headers).json()["revision"] == 0
+    assert client.get(f"/api/v1/media/{uploaded['id']}", headers=headers).json()["revision"] == 0
 
 
 def test_turns_only_by_quarters(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
@@ -449,11 +449,11 @@ def test_cannot_turn_an_unknown_image(client: TestClient, headers: dict[str, str
 # --- Searching
 
 def test_search_needs_a_login(client: TestClient) -> None:
-    assert client.get("/api/v1/images").status_code == 401
+    assert client.get("/api/v1/media").status_code == 401
 
 
 def test_search_returns_image_objects(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
-    response = client.get("/api/v1/images", params={"q": "category:photo summer"}, headers=headers)
+    response = client.get("/api/v1/media", params={"q": "category:photo summer"}, headers=headers)
 
     assert response.status_code == 200
     body = response.json()
@@ -467,23 +467,23 @@ def test_search_pages_with_the_cursor(client: TestClient, headers: dict[str, str
     for colour in ("red", "green", "blue"):
         upload(client, headers, jpeg_bytes(colour=colour))
 
-    first = client.get("/api/v1/images", params={"limit": 2}, headers=headers).json()
-    second = client.get("/api/v1/images", params={"limit": 2, "cursor": first["next_cursor"]}, headers=headers).json()
+    first = client.get("/api/v1/media", params={"limit": 2}, headers=headers).json()
+    second = client.get("/api/v1/media", params={"limit": 2, "cursor": first["next_cursor"]}, headers=headers).json()
 
     assert len(first["items"]) == 2 and len(second["items"]) == 1
     assert second["next_cursor"] is None
 
 
 def test_count_needs_a_login(client: TestClient) -> None:
-    assert client.get("/api/v1/images/count").status_code == 401
+    assert client.get("/api/v1/media/count").status_code == 401
 
 
 def test_count_says_how_many_a_search_finds(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
     for colour in ("red", "green"):
         upload(client, headers, jpeg_bytes(colour=colour))
 
-    everything = client.get("/api/v1/images/count", headers=headers)
-    photos = client.get("/api/v1/images/count", params={"q": "category:photo summer"}, headers=headers)
+    everything = client.get("/api/v1/media/count", headers=headers)
+    photos = client.get("/api/v1/media/count", params={"q": "category:photo summer"}, headers=headers)
 
     assert everything.status_code == 200
     assert everything.json() == {"count": 3, "effective_query": ""}
@@ -491,14 +491,14 @@ def test_count_says_how_many_a_search_finds(client: TestClient, headers: dict[st
 
 
 def test_count_refuses_an_invalid_query(client: TestClient, headers: dict[str, str]) -> None:
-    response = client.get("/api/v1/images/count", params={"q": "summer beach,,sand"}, headers=headers)
+    response = client.get("/api/v1/media/count", params={"q": "summer beach,,sand"}, headers=headers)
 
     assert response.status_code == 400
     assert response.json()["code"] == "invalid_query"
 
 
 def test_invalid_query_says_where(client: TestClient, headers: dict[str, str]) -> None:
-    response = client.get("/api/v1/images", params={"q": "summer beach,,sand"}, headers=headers)
+    response = client.get("/api/v1/media", params={"q": "summer beach,,sand"}, headers=headers)
 
     assert response.status_code == 400
     assert (response.json()["code"], response.json()["position"]) == ("invalid_query", 13)
@@ -506,7 +506,7 @@ def test_invalid_query_says_where(client: TestClient, headers: dict[str, str]) -
 
 @pytest.mark.parametrize("params", [{"limit": 0}, {"limit": 501}, {"sort": "size"}, {"sort": "random"}])
 def test_invalid_search_parameters(client: TestClient, headers: dict[str, str], params: dict) -> None:
-    assert client.get("/api/v1/images", params=params, headers=headers).status_code == 422
+    assert client.get("/api/v1/media", params=params, headers=headers).status_code == 422
 
 
 # --- Tag counts, for the viewer's tag pane
@@ -514,27 +514,27 @@ def test_invalid_search_parameters(client: TestClient, headers: dict[str, str], 
 def test_counts_the_images_of_each_of_its_tags(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
     upload(client, headers, jpeg_bytes(colour="red"), {"original_filename": "dusk.jpg", "tags": ["summer"]})
 
-    response = client.get(f"/api/v1/images/{uploaded['id']}/tag-counts", headers=headers)
+    response = client.get(f"/api/v1/media/{uploaded['id']}/tag-counts", headers=headers)
 
-    counts = {item["tag"]: item["image_count"] for item in response.json()["items"]}
+    counts = {item["tag"]: item["media_count"] for item in response.json()["items"]}
     assert [item["tag"] for item in response.json()["items"]] == uploaded["tags"]  # every tag, in the same order
     assert (counts["general:summer"], counts["category:photo"], counts["meta:jpeg"]) == (2, 1, 2)
 
 
 def test_tag_counts_of_an_unknown_image_are_not_found(client: TestClient, headers: dict[str, str]) -> None:
-    assert client.get("/api/v1/images/999/tag-counts", headers=headers).status_code == 404
+    assert client.get("/api/v1/media/999/tag-counts", headers=headers).status_code == 404
 
 
 # --- Changing tags
 
 def test_changing_tags_needs_a_login(client: TestClient) -> None:
-    assert client.patch("/api/v1/images/1", json={"add_tags": ["x"]}).status_code == 401
-    assert client.post("/api/v1/images/bulk-tags", json={"image_ids": [1], "add_tags": ["x"]}).status_code == 401
+    assert client.patch("/api/v1/media/1", json={"add_tags": ["x"]}).status_code == 401
+    assert client.post("/api/v1/media/bulk-tags", json={"media_ids": [1], "add_tags": ["x"]}).status_code == 401
 
 
 def test_patch_adds_and_removes_tags(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
     response = client.patch(
-        f"/api/v1/images/{uploaded['id']}", json={"add_tags": ["Sunset"], "remove_tags": ["summer"]}, headers=headers
+        f"/api/v1/media/{uploaded['id']}", json={"add_tags": ["Sunset"], "remove_tags": ["summer"]}, headers=headers
     )
 
     assert response.status_code == 200
@@ -545,11 +545,11 @@ def test_patch_moves_the_file_with_a_folder_forming_tag(
     client: TestClient, headers: dict[str, str], uploaded: dict
 ) -> None:
     response = client.patch(
-        f"/api/v1/images/{uploaded['id']}", json={"add_tags": ["category:artwork"]}, headers=headers
+        f"/api/v1/media/{uploaded['id']}", json={"add_tags": ["category:artwork"]}, headers=headers
     )
 
     assert response.json()["storage_path"].startswith("artwork/")
-    file_response = client.get(f"/api/v1/images/{uploaded['id']}/file", headers=headers)
+    file_response = client.get(f"/api/v1/media/{uploaded['id']}/file", headers=headers)
     assert file_response.content == uploaded["content"]
 
 
@@ -565,7 +565,7 @@ def test_patch_moves_the_file_with_a_folder_forming_tag(
 def test_patch_refusals(
     client: TestClient, headers: dict[str, str], uploaded: dict, path_id: int | None, body: dict, status: int, code: str
 ) -> None:
-    response = client.patch(f"/api/v1/images/{path_id or uploaded['id']}", json=body, headers=headers)
+    response = client.patch(f"/api/v1/media/{path_id or uploaded['id']}", json=body, headers=headers)
 
     assert (response.status_code, response.json()["code"]) == (status, code)
 
@@ -573,37 +573,37 @@ def test_patch_refusals(
 def test_bulk_changes_every_image(client: TestClient, headers: dict[str, str]) -> None:
     ids = [upload(client, headers, jpeg_bytes(colour=colour)).json()["id"] for colour in ("red", "green")]
 
-    body = {"image_ids": ids, "add_tags": ["album:trip"]}
+    body = {"media_ids": ids, "add_tags": ["album:trip"]}
 
-    response = client.post("/api/v1/images/bulk-tags", json=body, headers=headers)
+    response = client.post("/api/v1/media/bulk-tags", json=body, headers=headers)
 
     assert response.json() == {"updated": 2}
-    for image_id in ids:
-        assert user_tags(client.get(f"/api/v1/images/{image_id}", headers=headers).json()["tags"]) == ["album:trip"]
+    for media_id in ids:
+        assert user_tags(client.get(f"/api/v1/media/{media_id}", headers=headers).json()["tags"]) == ["album:trip"]
 
 
 def test_bulk_refuses_meta_tags(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
-    body = {"image_ids": [uploaded["id"]], "add_tags": ["meta:video"]}
+    body = {"media_ids": [uploaded["id"]], "add_tags": ["meta:video"]}
 
-    response = client.post("/api/v1/images/bulk-tags", json=body, headers=headers)
+    response = client.post("/api/v1/media/bulk-tags", json=body, headers=headers)
 
     assert (response.status_code, response.json()["code"]) == (422, "tag_read_only")
 
 
 def test_bulk_with_an_unknown_id_changes_nothing(client: TestClient, headers: dict[str, str], uploaded: dict) -> None:
-    body = {"image_ids": [uploaded["id"], 999], "add_tags": ["album:trip"]}
+    body = {"media_ids": [uploaded["id"], 999], "add_tags": ["album:trip"]}
 
-    response = client.post("/api/v1/images/bulk-tags", json=body, headers=headers)
+    response = client.post("/api/v1/media/bulk-tags", json=body, headers=headers)
 
     assert response.status_code == 404
-    assert "album:trip" not in client.get(f"/api/v1/images/{uploaded['id']}", headers=headers).json()["tags"]
+    assert "album:trip" not in client.get(f"/api/v1/media/{uploaded['id']}", headers=headers).json()["tags"]
 
 
-@pytest.mark.parametrize("image_ids", [[], list(range(1, 1002))], ids=["none", "over 1000"])
-def test_bulk_takes_1_to_1000_images(client: TestClient, headers: dict[str, str], image_ids: list[int]) -> None:
-    body = {"image_ids": image_ids, "add_tags": ["x"]}
+@pytest.mark.parametrize("media_ids", [[], list(range(1, 1002))], ids=["none", "over 1000"])
+def test_bulk_takes_1_to_1000_images(client: TestClient, headers: dict[str, str], media_ids: list[int]) -> None:
+    body = {"media_ids": media_ids, "add_tags": ["x"]}
 
-    response = client.post("/api/v1/images/bulk-tags", json=body, headers=headers)
+    response = client.post("/api/v1/media/bulk-tags", json=body, headers=headers)
 
     assert response.status_code == 422
-    assert response.json()["errors"][0]["field"] == "body.image_ids"
+    assert response.json()["errors"][0]["field"] == "body.media_ids"

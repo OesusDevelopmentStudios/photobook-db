@@ -173,7 +173,7 @@ def test_asks_in_the_terminal(machine: Machine, tmp_path: Path) -> None:
     code, shown = install_answering(machine, ["~/Photos", "", "", "", "", "n"])
 
     assert code == 0, shown
-    assert "Library folder, for the images" in shown
+    assert "Library folder, for the photos and videos" in shown
     lines = machine.unit_lines()
     assert f"Volume={machine.home}/Photos:/library:Z" in lines
     assert f"Volume={machine.home}/Photos/.photobook:/data:Z" in lines

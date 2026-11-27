@@ -161,7 +161,10 @@ def test_import_ignores_a_meta_field(admin_browser: TestClient) -> None:
         ({"source_subdir": "nowhere"}, "Folder not found. The import folder has no &#39;nowhere&#39;."),
         ({"source_subdir": "../outside"}, "Invalid folder."),
         ({"source_subdir": "holiday", "tag_general": "a|b"}, "Invalid tag."),
-        ({"source_subdir": "holiday", "tag_category": "photo, artwork"}, "An image has one category tag, so give one."),
+        (
+            {"source_subdir": "holiday", "tag_category": "photo, artwork"},
+            "A photo or video has one category tag, so give one.",
+        ),
     ],
     ids=["missing folder", "outside the import folder", "invalid tag", "two tags in a one-tag field"],
 )
@@ -260,8 +263,22 @@ def test_shows_a_meta_tags_job(admin_browser: TestClient) -> None:
 
     page = admin_browser.get(f"/admin/import/{job.id}").text
 
-    assert "Meta tags for the images stored before" in page
+    assert "Meta tags for the photos and videos stored before" in page
     assert "<dt>Tagged</dt><dd>0</dd>" in page
+
+
+@pytest.mark.parametrize("key", ["media_id", "image_id"], ids=["now", "from before media"])
+def test_shows_which_files_failed(admin_browser: TestClient, key: str) -> None:
+    job = admin_browser.app.state.jobs.submit(JobKind.META_TAGS, {}, None)
+    finished(admin_browser, job.id)
+    with admin_browser.app.state.database.session() as session:
+        failed = {"tagged": 0, "failed": [{key: 7, "code": "unreadable"}]}
+        session.execute(update(Job).where(Job.id == job.id).values(result=failed))
+        session.commit()
+
+    page = admin_browser.get(f"/admin/import/{job.id}").text
+
+    assert "<tr><td>7</td><td><code>unreadable</code></td></tr>" in page
 
 
 def test_unknown_job_is_a_404_page(admin_browser: TestClient) -> None:

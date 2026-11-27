@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 OesusDevelopmentStudios
 
-"""Receives an image upload (multipart/form-data with the parts `file` and `metadata`) as it streams in.
+"""Receives an upload of a photo or video (multipart/form-data with the parts `file` and `metadata`) as it streams in.
 FastAPI's own form handling would first write the whole upload to a temporary file without a size limit,
 so a huge upload could fill the disk before it is refused."""
 

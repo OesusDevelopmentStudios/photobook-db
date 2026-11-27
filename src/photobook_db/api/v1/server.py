@@ -45,7 +45,7 @@ def server_info(auth: AuthServiceDependency, media_probe: MediaProbeDependency) 
 
 class LocalLibrary(BaseModel):
     library_dir: str = Field(
-        description="The library folder on this computer; an image's file is there at its storage_path",
+        description="The library folder on this computer; a photo's or video's file is there at its storage_path",
         examples=["/home/restricted_user/Pictures/photobook-library"],
     )
 

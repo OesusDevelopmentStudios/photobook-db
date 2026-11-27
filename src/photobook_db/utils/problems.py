@@ -64,7 +64,7 @@ def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
 
 class Problem(Exception):
     """Raise anywhere to answer with a problem response. `extra` adds code-specific fields,
-    e.g. existing_image_id."""
+    e.g. existing_media_id."""
 
     def __init__(
         self,

@@ -17,7 +17,7 @@ def client() -> TestClient:
 
     @app.get("/duplicate")
     def duplicate() -> None:
-        raise Problem(409, "duplicate_image", "Image already exists", "Same SHA-256.", existing_image_id=1234)
+        raise Problem(409, "duplicate_media", "Already in the library", "Same SHA-256.", existing_media_id=1234)
 
     @app.get("/rate-limited")
     def rate_limited() -> None:
@@ -40,12 +40,12 @@ def test_problem_has_rfc9457_fields_and_extras(client: TestClient) -> None:
     assert response.status_code == 409
     assert response.headers["content-type"] == PROBLEM_MEDIA_TYPE
     assert response.json() == {
-        "type": "https://photobook.invalid/problems/duplicate-image",
-        "title": "Image already exists",
+        "type": "https://photobook.invalid/problems/duplicate-media",
+        "title": "Already in the library",
         "status": 409,
-        "code": "duplicate_image",
+        "code": "duplicate_media",
         "detail": "Same SHA-256.",
-        "existing_image_id": 1234,
+        "existing_media_id": 1234,
     }
 
 

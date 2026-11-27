@@ -24,7 +24,7 @@ Installs the photobook-db server for your user with Podman and systemd.
 
 Usage: install.sh [options]
 
-  --library DIR    where the images go (default: ~/Pictures/photobook-library)
+  --library DIR    where the photos and videos go (default: ~/Pictures/photobook-library)
   --database DIR   the database and thumbnails (default: .photobook in the library folder)
   --import DIR     a folder admins can import from, read only (default: none)
   --port PORT      the port on this computer (default: 8737)
@@ -141,12 +141,12 @@ fi
 
 if [ -e "$UNIT_FILE" ] && [ "$replace" = no ]; then
     [ "$assume_defaults" = no ] || fail "$UNIT_FILE exists already; add --replace to replace it"
-    [ "$(ask_yes_no "photobook-db is set up already. Replace its unit file? The images and database stay" no)" = yes ] \
+    [ "$(ask_yes_no "photobook-db is set up already. Replace its unit file? The photos, videos and database stay" no)" = yes ] \
         || { echo "Nothing changed."; exit 0; }
 fi
 
 # The questions not answered by options
-[ -n "$library" ] || library=$(ask "Library folder, for the images" "$HOME/Pictures/photobook-library")
+[ -n "$library" ] || library=$(ask "Library folder, for the photos and videos" "$HOME/Pictures/photobook-library")
 library=$(folder "$library")
 [ -n "$database" ] || database=$(ask "Database folder, also for the thumbnails" "$library/.photobook")
 database=$(folder "$database")
@@ -192,7 +192,7 @@ cat >"$UNIT_FILE" <<EOF
 # Written by photobook-db's install.sh. Run it again to change the answers.
 
 [Unit]
-Description=photobook-db image library server
+Description=photobook-db photo and video library server
 
 [Container]
 $image_lines

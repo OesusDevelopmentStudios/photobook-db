@@ -111,7 +111,7 @@ def delete_user(user_id: int, _admin: CurrentAdmin, auth: AuthServiceDependency)
 
 class Settings(BaseModel):
     path_template: str = Field(
-        description="Where images are stored in the library: folders named by {namespace} placeholders and "
+        description="Where photos and videos are stored in the library: folders named by {namespace} placeholders and "
         "{year} and {month}",
         examples=["{category}/{author}/{year}"],
     )
@@ -184,7 +184,7 @@ class ImportRequest(BaseModel):
     remove_originals: bool = Field(
         default=False, description="Delete each file once it is in the library, or was there already"
     )
-    tags: list[str] = Field(default=[], max_length=200, description="Given to every imported image")
+    tags: list[str] = Field(default=[], max_length=200, description="Given to every imported photo and video")
 
 
 class StartedJob(BaseModel):

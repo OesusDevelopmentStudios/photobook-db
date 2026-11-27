@@ -11,7 +11,7 @@
 # To install new releases by themselves: systemctl --user enable --now podman-auto-update.timer
 
 [Unit]
-Description=photobook-db image library server
+Description=photobook-db photo and video library server
 
 [Container]
 # The released image for amd64 and arm64. For an image you built yourself, use localhost/photobook-db:latest
@@ -29,11 +29,11 @@ PublishPort=8737:8737
 # The database; a named volume keeps it when the image is updated.
 Volume=photobook-data:/data
 
-# The images, in a folder of your own. Create it before the first start: mkdir -p ~/Pictures/photobook-library
+# The photos and videos, in a folder of your own. Create it before the first start: mkdir -p ~/Pictures/photobook-library
 # :Z lets the container use it on systems with SELinux.
 Volume=%h/Pictures/photobook-library:/library:Z
 
-# The desktop app on this computer can then open an image's folder in the file manager: the host's machine ID
+# The desktop app on this computer can then open a file's folder in the file manager: the host's machine ID
 # shows it runs here, and the library's path is as above. No :Z here: the file is only read.
 Volume=/etc/machine-id:/run/host/machine-id:ro
 Environment=PHOTOBOOK_HOST_LIBRARY_DIR=%h/Pictures/photobook-library
